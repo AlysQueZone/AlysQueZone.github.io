@@ -19,10 +19,14 @@ const base = import.meta.env.BASE_URL;
     <title>{title}</title>
   </head>
   <body class="bg-void text-milk min-h-screen antialiased">
+    <!-- Фон-арт F1 (тикет 37): широкий webp cover center + кремовая вуаль 0.88, контент поверх. -->
     <div
       aria-hidden="true"
-      class="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(60rem_30rem_at_85%_-5%,#FF00BC22,transparent),radial-gradient(50rem_28rem_at_10%_0%,#FF9E2C33,transparent),radial-gradient(40rem_24rem_at_50%_110%,#FF4D6D22,transparent)]"
+      class="pointer-events-none fixed inset-0 -z-20 bg-cover bg-center bg-no-repeat"
+      style={`background-image: url('${base}bg/sunflowers.webp')`}
     >
+    </div>
+    <div aria-hidden="true" class="pointer-events-none fixed inset-0 -z-10 bg-[rgba(255,246,191,0.88)]">
     </div>
     <header class="sticky top-0 z-10 border-b border-black/10 bg-bar/90 backdrop-blur">
       <div class="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
