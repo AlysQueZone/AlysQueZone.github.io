@@ -29,6 +29,8 @@ export const LOT_EMOTES: Record<string, { src: string; name: string }> = {
   'lot-meme-remolol': { src: cdn(CAT_CLAP_ID), name: 'CatClap' },
   'lot-meme-salat': { src: cdn(POG_CLAP_ID), name: 'PogClap' },
   'lot-meme-quevizar': { src: cdn(CAT_CLAP_ID), name: 'CatClap' },
+  'lot-meme-myth': { src: cdn(POG_CLAP_ID), name: 'PogClap' },
+  'lot-meme-evilzeg': { src: cdn(CAT_CLAP_ID), name: 'CatClap' },
 };
 
 export function lotEmote(id: string): { src: string; name: string } | null {

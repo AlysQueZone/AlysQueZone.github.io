@@ -190,5 +190,29 @@
     "meme": "привет для Quevizar",
     "audio": "sounds/n4-quevizar.mp3",
     "poster": "memes/n4.jpg"
+  },
+  {
+    "id": "lot-meme-myth",
+    "title": "Миф о бесплатном пивете",
+    "owner": "Onghanntto",
+    "price": 1000,
+    "rarity": "rare",
+    "forSale": true,
+    "history": [{ "from": "kvakograk", "to": "Onghanntto", "price": 800 }],
+    "meme": "миф о бесплатном пивете",
+    "audio": "sounds/r1-myth.mp3",
+    "poster": "memes/r1.jpg"
+  },
+  {
+    "id": "lot-meme-evilzeg",
+    "title": "Привет Evilzeg",
+    "owner": "evilzerg57",
+    "price": 900,
+    "rarity": "rare",
+    "forSale": true,
+    "history": [{ "from": "DonBurbonn", "to": "evilzerg57", "price": 700 }],
+    "meme": "привет Evilzeg",
+    "audio": "sounds/r2-evilzeg.mp3",
+    "poster": "memes/r2.jpg"
   }
 ]
