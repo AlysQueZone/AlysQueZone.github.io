@@ -1,0 +1,231 @@
+---
+// Общий компонент покупки (тикеты 10 «биржа» и 11 «карточка»):
+// модалка «Потратить N Пивкойнов?» + confetti + тосты в тоне канала.
+//
+// Использование: положить <BuyModal /> на страницу и вешать на кнопки
+// data-buy-lot="<id>" data-lot-title="<title>" data-lot-price="<n>"
+// data-lot-owner="<owner>" data-for-sale="<true|false>".
+// Клик по такой кнопке сам откроет модалку — скрипт ниже делегированный.
+// После покупки кидается window CustomEvent('alysque:bought', { detail: { id } }).
+import { ALYSQUE_CLAP_DARK } from '../lib/emotes.ts';
+
+const base = import.meta.env.BASE_URL;
+const clapSound = `${base}sounds/clap.mp3`;
+---
+
+<div
+  id="buy-modal"
+  data-clap-sound={clapSound}
+  class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="buy-modal-title"
+>
+  <div class="w-full max-w-sm rounded-2xl border border-stream bg-panel p-5">
+    <div class="flex items-center gap-3">
+      <img src={ALYSQUE_CLAP_DARK} alt="alysqueCLAP" width="56" height="56" loading="lazy" class="h-14 w-14 shrink-0 object-contain" />
+      <h3 id="buy-modal-title" class="text-lg font-black uppercase">Купить привет?</h3>
+    </div>
+    <p id="buy-modal-text" class="mt-2 font-mono text-sm text-mist"></p>
+    <div class="mt-4 flex gap-2">
+      <button
+        id="buy-modal-yes"
+        type="button"
+        class="cursor-pointer rounded-xl bg-stream px-4 py-2 font-extrabold text-white hover:brightness-110"
+      >
+        Да, забираю
+      </button>
+      <button
+        id="buy-modal-no"
+        type="button"
+        class="cursor-pointer rounded-xl border border-white/20 bg-transparent px-4 py-2 text-mist hover:bg-white/10"
+      >
+        Не, пойду на стрим
+      </button>
+    </div>
+  </div>
+</div>
+
+<div
+  id="buy-toast"
+  class="fixed bottom-16 left-1/2 z-50 hidden -translate-x-1/2 rounded-full border-2 bg-panel px-5 py-2 font-mono text-sm text-milk whitespace-nowrap shadow-lg"
+  role="status"
+></div>
+
+<script>
+  import {
+    getBalance,
+    canAfford,
+    spend,
+    addToInventory,
+    getInventory,
+    appendHistory,
+  } from '../lib/wallet.ts';
+  import { boom } from '../lib/confetti.ts';
+
+  interface CatalogEntry {
+    id: string;
+    title: string;
+    price: number;
+  }
+
+  const modal = document.getElementById('buy-modal');
+  const modalText = document.getElementById('buy-modal-text');
+  const modalTitle = document.getElementById('buy-modal-title');
+  const yesBtn = document.getElementById('buy-modal-yes');
+  const noBtn = document.getElementById('buy-modal-no');
+  const toast = document.getElementById('buy-toast');
+
+  let pending: { id: string; title: string; price: number; owner: string; audio?: string } | null = null;
+  let toastTimer: number | undefined;
+
+  const CLAP_URL =
+    'https://static-cdn.jtvnw.net/emoticons/v2/emotesv2_1075070639054e5d8cacb8a0ef4872d7/default/dark/3.0';
+
+  function playClap(prefer?: string): void {
+    try {
+      // Мем-лот играет свой звук (тикет 17), остальные — clap.mp3.
+      const src = prefer ?? modal?.dataset.clapSound;
+      if (!src) return;
+      const audio = new Audio(src);
+      audio.volume = 0.8;
+      const p = audio.play();
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+    } catch {
+      // graceful-fallback: без звука, покупка всё равно засчитана
+    }
+  }
+
+  function showToast(text: string, ok: boolean): void {
+    if (!toast) return;
+    toast.innerHTML = '';
+    const span = document.createElement('span');
+    span.textContent = text;
+    toast.appendChild(span);
+    if (ok) {
+      const img = document.createElement('img');
+      img.src = CLAP_URL;
+      img.alt = 'alysqueCLAP';
+      img.width = 28;
+      img.height = 28;
+      img.loading = 'eager';
+      img.className = 'ml-2 inline h-7 w-7 object-contain';
+      toast.appendChild(img);
+      toast.classList.add('flex', 'items-center');
+    } else {
+      toast.classList.remove('flex', 'items-center');
+    }
+    toast.classList.remove('hidden', 'border-rind', 'border-melon');
+    toast.classList.add(ok ? 'border-rind' : 'border-melon');
+    window.clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(() => toast.classList.add('hidden'), 2600);
+  }
+
+  function renderBalances(): void {
+    const balance = String(getBalance());
+    document.querySelectorAll('[data-wallet-balance]').forEach((el) => {
+      el.textContent = balance;
+    });
+  }
+
+  function readCatalog(): CatalogEntry[] {
+    const tag = document.querySelector('[data-lots-catalog]');
+    if (!tag) return [];
+    try {
+      const parsed: unknown = JSON.parse(tag.textContent ?? '[]');
+      return Array.isArray(parsed) ? (parsed as CatalogEntry[]) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  /** Перерисовывает секцию «Мои приветы» ([data-my-privety]), если она есть на странице. */
+  function renderInventory(): void {
+    const slot = document.querySelector('[data-my-privety]');
+    if (!slot) return;
+    const owned = getInventory();
+    const catalog = readCatalog();
+    const byId = new Map(catalog.map((l) => [l.id, l]));
+    if (owned.length === 0) {
+      slot.innerHTML =
+        '<p class="font-mono text-sm text-mist/60">Пока пусто. СТРИМ ВКЛЮЧИЛСЯ, А ТЫ?</p>';
+      return;
+    }
+    slot.innerHTML = owned
+      .map((id) => {
+        const lot = byId.get(id);
+        const title = lot ? lot.title : id;
+        const price = lot ? ` <span class="text-pivko">${lot.price} 🪙</span>` : '';
+        return `<div class="rounded-xl border border-rind/40 bg-panel px-3 py-2 text-sm"><b>${title}</b>${price} <span class="text-rind">· ТВОЙ</span></div>`;
+      })
+      .join('');
+    const counter = document.querySelector('[data-my-privety-count]');
+    if (counter) counter.textContent = String(owned.length);
+  }
+
+  function openModal(): void {
+    if (!modal || !pending || !modalText || !modalTitle) return;
+    modalTitle.textContent = pending.title;
+    modalText.textContent = `Потратить ${pending.price} Пивкойнов? Владелец: ${pending.owner}`;
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+
+  function closeModal(): void {
+    pending = null;
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+
+  document.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement | null;
+    const btn = target?.closest?.('[data-buy-lot]');
+    if (!(btn instanceof HTMLElement)) return;
+    const { buyLot: id, lotTitle, lotPrice, lotOwner, lotAudio, forSale } = btn.dataset;
+    if (!id) return;
+    if (forSale === 'false') {
+      showToast('ЛУК не продаётся. Хозяин не менялся.', false);
+      return;
+    }
+    pending = {
+      id,
+      title: lotTitle ?? id,
+      price: Number(lotPrice ?? 0),
+      owner: lotOwner ?? '?',
+      audio: lotAudio,
+    };
+    openModal();
+  });
+
+  yesBtn?.addEventListener('click', () => {
+    if (!pending) return;
+    const { id, title, price, owner, audio } = pending;
+    if (!canAfford(price)) {
+      closeModal();
+      showToast('Не хватает Пивкойнов, пойжем жоско на стрим', false);
+      return;
+    }
+    spend(price);
+    addToInventory(id);
+    appendHistory(id, { from: owner, to: 'ты', price });
+    closeModal();
+    renderBalances();
+    renderInventory();
+    boom();
+    playClap(audio);
+    showToast(`ЗАБРАЛ! Привет твой: ${title}`, true);
+    window.dispatchEvent(new CustomEvent('alysque:bought', { detail: { id } }));
+  });
+
+  noBtn?.addEventListener('click', closeModal);
+  modal?.addEventListener('click', (e) => {
+    if (e.target === modal) closeModal();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeModal();
+  });
+
+  renderBalances();
+  renderInventory();
+</script>

@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+@theme {
+  /* Светлая теплая тема (тикет 15): кремово-персиковый фон */
+  --color-void: #fff3e6;
+  --color-panel: #fffefa;
+  /* Текст на светлом: теплый почти-черный + теплый серо-коричневый */
+  --color-milk: #221a14;
+  --color-mist: #6b5e54;
+  /* Primary CTA — Twitch Purple, без изменений */
+  --color-stream: #9146ff;
+  /* Тёплые акценты */
+  --color-ember: #ff9e2c;
+  --color-melon: #ff4d6d;
+  /* Хот-пинк — официальный цвет чата канала в Twitch */
+  --color-blush: #ff00bc;
+  /* Пивное золото, затемнено для контраста на светлом (4.6:1 на cream).
+     Бейджи bg-pivko + text-black читаются (4.3:1). */
+  --color-pivko: #8a6d00;
+  /* Арбузная корка, затемнена для читаемости text-rind на светлом */
+  --color-rind: #15803d;
+}
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  body {
+    background-color: var(--color-void);
+    color: var(--color-milk);
+  }
+
+  ::selection {
+    background: var(--color-blush);
+    color: #fff;
+  }
+
+  /* Контраст текста акцентными цветами на светлом фоне.
+     Сами токены остаются яркими (бейджи/подложки), а текст темнеет. */
+  .text-ember {
+    color: #b34a00;
+  }
+  .hover\:text-ember:hover {
+    color: #b34a00;
+  }
+  .text-blush {
+    color: #c4008c;
+  }
+
+  /* Белые полупрозрачные бордеры/подложки от тёмной темы на светлом
+     невидимы — переводим их на тёплые тёмные. */
+  .border-white\/10 {
+    border-color: rgb(34 26 20 / 0.12);
+  }
+  .border-white\/15 {
+    border-color: rgb(34 26 20 / 0.18);
+  }
+  .border-white\/20 {
+    border-color: rgb(34 26 20 / 0.24);
+  }
+  .bg-white\/5 {
+    background-color: rgb(34 26 20 / 0.04);
+  }
+  .bg-white\/10 {
+    background-color: rgb(34 26 20 / 0.07);
+  }
+  .hover\:bg-white\/10:hover {
+    background-color: rgb(34 26 20 / 0.1);
+  }
+}

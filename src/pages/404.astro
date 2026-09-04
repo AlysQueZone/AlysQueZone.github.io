@@ -1,0 +1,30 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="AlysQueZone — ТУТ ПУСТО, ЧАТ В ШОКЕ">
+  <section class="mx-auto max-w-xl py-10 text-center">
+    <p class="text-7xl" aria-hidden="true">🧳</p>
+    <h1 class="mt-4 text-4xl font-black uppercase">404. ПРИВЕТ НЕ НАЙДЕН</h1>
+    <p class="mt-3 text-mist/70">
+      Стрим включился, а ты? Такой страницы нет — видимо, привет увернулся как Gedo0.
+      Пойжем жоско обратно на биржу. Жду тебя 🙂🙂🙂
+    </p>
+    <div class="mt-6 flex flex-wrap justify-center gap-3">
+      <a
+        href={`${base}lots/`}
+        class="rounded-xl bg-stream px-6 py-3 font-extrabold text-white uppercase hover:brightness-110"
+      >
+        На биржу →
+      </a>
+      <a
+        href={`${base}`}
+        class="rounded-xl border border-white/15 px-6 py-3 font-bold text-mist/70 hover:bg-white/10"
+      >
+        На главную
+      </a>
+    </div>
+  </section>
+</BaseLayout>

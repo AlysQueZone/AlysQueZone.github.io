@@ -1,0 +1,35 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import LotCard from '../../components/LotCard.astro';
+import BuyModal from '../../components/BuyModal.astro';
+import { lots } from '../../lib/lots.ts';
+
+// Каталог для клиентского рендера «Моих приветов» (читает скрипт BuyModal).
+const catalog = lots.map((lot) => ({ id: lot.id, title: lot.title, price: lot.price }));
+---
+
+<BaseLayout title="AlysQueZone — БИРЖА ПРИВЕТОВ">
+  <h1 class="text-3xl font-black uppercase">
+    Биржа приветов. <span class="text-ember">Стрим включился, а ты?</span>
+  </h1>
+  <p class="mt-2 text-mist/80">
+    Выбирай лот, жми «купить», кайфуем жоско + мощно. Жду тебя 🙂🙂🙂
+  </p>
+
+  <section aria-label="Мои приветы" class="mt-8">
+    <h2 class="text-xl font-black uppercase">
+      Мои приветы <span data-my-privety-count class="font-mono text-pivko">0</span>
+    </h2>
+    <div data-my-privety class="mt-3 flex flex-col gap-2"></div>
+  </section>
+
+  <section aria-label="Все лоты" class="mt-8">
+    <h2 class="text-xl font-black uppercase">Все лоты</h2>
+    <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {lots.map((lot) => <LotCard lot={lot} />)}
+    </div>
+  </section>
+
+  <span data-lots-catalog class="hidden" set:html={JSON.stringify(catalog)} />
+  <BuyModal />
+</BaseLayout>

@@ -1,0 +1,194 @@
+[
+  {
+    "id": "lot-gedo-sleepy",
+    "title": "Спящий привет от Gedo0",
+    "owner": "Gedo0",
+    "price": 250,
+    "rarity": "common",
+    "forSale": true,
+    "history": [{ "from": "aLySQuE", "to": "Gedo0", "price": 250 }],
+    "meme": "😴"
+  },
+  {
+    "id": "lot-gedo-uvernulya",
+    "title": "Привет, который увернулся",
+    "owner": "Gedo0",
+    "price": 300,
+    "rarity": "common",
+    "forSale": true,
+    "history": [{ "from": "aLySQuE", "to": "Gedo0", "price": 300 }]
+  },
+  {
+    "id": "lot-gedo-flat",
+    "title": "Квартира в Москве (приму в дар)",
+    "owner": "Gedo0",
+    "price": 800,
+    "rarity": "rare",
+    "forSale": true,
+    "history": [
+      { "from": "aLySQuE", "to": "Gedo0", "price": 500 },
+      { "from": "Gedo0", "to": "Gedo0", "price": 800 }
+    ]
+  },
+  {
+    "id": "lot-evil-friendship",
+    "title": "Дружба за 2 привета",
+    "owner": "evilzerg57",
+    "price": 400,
+    "rarity": "common",
+    "forSale": true,
+    "history": [{ "from": "aLySQuE", "to": "evilzerg57", "price": 400 }]
+  },
+  {
+    "id": "lot-cool-holst",
+    "title": "Привет, который не купишь за 14 рублей",
+    "owner": "coolbeback",
+    "price": 350,
+    "rarity": "common",
+    "forSale": true,
+    "history": [{ "from": "aLySQuE", "to": "coolbeback", "price": 350 }]
+  },
+  {
+    "id": "lot-gribo-calendar",
+    "title": "Календарный привет",
+    "owner": "gRiBoCheQuE",
+    "price": 300,
+    "rarity": "common",
+    "forSale": true,
+    "history": [{ "from": "aLySQuE", "to": "gRiBoCheQuE", "price": 300 }]
+  },
+  {
+    "id": "lot-vandal-privet",
+    "title": "Привет онлайновсеие чуваки",
+    "owner": "VandaLQuE",
+    "price": 600,
+    "rarity": "rare",
+    "forSale": true,
+    "history": [
+      { "from": "aLySQuE", "to": "VandaLQuE", "price": 200 },
+      { "from": "VandaLQuE", "to": "VandaLQuE", "price": 600 }
+    ]
+  },
+  {
+    "id": "lot-rush-podelu",
+    "title": "Привет мне по делу",
+    "owner": "andRushQuE",
+    "price": 200,
+    "rarity": "common",
+    "forSale": true,
+    "history": [{ "from": "aLySQuE", "to": "andRushQuE", "price": 200 }]
+  },
+  {
+    "id": "lot-las-skum",
+    "title": "Скум на привет",
+    "owner": "las1que",
+    "price": 150,
+    "rarity": "common",
+    "forSale": true,
+    "history": [{ "from": "aLySQuE", "to": "las1que", "price": 150 }]
+  },
+  {
+    "id": "lot-andrew-37",
+    "title": "Привет от Андрюши №37",
+    "owner": "Андрюша №37",
+    "price": 100,
+    "rarity": "common",
+    "forSale": true,
+    "history": [{ "from": "aLySQuE", "to": "Андрюша №37", "price": 100 }],
+    "meme": "МНОГОУВАЖАЕМЫЕ АНДРЕИ"
+  },
+  {
+    "id": "luk-legend",
+    "title": "ЛУК — хозяин не менялся",
+    "owner": "aLySQuE",
+    "price": 9999,
+    "rarity": "legendary",
+    "forSale": false,
+    "history": [],
+    "meme": "Нынешний хозяин Лука пока ни разу не сменился"
+  },
+  {
+    "id": "lot-meme-nyachos",
+    "title": "Здраствуйте, nyanyachos",
+    "owner": "bEnDQuEt",
+    "price": 1200,
+    "rarity": "rare",
+    "forSale": true,
+    "history": [{ "from": "las1que", "to": "bEnDQuEt", "price": 900 }],
+    "meme": "@nyanyachos",
+    "audio": "sounds/m1-nyachos.mp3",
+    "poster": "memes/m1.jpg"
+  },
+  {
+    "id": "lot-meme-optom",
+    "title": "Привет сразу всем (оптом)",
+    "owner": "foxindique",
+    "price": 700,
+    "rarity": "rare",
+    "forSale": true,
+    "history": [{ "from": "VandaLQuE", "to": "foxindique", "price": 500 }],
+    "meme": "оптовый привет",
+    "audio": "sounds/m2-optom.mp3",
+    "poster": "memes/m2.jpg"
+  },
+  {
+    "id": "lot-meme-mass",
+    "title": "Массовый привет (коты одобряют)",
+    "owner": "coolbeback",
+    "price": 800,
+    "rarity": "rare",
+    "forSale": true,
+    "history": [{ "from": "4Deli", "to": "coolbeback", "price": 600 }],
+    "meme": "массовый привет",
+    "audio": "sounds/m3-mass.mp3",
+    "poster": "memes/m3.jpg"
+  },
+  {
+    "id": "lot-meme-repeat",
+    "title": "Второй повторный привет",
+    "owner": "ShidouQuE",
+    "price": 650,
+    "rarity": "rare",
+    "forSale": true,
+    "history": [{ "from": "AkseLWalkerQuE", "to": "ShidouQuE", "price": 500 }],
+    "meme": "повторный привет",
+    "audio": "sounds/n1-repeat.mp3",
+    "poster": "memes/n1.jpg"
+  },
+  {
+    "id": "lot-meme-remolol",
+    "title": "Привет для remolol",
+    "owner": "remololpro",
+    "price": 750,
+    "rarity": "rare",
+    "forSale": true,
+    "history": [{ "from": "spiritbanbanban", "to": "remololpro", "price": 600 }],
+    "meme": "привет для remolol",
+    "audio": "sounds/n2-remolol.mp3",
+    "poster": "memes/n2.jpg"
+  },
+  {
+    "id": "lot-meme-salat",
+    "title": "Привет для Салата",
+    "owner": "spiritbanbanban",
+    "price": 750,
+    "rarity": "rare",
+    "forSale": true,
+    "history": [{ "from": "coolbeback", "to": "spiritbanbanban", "price": 600 }],
+    "meme": "привет для Салата",
+    "audio": "sounds/n3-salat.mp3",
+    "poster": "memes/n3.jpg"
+  },
+  {
+    "id": "lot-meme-quevizar",
+    "title": "Привет для Quevizar",
+    "owner": "foxindique",
+    "price": 850,
+    "rarity": "rare",
+    "forSale": true,
+    "history": [{ "from": "VandaLQuE", "to": "foxindique", "price": 700 }],
+    "meme": "привет для Quevizar",
+    "audio": "sounds/n4-quevizar.mp3",
+    "poster": "memes/n4.jpg"
+  }
+]

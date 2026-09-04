@@ -1,0 +1,152 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title?: string;
+}
+
+const { title = 'AlysQueZone — БИРЖА ПРИВЕТОВ' } = Astro.props;
+const base = import.meta.env.BASE_URL;
+---
+
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href={`${base}favicon.svg`} />
+    <title>{title}</title>
+  </head>
+  <body class="bg-void text-milk min-h-screen antialiased">
+    <div
+      aria-hidden="true"
+      class="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(60rem_30rem_at_85%_-5%,#FF00BC22,transparent),radial-gradient(50rem_28rem_at_10%_0%,#FF9E2C33,transparent),radial-gradient(40rem_24rem_at_50%_110%,#FF4D6D22,transparent)]"
+    >
+    </div>
+    <header class="sticky top-0 z-10 border-b border-black/10 bg-panel/90 backdrop-blur">
+      <div class="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+        <a href={`${base}`} class="text-lg font-black tracking-tight uppercase">
+          Alys<span class="text-stream">Que</span>Zone<span class="text-blush">.</span>
+        </a>
+        <div class="flex items-center gap-2 rounded-full border border-pivko/50 bg-void px-3 py-1 text-sm font-bold">
+          <span class="text-melon">◉</span>
+          <span data-wallet-balance>1000</span>
+          <span class="text-mist/70">Пивкойнов</span>
+        </div>
+        <button
+          type="button"
+          data-scum-button
+          data-scum-sound={`${base}sounds/m4-scum.mp3`}
+          class="cursor-pointer rounded-full border border-stream/50 px-3 py-1 text-xs font-extrabold text-stream uppercase hover:bg-stream/10"
+        >
+          Получить еще пивкойнов
+        </button>
+      </div>
+    </header>
+    <main class="mx-auto max-w-6xl px-4 py-8">
+      <slot />
+    </main>
+    <!-- Scum-кнопка (тикет 22): звук + модалка + earn(1000) в баланс. -->
+    <div
+      id="scum-modal"
+      class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div class="w-full max-w-sm rounded-2xl border border-melon bg-panel p-5 text-center">
+        <p class="text-4xl" aria-hidden="true">😏</p>
+        <p class="mt-2 text-lg font-black uppercase">Упс, вас обманули!</p>
+        <p class="mt-1 font-mono text-sm text-mist">Но это не точно — держи еще 1000 пивкойнов</p>
+        <button
+          type="button"
+          id="scum-modal-ok"
+          class="mt-4 cursor-pointer rounded-xl bg-stream px-4 py-2 font-extrabold text-white hover:brightness-110"
+        >
+          Пойжем дальше
+        </button>
+      </div>
+    </div>
+    <script>
+      import { getBalance, earn, BALANCE_KEY } from '../lib/wallet.ts';
+      const render = () => {
+        document.querySelectorAll('[data-wallet-balance]').forEach((el) => {
+          el.textContent = String(getBalance());
+        });
+      };
+      render();
+      window.addEventListener('storage', (e) => {
+        if (e.key === BALANCE_KEY) render();
+      });
+
+      // Кнопка «слушать» мем-лота (тикет 17): делегированная, play/stop-тоггл.
+      let listenAudio: HTMLAudioElement | null = null;
+      let listenBtn: HTMLElement | null = null;
+      function resetListenLabel(): void {
+        if (listenBtn) listenBtn.textContent = '▶ слушать';
+        listenBtn = null;
+      }
+      document.addEventListener('click', (e) => {
+        const target = e.target as HTMLElement | null;
+        const btn = target?.closest?.('[data-lot-listen]');
+        if (!(btn instanceof HTMLElement)) return;
+        const src = btn.dataset.lotListen;
+        if (!src) return;
+        try {
+          if (listenAudio && listenBtn === btn && !listenAudio.paused) {
+            listenAudio.pause();
+            resetListenLabel();
+            return;
+          }
+          listenAudio?.pause();
+          resetListenLabel();
+          listenAudio = new Audio(src);
+          listenBtn = btn;
+          btn.textContent = '⏸ стоп';
+          listenAudio.addEventListener('ended', resetListenLabel);
+          const p = listenAudio.play();
+          if (p && typeof p.catch === 'function') p.catch(resetListenLabel);
+        } catch {
+          resetListenLabel();
+        }
+      });
+
+      // Scum-кнопка (тикет 22): играет m4-scum.mp3, начисляет +1000 и показывает модалку.
+      // Пилюля обновляется тем же render(), что и при старте; межвкладочно — через 'storage'.
+      const scumModal = document.getElementById('scum-modal');
+      const scumOk = document.getElementById('scum-modal-ok');
+      function closeScum(): void {
+        if (!scumModal) return;
+        scumModal.classList.add('hidden');
+        scumModal.classList.remove('flex');
+      }
+      document.addEventListener('click', (e) => {
+        const target = e.target as HTMLElement | null;
+        const btn = target?.closest?.('[data-scum-button]');
+        if (!(btn instanceof HTMLElement)) return;
+        try {
+          const src = btn.dataset.scumSound;
+          if (src) {
+            const audio = new Audio(src);
+            audio.volume = 0.8;
+            const p = audio.play();
+            if (p && typeof p.catch === 'function') p.catch(() => {});
+          }
+        } catch {
+          // graceful-fallback: модалка показывается и без звука
+        }
+        earn(1000);
+        render();
+        if (!scumModal) return;
+        scumModal.classList.remove('hidden');
+        scumModal.classList.add('flex');
+      });
+      scumOk?.addEventListener('click', closeScum);
+      scumModal?.addEventListener('click', (e) => {
+        if (e.target === scumModal) closeScum();
+      });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeScum();
+      });
+    </script>
+  </body>
+</html>
