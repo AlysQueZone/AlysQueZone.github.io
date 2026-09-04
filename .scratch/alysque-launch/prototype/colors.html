@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<!-- THROWAWAY PROTOTYPE, wipe me. Not production: no tests, minimal error handling. -->
+<!-- Question: какая цветовая схема? Только светлая/теплая, без фиолетового (якорь #FF00BC). -->
+<!-- Assumption: структурно один layout, 3 палитры через ?variant=A/B/C. -->
+<!-- Run: double-click this file. State: in-memory (баланс 1000 Пивкойнов). -->
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AlysQueZone — Цветовые схемы (PROTOTYPE)</title>
+<style>
+  /* Base: single structure, palette comes from body[data-variant] vars. */
+  body[data-variant="A"]{
+    --bg:#FFF6E9; --surface:#FFFFFF; --surface2:#FFF1DE;
+    --ink:#38210F; --muted:#6B4A2F;
+    --cta:#A6006E; --cta-hover:#8C005E; --cta-text:#FFFFFF;
+    --accent:#FF00BC; --accent-soft:#FDD7EC;
+    --detail:#C2410C; --card-border:#EAD9C2;
+    --badge-common-bg:#F1E3CE; --badge-common-tx:#4A2E17;
+    --badge-rare-bg:#C2410C; --badge-rare-tx:#FFFFFF;
+    --badge-leg-bg:#A6006E; --badge-leg-tx:#FFFFFF;
+    --hero-grad:linear-gradient(180deg,#FFF1DE,#FFE4EF);
+  }
+  body[data-variant="B"]{
+    --bg:#FFEEE0; --surface:#FFF9F3; --surface2:#FFE3CB;
+    --ink:#431407; --muted:#7C3F21;
+    --cta:#C2410C; --cta-hover:#9A3412; --cta-text:#FFFFFF;
+    --accent:#A6006E; --accent-soft:#FBD9E8;
+    --detail:#B45309; --card-border:#F0CFAE;
+    --badge-common-bg:#F5E0C9; --badge-common-tx:#431407;
+    --badge-rare-bg:#C2410C; --badge-rare-tx:#FFFFFF;
+    --badge-leg-bg:#A6006E; --badge-leg-tx:#FFFFFF;
+    --hero-grad:linear-gradient(180deg,#FFE3CB,#FFD9E3);
+  }
+  body[data-variant="C"]{
+    --bg:#FFF6C9; --surface:#FFFFFF; --surface2:#FFF0A8;
+    --ink:#422006; --muted:#7A4A16;
+    --cta:#BE123C; --cta-hover:#9F1239; --cta-text:#FFFFFF;
+    --accent:#FF00BC; --accent-soft:#FCD9EC;
+    --detail:#B45309; --card-border:#EBD9A0;
+    --badge-common-bg:#F7E8B8; --badge-common-tx:#422006;
+    --badge-rare-bg:#B45309; --badge-rare-tx:#FFFFFF;
+    --badge-leg-bg:#BE123C; --badge-leg-tx:#FFFFFF;
+    --hero-grad:linear-gradient(180deg,#FFF0A8,#FFD3E2);
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);font-family:Inter,Manrope,system-ui,sans-serif;margin:0}
+  .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+  a{color:var(--cta)}
+  header.top{display:flex;gap:12px;align-items:center;padding:12px 16px;background:var(--surface);border-bottom:2px solid var(--card-border);position:sticky;top:0;z-index:5}
+  header.top .logo{font-weight:900;letter-spacing:.5px}
+  header.top .logo .dot{color:var(--accent)}
+  #wallet{margin-left:auto;background:var(--ink);color:#FFF7EA;padding:6px 12px;border-radius:999px}
+  main{max-width:1100px;margin:0 auto;padding:20px}
+  .hero{padding:28px;border:2px solid var(--card-border);border-radius:16px;background:var(--hero-grad);margin-bottom:18px}
+  .hero h1{margin:0 0 8px;font-size:32px}
+  .hero h1 .acc{color:var(--cta)}
+  .hero p{color:var(--muted)}
+  .cta{background:var(--cta);color:var(--cta-text);border:0;padding:10px 18px;border-radius:10px;font-weight:800;cursor:pointer}
+  .cta:hover{background:var(--cta-hover)}
+  .ghost{background:transparent;color:var(--ink);border:2px solid var(--card-border);padding:8px 14px;border-radius:10px;cursor:pointer}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin-top:12px}
+  .card{background:var(--surface);border:2px solid var(--card-border);border-radius:14px;padding:14px}
+  .card.hl{border-color:var(--accent)}
+  .card h3{margin:8px 0}
+  .card .owner,.card .hist{color:var(--muted);font-size:13px}
+  .price{font-size:20px;font-weight:800}
+  .badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:700}
+  .common{background:var(--badge-common-bg);color:var(--badge-common-tx)}
+  .rare{background:var(--badge-rare-bg);color:var(--badge-rare-tx)}
+  .legendary{background:var(--badge-leg-bg);color:var(--badge-leg-tx)}
+  .palette{margin-top:18px;background:var(--surface);border:2px solid var(--card-border);border-radius:14px;padding:14px}
+  .swatches{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+  .sw{border:2px solid var(--card-border);border-radius:10px;padding:8px 10px;font-size:12px;background:var(--surface2);color:var(--ink)}
+  .sw i{display:inline-block;width:14px;height:14px;border-radius:4px;vertical-align:-2px;margin-right:6px;border:1px solid rgba(0,0,0,.25)}
+  #modal{position:fixed;inset:0;background:rgba(59,30,10,.45);display:none;align-items:center;justify-content:center;z-index:20}
+  #modal.open{display:flex}
+  #modal .box{background:var(--surface);color:var(--ink);border:2px solid var(--cta);border-radius:14px;padding:20px;max-width:380px;width:90%}
+  #modal .box p{color:var(--muted)}
+  #toast{position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:#2A160B;color:#FFF7EA;border:2px solid var(--cta);padding:10px 18px;border-radius:999px;display:none;z-index:30;max-width:90%}
+  #switcher{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);background:#2A160B;color:#FFF7EA;border-radius:999px;padding:6px 10px;display:flex;gap:10px;align-items:center;box-shadow:0 4px 24px rgba(0,0,0,.35);z-index:40;font-weight:800}
+  #switcher button{border:0;background:#FFF7EA;color:#2A160B;border-radius:999px;width:32px;height:32px;cursor:pointer;font-size:16px;font-weight:900}
+  #state{position:fixed;bottom:14px;right:14px;background:#2A160B;border:1px solid #2A160B;color:#FFF7EA;font-size:11px;padding:6px 10px;border-radius:8px;z-index:40}
+</style>
+</head>
+<body data-variant="A">
+<header class="top">
+  <span class="logo">ALYS<span class="dot">QUE</span>ZONE <span class="mono" style="font-size:11px;color:var(--muted)">PROTOTYPE · ЦВЕТА</span></span>
+  <span id="wallet" class="mono">🪙 <span id="bal">1000</span> Пивкойнов</span>
+</header>
+<main>
+  <div class="hero">
+    <h1>Биржа приветов. <span class="acc">Стрим включился, а ты?</span></h1>
+    <p>Один и тот же layout в трех теплых светлых палитрах. Листайте стрелками и выбирайте победителя.</p>
+    <button class="cta" onclick="document.getElementById('lots').scrollIntoView()">К лотам →</button>
+  </div>
+  <h2 id="vtitle"></h2>
+  <p id="vdesc" style="color:var(--muted)"></p>
+  <div id="lots" class="grid"></div>
+  <div class="palette">
+    <b>Палитра варианта <span id="pname"></span></b>
+    <div class="swatches" id="swatches"></div>
+  </div>
+</main>
+
+<div id="modal"><div class="box">
+  <h3 id="mTitle" style="margin-top:0">Купить привет?</h3>
+  <p id="mText" class="mono"></p>
+  <div style="display:flex;gap:10px"><button class="cta" id="mYes">Да, забираю</button><button class="ghost" onclick="closeModal()">Не, пойду на стрим</button></div>
+</div></div>
+<div id="toast" class="mono"></div>
+
+<nav id="switcher" aria-label="prototype switcher">
+  <button id="prev" title="prev">←</button>
+  <span id="vlabel" class="mono">A</span>
+  <button id="next" title="next">→</button>
+</nav>
+<div id="state" class="mono"></div>
+
+<script>
+// 4 лота инлайн из data/lots.json (копия полей, без подгрузки JSON)
+const LOTS = [
+  {id:"luk-legend", title:"ЛУК — хозяин не менялся", owner:"aLySQuE", price:9999, rarity:"legendary", history:[], meme:"Нынешний хозяин Лука пока ни разу не сменился"},
+  {id:"lot-vandal-privet", title:"Привет онлайновсеие чуваки", owner:"VandaLQuE", price:600, rarity:"rare", history:[{from:"aLySQuE",to:"VandaLQuE",price:200}], meme:""},
+  {id:"lot-gedo-sleepy", title:"Спящий привет от Gedo0", owner:"Gedo0", price:250, rarity:"common", history:[{from:"aLySQuE",to:"Gedo0",price:250}], meme:"😴"},
+  {id:"lot-andrew-37", title:"Привет от Андрюши №37", owner:"Андрюша №37", price:100, rarity:"common", history:[{from:"aLySQuE",to:"Андрюша №37",price:100}], meme:"МНОГОУВАЖАЕМЫЕ АНДРЕИ"}
+];
+const META = {
+  A:{name:"A «Крем + хот-пинк»", desc:"Кремовый фон, главный акцент и CTA — хот-пинк (затемненный для контраста), детали — теплый оранжевый.",
+     sw:[["Фон #FFF6E9","#FFF6E9"],["Карточка #FFFFFF","#FFFFFF"],["CTA #A6006E","#A6006E"],["Якорь #FF00BC","#FF00BC"],["Деталь #C2410C","#C2410C"]]},
+  B:{name:"B «Персик + оранжевый»", desc:"Персиковый фон, CTA — теплый оранжевый, розовый — вторичный акцент (бейдж легенды, обводка).",
+     sw:[["Фон #FFEEE0","#FFEEE0"],["Карточка #FFF9F3","#FFF9F3"],["CTA #C2410C","#C2410C"],["Розовый #A6006E","#A6006E"],["Деталь #B45309","#B45309"]]},
+  C:{name:"C «Солнечный»", desc:"Светло-желтый фон, CTA — кораллово-розовый, детали — оранжево-медовые.",
+     sw:[["Фон #FFF6C9","#FFF6C9"],["Карточка #FFFFFF","#FFFFFF"],["CTA #BE123C","#BE123C"],["Якорь #FF00BC","#FF00BC"],["Деталь #B45309","#B45309"]]}
+};
+const ORDER = ["A","B","C"];
+let balance = 1000, pending = null;
+function renderBal(){ document.getElementById("bal").textContent = balance; renderState(); }
+function renderState(){ document.getElementById("state").textContent = "variant=" + cur() + " balance=" + balance + " lots=" + LOTS.length; }
+function toast(t){ const e=document.getElementById("toast"); e.textContent=t; e.style.display="block"; setTimeout(()=>e.style.display="none",2600); }
+function askBuy(id){
+  const lot = LOTS.find(l=>l.id===id);
+  if(lot.price >= 9999){ toast("ЛУК не продается. Хозяин не менялся."); return; }
+  pending = lot;
+  document.getElementById("mTitle").textContent = lot.title;
+  document.getElementById("mText").textContent = "Потратить " + lot.price + " Пивкойнов? Владелец: " + lot.owner;
+  document.getElementById("modal").classList.add("open");
+}
+function closeModal(){ document.getElementById("modal").classList.remove("open"); pending=null; }
+document.getElementById("mYes").onclick = ()=>{
+  if(!pending) return;
+  if(balance < pending.price){ closeModal(); toast("Не хватает Пивкойнов, пойдем на стрим заработаем"); return; }
+  balance -= pending.price; renderBal();
+  closeModal(); toast("Поздравляем! Привет твой: " + pending.title);
+};
+function renderLots(){
+  const g = document.getElementById("lots"); g.innerHTML = "";
+  LOTS.forEach((l,i)=>{
+    const d = document.createElement("div"); d.className = "card" + (l.rarity==="legendary" ? " hl" : "");
+    const hist = l.history.length ? l.history.map(h=>h.from+" → "+h.to+" ("+h.price+")").join(" · ") : "истории перепродаж пока нет";
+    d.innerHTML = '<span class="badge '+l.rarity+'">'+l.rarity+'</span><h3>'+l.title+'</h3>'
+      + '<div class="owner mono">владелец: '+l.owner+'</div>'
+      + '<div class="price mono">'+l.price+' 🪙</div>'
+      + (l.meme ? '<div class="owner">'+l.meme+'</div>' : '')
+      + '<div class="hist mono">'+hist+'</div>'
+      + '<div style="margin-top:8px"><button class="cta">Купить привет</button></div>';
+    d.querySelector("button").onclick = ()=>askBuy(l.id);
+    g.appendChild(d);
+  });
+}
+function cur(){ return new URLSearchParams(location.search).get("variant") ?? "A"; }
+function show(v){
+  document.body.dataset.variant = v;
+  document.getElementById("vtitle").textContent = META[v].name;
+  document.getElementById("vdesc").textContent = META[v].desc;
+  document.getElementById("pname").textContent = v;
+  document.getElementById("vlabel").textContent = v + " (" + META[v].name + ")";
+  const s = document.getElementById("swatches"); s.innerHTML = "";
+  META[v].sw.forEach(([label,hex])=>{
+    const d = document.createElement("span"); d.className = "sw mono";
+    d.innerHTML = '<i style="background:'+hex+'"></i>' + label;
+    s.appendChild(d);
+  });
+  const u = new URL(location.href); u.searchParams.set("variant", v); history.replaceState(null,"",u);
+  renderState();
+}
+function step(d){ const i = ORDER.indexOf(cur()); show(ORDER[(i+d+ORDER.length)%ORDER.length]); }
+document.getElementById("prev").onclick = ()=>step(-1);
+document.getElementById("next").onclick = ()=>step(1);
+document.addEventListener("keydown", (e)=>{
+  if(/INPUT|TEXTAREA/.test(document.activeElement?.tagName||"") || document.activeElement?.isContentEditable) return;
+  if(e.key==="ArrowLeft") step(-1); if(e.key==="ArrowRight") step(1);
+  if(e.key==="Escape") closeModal();
+});
+renderLots(); renderBal();
+show(ORDER.includes(cur()) ? cur() : "A");
+</script>
+</body>
+</html>
