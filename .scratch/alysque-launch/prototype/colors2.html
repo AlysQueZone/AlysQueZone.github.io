@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<!-- THROWAWAY PROTOTYPE, wipe me. Not production: no tests, minimal error handling. -->
+<!-- Question: какая финальная схема? Refined вариант C «Солнечный»: меньше белого, CTA D1 маджента-пинк / D2 глубокий оранжевый. -->
+<!-- Assumption: один layout, два подварианта через ?variant=D1/D2. Остальное одинаково. -->
+<!-- Run: double-click this file. State: in-memory (баланс 1000 Пивкойнов). -->
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AlysQueZone — Refined цвета D1/D2 (PROTOTYPE)</title>
+<style>
+  /* Common warm light theme; only CTA (+its hover) differs between D1/D2. */
+  body{
+    --bg:#FFF6BF; --topbar:#FFE4A6; --surface:#FFEFC0; --surface2:#FFE4A6;
+    --ink:#422006; --muted:#744210;
+    --cta-text:#FFFBEA;
+    --accent:#FF00BC; --accent-soft:#FFC9DD;
+    --detail:#92400E; --card-border:#DFA14E;
+    --badge-common-bg:#FFE4A6; --badge-common-tx:#422006;
+    --badge-rare-bg:#9A3412; --badge-rare-tx:#FFFBEA;
+    --badge-leg-bg:#B3127A; --badge-leg-tx:#FFFBEA;
+    --hero-grad:linear-gradient(180deg,#FFE4A6,#FFC9DD);
+    --toast-bg:#2A160B; --toast-tx:#FFFBEA;
+  }
+  body[data-variant="D1"]{ --cta:#C2187B; --cta-hover:#9E145F; }
+  body[data-variant="D2"]{ --cta:#9A3412; --cta-hover:#7C2D12; }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);font-family:Inter,Manrope,system-ui,sans-serif;margin:0}
+  .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+  a{color:var(--cta)}
+  header.top{display:flex;gap:12px;align-items:center;padding:12px 16px;background:var(--topbar);border-bottom:2px solid var(--card-border);position:sticky;top:0;z-index:5}
+  header.top .logo{font-weight:900;letter-spacing:.5px}
+  header.top .logo .dot{color:var(--accent)}
+  #wallet{margin-left:auto;background:var(--ink);color:var(--toast-tx);padding:6px 12px;border-radius:999px}
+  main{max-width:1100px;margin:0 auto;padding:20px}
+  .hero{padding:28px;border:2px solid var(--card-border);border-radius:16px;background:var(--hero-grad);margin-bottom:18px}
+  .hero h1{margin:0 0 8px;font-size:32px}
+  .hero h1 .acc{color:var(--cta)}
+  .hero p{color:var(--muted)}
+  .cta{background:var(--cta);color:var(--cta-text);border:0;padding:10px 18px;border-radius:10px;font-weight:800;cursor:pointer}
+  .cta:hover{background:var(--cta-hover)}
+  .ghost{background:transparent;color:var(--ink);border:2px solid var(--card-border);padding:8px 14px;border-radius:10px;cursor:pointer}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin-top:12px}
+  .card{background:var(--surface);border:2px solid var(--card-border);border-radius:14px;padding:14px}
+  .card.hl{border-color:var(--accent)}
+  .card h3{margin:8px 0}
+  .card .owner,.card .hist{color:var(--muted);font-size:13px}
+  .price{font-size:20px;font-weight:800;color:var(--detail)}
+  .badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:700}
+  .common{background:var(--badge-common-bg);color:var(--badge-common-tx)}
+  .rare{background:var(--badge-rare-bg);color:var(--badge-rare-tx)}
+  .legendary{background:var(--badge-leg-bg);color:var(--badge-leg-tx)}
+  .palette{margin-top:18px;background:var(--surface);border:2px solid var(--card-border);border-radius:14px;padding:14px}
+  .swatches{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+  .sw{border:2px solid var(--card-border);border-radius:10px;padding:8px 10px;font-size:12px;background:var(--surface2);color:var(--ink)}
+  .sw i{display:inline-block;width:14px;height:14px;border-radius:4px;vertical-align:-2px;margin-right:6px;border:1px solid rgba(0,0,0,.25)}
+  .scale{display:flex;gap:0;margin-top:10px;border:2px solid var(--card-border);border-radius:10px;overflow:hidden}
+  .scale div{flex:1;padding:10px 4px;font-size:11px;text-align:center;color:#422006}
+  #modal{position:fixed;inset:0;background:rgba(59,30,10,.45);display:none;align-items:center;justify-content:center;z-index:20}
+  #modal.open{display:flex}
+  #modal .box{background:var(--surface);color:var(--ink);border:2px solid var(--cta);border-radius:14px;padding:20px;max-width:380px;width:90%}
+  #modal .box p{color:var(--muted)}
+  #toast{position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:var(--toast-bg);color:var(--toast-tx);border:2px solid var(--cta);padding:10px 18px;border-radius:999px;display:none;z-index:30;max-width:90%}
+  #switcher{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);background:#2A160B;color:#FFFBEA;border-radius:999px;padding:6px 10px;display:flex;gap:10px;align-items:center;box-shadow:0 4px 24px rgba(0,0,0,.35);z-index:40;font-weight:800}
+  #switcher button{border:0;background:#FFFBEA;color:#2A160B;border-radius:999px;width:32px;height:32px;cursor:pointer;font-size:16px;font-weight:900}
+  #state{position:fixed;bottom:14px;right:14px;background:#2A160B;border:1px solid #2A160B;color:#FFFBEA;font-size:11px;padding:6px 10px;border-radius:8px;z-index:40}
+</style>
+</head>
+<body data-variant="D1">
+<header class="top">
+  <span class="logo">ALYS<span class="dot">QUE</span>ZONE <span class="mono" style="font-size:11px;color:var(--muted)">PROTOTYPE · ЦВЕТА v2</span></span>
+  <span id="wallet" class="mono">🪙 <span id="bal">1000</span> Пивкойнов</span>
+</header>
+<main>
+  <div class="hero">
+    <h1>Биржа приветов. <span class="acc">Стрим включился, а ты?</span></h1>
+    <p>Refined «Солнечный»: теплый тинт вместо белого, бар персиковый, карточки кремово-персиковые. D1 и D2 отличаются только CTA.</p>
+    <button class="cta" onclick="document.getElementById('lots').scrollIntoView()">К лотам →</button>
+  </div>
+  <h2 id="vtitle"></h2>
+  <p id="vdesc" style="color:var(--muted)"></p>
+  <div id="lots" class="grid"></div>
+  <div class="palette">
+    <b>Палитра варианта <span id="pname"></span></b>
+    <div class="swatches" id="swatches"></div>
+    <b style="display:block;margin-top:12px">Шкала из ТЗ (7 полос + якорь)</b>
+    <div class="scale mono">
+      <div style="background:#FFF6BF">#FFF6BF</div>
+      <div style="background:#FFE4A6">#FFE4A6</div>
+      <div style="background:#FFC878">#FFC878</div>
+      <div style="background:#FF9E66">#FF9E66</div>
+      <div style="background:#FF7FA8">#FF7FA8</div>
+      <div style="background:#F75C9C;color:#422006">#F75C9C</div>
+      <div style="background:#E91E8C;color:#FFFBEA">#E91E8C</div>
+      <div style="background:#FF00BC;color:#FFFBEA">якорь #FF00BC</div>
+    </div>
+  </div>
+</main>
+
+<div id="modal"><div class="box">
+  <h3 id="mTitle" style="margin-top:0">Купить привет?</h3>
+  <p id="mText" class="mono"></p>
+  <div style="display:flex;gap:10px"><button class="cta" id="mYes">Да, забираю</button><button class="ghost" onclick="closeModal()">Не, пойду на стрим</button></div>
+</div></div>
+<div id="toast" class="mono"></div>
+
+<nav id="switcher" aria-label="prototype switcher">
+  <button id="prev" title="prev">←</button>
+  <span id="vlabel" class="mono">D1</span>
+  <button id="next" title="next">→</button>
+</nav>
+<div id="state" class="mono"></div>
+
+<script>
+const LOTS = [
+  {id:"luk-legend", title:"ЛУК — хозяин не менялся", owner:"aLySQuE", price:9999, rarity:"legendary", history:[], meme:"Нынешний хозяин Лука пока ни разу не сменился"},
+  {id:"lot-vandal-privet", title:"Привет онлайновсеие чуваки", owner:"VandaLQuE", price:600, rarity:"rare", history:[{from:"aLySQuE",to:"VandaLQuE",price:200}], meme:""},
+  {id:"lot-gedo-sleepy", title:"Спящий привет от Gedo0", owner:"Gedo0", price:250, rarity:"common", history:[{from:"aLySQuE",to:"Gedo0",price:250}], meme:"😴"},
+  {id:"lot-andrew-37", title:"Привет от Андрюши №37", owner:"Андрюша №37", price:100, rarity:"common", history:[{from:"aLySQuE",to:"Андрюша №37",price:100}], meme:"МНОГОУВАЖАЕМЫЕ АНДРЕИ"}
+];
+const META = {
+  D1:{name:"D1 «Маджента CTA»", desc:"Общее: фон #FFF6BF, бар #FFE4A6, карточки #FFEFC0. CTA — маджента-пинк #C2187B (hover #9E145F).",
+     sw:[["Фон #FFF6BF","#FFF6BF"],["Бар #FFE4A6","#FFE4A6"],["Карточка #FFEFC0","#FFEFC0"],["CTA #C2187B","#C2187B"],["Якорь #FF00BC","#FF00BC"],["Деталь #92400E","#92400E"]]},
+  D2:{name:"D2 «Глубокий оранжевый CTA»", desc:"Общее как в D1. CTA — глубокий оранжевый #9A3412 (hover #7C2D12).",
+     sw:[["Фон #FFF6BF","#FFF6BF"],["Бар #FFE4A6","#FFE4A6"],["Карточка #FFEFC0","#FFEFC0"],["CTA #9A3412","#9A3412"],["Якорь #FF00BC","#FF00BC"],["Деталь #B45309","#B45309"]]}
+};
+const ORDER = ["D1","D2"];
+let balance = 1000, pending = null;
+function renderBal(){ document.getElementById("bal").textContent = balance; renderState(); }
+function renderState(){ document.getElementById("state").textContent = "variant=" + cur() + " balance=" + balance + " lots=" + LOTS.length; }
+function toast(t){ const e=document.getElementById("toast"); e.textContent=t; e.style.display="block"; setTimeout(()=>e.style.display="none",2600); }
+function askBuy(id){
+  const lot = LOTS.find(l=>l.id===id);
+  if(lot.price >= 9999){ toast("ЛУК не продается. Хозяин не менялся."); return; }
+  pending = lot;
+  document.getElementById("mTitle").textContent = lot.title;
+  document.getElementById("mText").textContent = "Потратить " + lot.price + " Пивкойнов? Владелец: " + lot.owner;
+  document.getElementById("modal").classList.add("open");
+}
+function closeModal(){ document.getElementById("modal").classList.remove("open"); pending=null; }
+document.getElementById("mYes").onclick = ()=>{
+  if(!pending) return;
+  if(balance < pending.price){ closeModal(); toast("Не хватает Пивкойнов, пойдем на стрим заработаем"); return; }
+  balance -= pending.price; renderBal();
+  closeModal(); toast("Поздравляем! Привет твой: " + pending.title);
+};
+function renderLots(){
+  const g = document.getElementById("lots"); g.innerHTML = "";
+  LOTS.forEach((l)=>{
+    const d = document.createElement("div"); d.className = "card" + (l.rarity==="legendary" ? " hl" : "");
+    const hist = l.history.length ? l.history.map(h=>h.from+" → "+h.to+" ("+h.price+")").join(" · ") : "истории перепродаж пока нет";
+    d.innerHTML = '<span class="badge '+l.rarity+'">'+l.rarity+'</span><h3>'+l.title+'</h3>'
+      + '<div class="owner mono">владелец: '+l.owner+'</div>'
+      + '<div class="price mono">'+l.price+' 🪙</div>'
+      + (l.meme ? '<div class="owner">'+l.meme+'</div>' : '')
+      + '<div class="hist mono">'+hist+'</div>'
+      + '<div style="margin-top:8px"><button class="cta">Купить привет</button></div>';
+    d.querySelector("button").onclick = ()=>askBuy(l.id);
+    g.appendChild(d);
+  });
+}
+function cur(){ return new URLSearchParams(location.search).get("variant") ?? "D1"; }
+function show(v){
+  document.body.dataset.variant = v;
+  document.getElementById("vtitle").textContent = META[v].name;
+  document.getElementById("vdesc").textContent = META[v].desc;
+  document.getElementById("pname").textContent = v;
+  document.getElementById("vlabel").textContent = v + " (" + META[v].name + ")";
+  const s = document.getElementById("swatches"); s.innerHTML = "";
+  META[v].sw.forEach(([label,hex])=>{
+    const d = document.createElement("span"); d.className = "sw mono";
+    d.innerHTML = '<i style="background:'+hex+'"></i>' + label;
+    s.appendChild(d);
+  });
+  const u = new URL(location.href); u.searchParams.set("variant", v); history.replaceState(null,"",u);
+  renderState();
+}
+function step(d){ const i = ORDER.indexOf(cur()); show(ORDER[(i+d+ORDER.length)%ORDER.length]); }
+document.getElementById("prev").onclick = ()=>step(-1);
+document.getElementById("next").onclick = ()=>step(1);
+document.addEventListener("keydown", (e)=>{
+  if(/INPUT|TEXTAREA/.test(document.activeElement?.tagName||"") || document.activeElement?.isContentEditable) return;
+  if(e.key==="ArrowLeft") step(-1); if(e.key==="ArrowRight") step(1);
+  if(e.key==="Escape") closeModal();
+});
+renderLots(); renderBal();
+show(ORDER.includes(cur()) ? cur() : "D1");
+</script>
+</body>
+</html>
