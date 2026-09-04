@@ -1,5 +1,6 @@
 ---
 import '../styles/global.css';
+import GambaModal from '../components/GambaModal.astro';
 
 interface Props {
   title?: string;
@@ -35,39 +36,20 @@ const base = import.meta.env.BASE_URL;
         </div>
         <button
           type="button"
-          data-scum-button
-          data-scum-sound={`${base}sounds/m4-scum.mp3`}
-          class="cursor-pointer rounded-full border border-stream/50 px-3 py-1 text-xs font-extrabold text-stream uppercase hover:bg-stream/10"
+          data-gamba-button
+          class="cursor-pointer rounded-full border border-stream/50 px-5 py-2 text-sm font-extrabold text-stream uppercase hover:bg-stream/10"
         >
-          Получить еще пивкойнов
+          гамба на пивкойны
         </button>
       </div>
     </header>
     <main class="mx-auto max-w-6xl px-4 py-8">
       <slot />
     </main>
-    <!-- Scum-кнопка (тикет 22): звук + модалка + earn(1000) в баланс. -->
-    <div
-      id="scum-modal"
-      class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4"
-      role="dialog"
-      aria-modal="true"
-    >
-      <div class="w-full max-w-sm rounded-2xl border border-melon bg-panel p-5 text-center">
-        <p class="text-4xl" aria-hidden="true">😏</p>
-        <p class="mt-2 text-lg font-black uppercase">Упс, вас обманули!</p>
-        <p class="mt-1 font-mono text-sm text-mist">Но это не точно — держи еще 1000 пивкойнов</p>
-        <button
-          type="button"
-          id="scum-modal-ok"
-          class="mt-4 cursor-pointer rounded-xl bg-stream px-4 py-2 font-extrabold text-white hover:bg-ctahover"
-        >
-          Пойжем дальше
-        </button>
-      </div>
-    </div>
+    <!-- Гамба-рулетка (тикет 32): кнопка в шапке открывает модалку-колесо. -->
+    <GambaModal />
     <script>
-      import { getBalance, earn, BALANCE_KEY } from '../lib/wallet.ts';
+      import { getBalance, BALANCE_KEY } from '../lib/wallet.ts';
       const render = () => {
         document.querySelectorAll('[data-wallet-balance]').forEach((el) => {
           el.textContent = String(getBalance());
@@ -110,43 +92,6 @@ const base = import.meta.env.BASE_URL;
         }
       });
 
-      // Scum-кнопка (тикет 22): играет m4-scum.mp3, начисляет +1000 и показывает модалку.
-      // Пилюля обновляется тем же render(), что и при старте; межвкладочно — через 'storage'.
-      const scumModal = document.getElementById('scum-modal');
-      const scumOk = document.getElementById('scum-modal-ok');
-      function closeScum(): void {
-        if (!scumModal) return;
-        scumModal.classList.add('hidden');
-        scumModal.classList.remove('flex');
-      }
-      document.addEventListener('click', (e) => {
-        const target = e.target as HTMLElement | null;
-        const btn = target?.closest?.('[data-scum-button]');
-        if (!(btn instanceof HTMLElement)) return;
-        try {
-          const src = btn.dataset.scumSound;
-          if (src) {
-            const audio = new Audio(src);
-            audio.volume = 0.8;
-            const p = audio.play();
-            if (p && typeof p.catch === 'function') p.catch(() => {});
-          }
-        } catch {
-          // graceful-fallback: модалка показывается и без звука
-        }
-        earn(1000);
-        render();
-        if (!scumModal) return;
-        scumModal.classList.remove('hidden');
-        scumModal.classList.add('flex');
-      });
-      scumOk?.addEventListener('click', closeScum);
-      scumModal?.addEventListener('click', (e) => {
-        if (e.target === scumModal) closeScum();
-      });
-      document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') closeScum();
-      });
     </script>
   </body>
 </html>

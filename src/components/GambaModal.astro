@@ -1,0 +1,298 @@
+---
+// Рулетка «гамба на пивкойны» (тикет 32): колесо-canvas из 10 сегментов,
+// крутка ≤5с с ease-out, щелчки через WebAudio, взвешенный исход 50/40/10.
+//
+// Использование: положить <GambaModal /> в layout; кнопка в шапке с
+// атрибутом data-gamba-button сама откроет модалку (скрипт делегированный).
+// Начисления — только через earn() из wallet и только на выигрышах.
+const base = import.meta.env.BASE_URL;
+---
+
+<div
+  id="gamba-modal"
+  data-bg={`${base}sounds/gamba-bg.mp3`}
+  data-win1k={`${base}sounds/gamba-win1k.mp3`}
+  data-lose={`${base}sounds/m4-scum.mp3`}
+  data-win100k={`${base}sounds/gamba-win100k.mp3`}
+  class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="gamba-title"
+>
+  <div class="w-full max-w-sm rounded-2xl border border-stream bg-panel p-5 text-center">
+    <h3 id="gamba-title" class="text-lg font-black uppercase">Гамба на пивкойны</h3>
+    <p class="mt-1 font-mono text-xs text-mist">+1000 — 50% · мимо — 40% · +100000 — 10%</p>
+    <div class="relative mx-auto mt-3 h-70 w-70">
+      <canvas id="gamba-wheel" width="560" height="560" class="h-70 w-70"></canvas>
+      <div
+        aria-hidden="true"
+        class="absolute top-0 left-1/2 -translate-x-1/2 border-x-12 border-t-20 border-x-transparent border-t-melon"
+      >
+      </div>
+    </div>
+    <p id="gamba-result" class="mt-3 min-h-6 font-mono text-sm text-milk" role="status"></p>
+    <div class="mt-3 flex justify-center gap-2">
+      <button
+        id="gamba-spin"
+        type="button"
+        class="cursor-pointer rounded-xl bg-stream px-6 py-2 font-extrabold text-white uppercase hover:bg-ctahover disabled:opacity-50"
+      >
+        Крутить
+      </button>
+      <button
+        id="gamba-close"
+        type="button"
+        class="cursor-pointer rounded-xl border border-white/20 bg-transparent px-4 py-2 text-mist hover:bg-white/10"
+      >
+        Не, пойду на стрим
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  import { getBalance, earn } from '../lib/wallet.ts';
+
+  // 10 сегментов: 5×«+1000», 4×«мимо», 1×«+100000» — веса видны сразу.
+  type Outcome = 'win1k' | 'lose' | 'win100k';
+  const SEGMENTS: { label: string; outcome: Outcome; color: string }[] = [
+    { label: '+1000', outcome: 'win1k', color: '#FF9E2C' },
+    { label: 'мимо', outcome: 'lose', color: '#FFE6AC' },
+    { label: '+1000', outcome: 'win1k', color: '#FF9E2C' },
+    { label: 'мимо', outcome: 'lose', color: '#FFE6AC' },
+    { label: '+1000', outcome: 'win1k', color: '#FF9E2C' },
+    { label: '+100000', outcome: 'win100k', color: '#FF00BC' },
+    { label: '+1000', outcome: 'win1k', color: '#FF9E2C' },
+    { label: 'мимо', outcome: 'lose', color: '#FFE6AC' },
+    { label: '+1000', outcome: 'win1k', color: '#FF9E2C' },
+    { label: 'мимо', outcome: 'lose', color: '#FFE6AC' },
+  ];
+  const SEG = (Math.PI * 2) / SEGMENTS.length;
+  const SPIN_MS = 4200;
+
+  const RESULT_TEXT: Record<Outcome, string> = {
+    win1k: 'ПОЙЖЕМ! +1000 Пивкойнов — чат в шоке 🙂',
+    lose: 'МИМО! Пивкойны целы, пойжем дальше',
+    win100k: 'ДЖЕКПОТ ЖОСКО! +100000 Пивкойнов — ты богат 🍺',
+  };
+
+  const modal = document.getElementById('gamba-modal');
+  const canvas = document.getElementById('gamba-wheel');
+  const result = document.getElementById('gamba-result');
+  const spinBtn = document.getElementById('gamba-spin');
+  const closeBtn = document.getElementById('gamba-close');
+
+  let spinning = false;
+  let raf = 0;
+  let bgAudio: HTMLAudioElement | null = null;
+  let outcomeAudio: HTMLAudioElement | null = null;
+  let tickCtx: AudioContext | null = null;
+
+  const ctx =
+    canvas instanceof HTMLCanvasElement ? canvas.getContext('2d') : null;
+
+  /** Рисует колесо, повёрнутое на angle (стрелка сверху). */
+  function draw(angle: number): void {
+    if (!ctx || !(canvas instanceof HTMLCanvasElement)) return;
+    const r = canvas.width / 2;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
+    ctx.translate(r, r);
+    ctx.rotate(angle);
+    for (let i = 0; i < SEGMENTS.length; i++) {
+      const s = SEGMENTS[i];
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, r - 4, i * SEG, (i + 1) * SEG);
+      ctx.closePath();
+      ctx.fillStyle = s.color;
+      ctx.fill();
+      ctx.strokeStyle = '#422006';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.save();
+      ctx.rotate(i * SEG + SEG / 2);
+      ctx.textAlign = 'right';
+      ctx.fillStyle = s.outcome === 'lose' ? '#422006' : '#FFFBEA';
+      ctx.font = `bold ${s.outcome === 'win100k' ? 30 : 34}px monospace`;
+      ctx.fillText(s.label, r - 26, 12);
+      ctx.restore();
+    }
+    ctx.beginPath();
+    ctx.arc(0, 0, 34, 0, Math.PI * 2);
+    ctx.fillStyle = '#422006';
+    ctx.fill();
+    ctx.restore();
+  }
+
+  /** Короткий щелчок барабана (WebAudio, без файлов). */
+  function click(): void {
+    try {
+      tickCtx ??= new AudioContext();
+      if (tickCtx.state === 'suspended') void tickCtx.resume();
+      const osc = tickCtx.createOscillator();
+      const gain = tickCtx.createGain();
+      osc.type = 'square';
+      osc.frequency.value = 2000;
+      gain.gain.setValueAtTime(0.12, tickCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, tickCtx.currentTime + 0.03);
+      osc.connect(gain).connect(tickCtx.destination);
+      osc.start();
+      osc.stop(tickCtx.currentTime + 0.035);
+    } catch {
+      // graceful-fallback: крутка идёт и без щелчков
+    }
+  }
+
+  function playBg(src: string | undefined): void {
+    stopAll();
+    if (!src) return;
+    try {
+      bgAudio = new Audio(src);
+      bgAudio.loop = true;
+      bgAudio.volume = 0.6;
+      const p = bgAudio.play();
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+    } catch {
+      bgAudio = null;
+    }
+  }
+
+  /** Стопит фон и исходник — звуки не наслаиваются. */
+  function stopAll(): void {
+    try {
+      bgAudio?.pause();
+      outcomeAudio?.pause();
+    } catch {
+      // уже остановлены — ок
+    }
+    bgAudio = null;
+    outcomeAudio = null;
+  }
+
+  function playOutcome(src: string | undefined): void {
+    if (bgAudio) {
+      try {
+        bgAudio.pause();
+      } catch {
+        // уже остановлен — ок
+      }
+      bgAudio = null;
+    }
+    if (!src) return;
+    try {
+      outcomeAudio = new Audio(src);
+      outcomeAudio.volume = 0.8;
+      const p = outcomeAudio.play();
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+    } catch {
+      outcomeAudio = null;
+    }
+  }
+
+  function renderBalances(): void {
+    const balance = String(getBalance());
+    document.querySelectorAll('[data-wallet-balance]').forEach((el) => {
+      el.textContent = balance;
+    });
+  }
+
+  function open(): void {
+    if (!modal || spinning) return;
+    if (result) result.textContent = '';
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    draw(0);
+  }
+
+  function close(): void {
+    if (spinning) {
+      spinning = false;
+      cancelAnimationFrame(raf);
+      stopAll();
+    }
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    if (spinBtn instanceof HTMLButtonElement) spinBtn.disabled = false;
+  }
+
+  function spin(): void {
+    if (spinning || !modal) return;
+    // Взвешенный исход 50/40/10 — определяется ДО анимации,
+    // колесо лишь докручивается до сегмента выигравшего типа.
+    const roll = Math.random();
+    const outcome: Outcome = roll < 0.5 ? 'win1k' : roll < 0.9 ? 'lose' : 'win100k';
+    const candidates = SEGMENTS.map((s, i) => (s.outcome === outcome ? i : -1)).filter(
+      (i) => i >= 0,
+    );
+    const target = candidates[Math.floor(Math.random() * candidates.length)];
+    // Центр целевого сегмента под стрелку сверху (-PI/2).
+    const targetAngle = -Math.PI / 2 - (target * SEG + SEG / 2);
+    const start = 0;
+    const turns = Math.PI * 2 * 5;
+    let delta = (targetAngle - start) % (Math.PI * 2);
+    if (delta < 0) delta += Math.PI * 2;
+    const total = turns + delta;
+
+    spinning = true;
+    if (spinBtn instanceof HTMLButtonElement) spinBtn.disabled = true;
+    if (result) result.textContent = 'Крутится, пойжем жоско…';
+    playBg(modal.dataset.bg);
+    const t0 = performance.now();
+    let lastTick = 0;
+
+    const frame = (now: number): void => {
+      if (!spinning) return;
+      const t = Math.min((now - t0) / SPIN_MS, 1);
+      const eased = 1 - Math.pow(1 - t, 4);
+      const angle = start + total * eased;
+      draw(angle);
+      // Щелчок при проходе границы сегмента — по мере ease-out редеют сами.
+      const idx = Math.floor(
+        (((-Math.PI / 2 - angle) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) / SEG,
+      );
+      if (idx !== lastTick) {
+        lastTick = idx;
+        click();
+      }
+      if (t < 1) {
+        raf = requestAnimationFrame(frame);
+        return;
+      }
+      spinning = false;
+      if (spinBtn instanceof HTMLButtonElement) spinBtn.disabled = false;
+      if (outcome === 'win1k') {
+        earn(1000);
+        renderBalances();
+        playOutcome(modal.dataset.win1k);
+      } else if (outcome === 'win100k') {
+        earn(100000);
+        renderBalances();
+        playOutcome(modal.dataset.win100k);
+      } else {
+        playOutcome(modal.dataset.lose);
+      }
+      if (result) result.textContent = RESULT_TEXT[outcome];
+    };
+    raf = requestAnimationFrame(frame);
+  }
+
+  document.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement | null;
+    if (target?.closest?.('[data-gamba-button]')) {
+      open();
+      return;
+    }
+  });
+  spinBtn?.addEventListener('click', spin);
+  closeBtn?.addEventListener('click', close);
+  modal?.addEventListener('click', (e) => {
+    if (e.target === modal) close();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') close();
+  });
+
+  draw(0);
+</script>
