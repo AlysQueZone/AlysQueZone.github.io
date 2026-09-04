@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<!-- THROWAWAY PROTOTYPE, wipe me. Not production: no tests, minimal error handling. -->
+<!-- Question: как выглядят лендинг + биржа + карточка привета AlysQueZone? -->
+<!-- Assumption: шелла приложения в репо нет, поэтому sub-shape B как один файл с 3 вариантами через ?variant=A/B/C. -->
+<!-- Three variants of landing+birzha+lot-card, switchable via ?variant=, single throwaway file. -->
+<!-- Run: double-click this file OR python3 -m http.server + open birzha-prototype.html. State: localStorage pivkoiny_balance (старт 1000). -->
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AlysQueZone — Биржа приветов (PROTOTYPE)</title>
+<style>
+  :root{ --bg:#0E0E10; --bg2:#18181B; --txt:#EFEFF1; --purple:#9146FF; --orange:#FF9E2C; --melon:#FF4D6D; --rind:#3ECF6E; --beer:#F5C518; }
+  *{box-sizing:border-box} body{background:var(--bg);color:var(--txt);font-family:Inter,Manrope,system-ui,sans-serif;margin:0}
+  .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+  header.top{display:flex;gap:12px;align-items:center;padding:12px 16px;background:var(--bg2);position:sticky;top:0;z-index:5}
+  header.top .logo{font-weight:900;letter-spacing:.5px}
+  header.top .logo b{color:var(--purple)}
+  #wallet{margin-left:auto;background:#000;border:1px solid var(--beer);color:var(--beer);padding:6px 12px;border-radius:999px}
+  .cta{background:var(--purple);color:#fff;border:0;padding:10px 18px;border-radius:10px;font-weight:800;cursor:pointer}
+  .ghost{background:transparent;color:var(--txt);border:1px solid #444;padding:8px 14px;border-radius:10px;cursor:pointer}
+  .variant{display:none;padding:20px;max-width:1100px;margin:0 auto}
+  .variant.active{display:block}
+  .hero{padding:28px;border:1px solid #333;border-radius:16px;background:linear-gradient(180deg,#18181B,#0E0E10);margin-bottom:18px}
+  .hero h1{margin:0 0 8px;font-size:34px;text-transform:uppercase;letter-spacing:-.5px}
+  .hero h1 .acc{color:var(--orange)}
+  .badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:700}
+  .common{background:#222}.rare{background:var(--orange);color:#000}.legendary{background:var(--beer);color:#000}
+  /* Variant A: card grid */
+  #vA .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+  #vA .card{background:var(--bg2);border:1px solid #333;border-radius:14px;padding:14px;cursor:pointer}
+  #vA .card:hover{border-color:var(--purple)}
+  #vA .price{color:var(--beer);font-size:20px}
+  #detailA{margin-top:18px;border:1px solid var(--purple);border-radius:14px;padding:16px;background:#141419}
+  /* Variant B: sidebar + dense rows */
+  #vB .shell{display:grid;grid-template-columns:200px 1fr;gap:14px}
+  #vB aside{background:var(--bg2);border:1px solid #333;border-radius:14px;padding:14px;height:fit-content;position:sticky;top:70px}
+  #vB aside a{display:block;color:var(--txt);text-decoration:none;padding:8px;border-radius:8px}
+  #vB aside a:hover{background:#222}
+  #vB .row{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;background:var(--bg2);border:1px solid #2c2c30;border-radius:10px;padding:10px 12px;margin-bottom:8px}
+  #vB .row .price{color:var(--beer)}
+  /* Variant C: chat feed */
+  #vC .feed{max-width:640px;margin:0 auto}
+  #vC .msg{background:var(--bg2);border:1px solid #2c2c30;border-radius:12px;padding:10px 12px;margin-bottom:10px}
+  #vC .msg .nick{color:var(--purple);font-weight:800}
+  #vC .msg.pinned{border-color:var(--beer)}
+  #vC .msg .buy{margin-top:8px}
+  /* modal + toast */
+  #modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:20}
+  #modal.open{display:flex}
+  #modal .box{background:var(--bg2);border:1px solid var(--purple);border-radius:14px;padding:20px;max-width:380px;width:90%}
+  #toast{position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:#000;border:1px solid var(--rind);padding:10px 18px;border-radius:999px;display:none;z-index:30}
+  /* floating switcher */
+  #switcher{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);background:#fff;color:#000;border-radius:999px;padding:6px 10px;display:flex;gap:10px;align-items:center;box-shadow:0 4px 24px rgba(0,0,0,.5);z-index:40;font-weight:800}
+  #switcher button{border:0;background:#000;color:#fff;border-radius:999px;width:32px;height:32px;cursor:pointer;font-size:16px}
+  #state{position:fixed;bottom:14px;right:14px;background:#000;border:1px solid #444;color:#aaa;font-size:11px;padding:6px 10px;border-radius:8px;z-index:40}
+</style>
+</head>
+<body>
+<header class="top">
+  <span class="logo">ALYS<b>QUE</b>ZONE <span class="mono" style="font-size:11px;color:#888">PROTOTYPE</span></span>
+  <span class="mono" style="color:#888">СТРИМ ВКЛЮЧИЛСЯ, А ТЫ?</span>
+  <span id="wallet" class="mono">🪙 <span id="bal">1000</span> Пивкойнов</span>
+</header>
+
+<!-- VARIANT A -->
+<section id="vA" class="variant">
+  <div class="hero">
+    <h1>Биржа приветов. <span class="acc">Стрим включился, а ты?</span></h1>
+    <p>Чемодан со стикером «продам привет» уже здесь. Выбирай лот, жми «купить», кайфуем жоско + мощно. Жду тебя 🙂🙂🙂</p>
+    <button class="cta" onclick="document.getElementById('gridA').scrollIntoView()">К бирже →</button>
+  </div>
+  <h2>Как это работает</h2>
+  <p>1. Выбираешь привет &nbsp;2. Жмешь «купить за Пивкойны» &nbsp;3. Привет твой, чат в шоке, догон чатика обеспечен</p>
+  <h2>Топ приветов</h2>
+  <div id="gridA" class="grid"></div>
+  <div id="detailA"><i>Кликни по карточке — тут откроется владелец, история перепродаж и кнопка «купить».</i></div>
+</section>
+
+<!-- VARIANT B -->
+<section id="vB" class="variant">
+  <div class="shell">
+    <aside>
+      <b>Навигация</b>
+      <a href="#" onclick="return false">🏠 Лендинг</a>
+      <a href="#" onclick="return false">📈 Биржа</a>
+      <a href="#" onclick="return false">🏆 Топ приветов</a>
+      <a href="#" onclick="return false">🫙 Пивкойны</a>
+      <hr style="border-color:#333">
+      <span class="mono" style="font-size:12px;color:#888">ЛУК: хозяин не менялся</span>
+    </aside>
+    <div>
+      <div class="hero"><h1>Биржа приветов <span class="acc">плотной строкой</span></h1>
+      <p>Все лоты одной таблицей: цена моноширинным, редкость бейджем, покупка в один клик.</p></div>
+      <div id="rowsB"></div>
+    </div>
+  </div>
+</section>
+
+<!-- VARIANT C -->
+<section id="vC" class="variant">
+  <div class="feed">
+    <div class="msg pinned"><span class="nick">aLySQuE 📌</span><br>СТРИМ ВКЛЮЧИЛСЯ, А ТЫ? Биржа приветов открыта! Чемодан распакован, ЛУК на месте. Жду тебя 🙂🙂🙂</div>
+    <div id="feedC"></div>
+  </div>
+</section>
+
+<div id="modal"><div class="box">
+  <h3 id="mTitle" style="margin-top:0">Купить привет?</h3>
+  <p id="mText" class="mono"></p>
+  <div style="display:flex;gap:10px"><button class="cta" id="mYes">Да, забираю</button><button class="ghost" onclick="closeModal()">Не, пойду на стрим</button></div>
+</div></div>
+<div id="toast" class="mono"></div>
+
+<nav id="switcher" aria-label="prototype switcher">
+  <button id="prev" title="prev">←</button>
+  <span id="vlabel" class="mono">A</span>
+  <button id="next" title="next">→</button>
+</nav>
+<div id="state" class="mono"></div>
+
+<script>
+const LOTS = [
+  {id:"luk-legend", title:"ЛУК — легендарный, хозяин не менялся", owner:"aLySQuE", price:9999, rarity:"legendary", history:[{from:"чат",to:"aLySQuE",price:0}], meme:"Нынешний хозяин Лука пока ни разу не сменился"},
+  {id:"okoch-001", title:"Привет с Окочанием стрима", owner:"pepelnayaa", price:350, rarity:"common", history:[{from:"nyamuras",to:"pepelnayaa",price:200}], meme:"Окочание стрима примерно в 23:59"},
+  {id:"zdu-002", title:"Привет «жду тебя 🙂🙂🙂»", owner:"nyamuras", price:280, rarity:"common", history:[{from:"justdavidcool",to:"nyamuras",price:150}], meme:"жду тебя 🙂🙂🙂"},
+  {id:"andrew-037", title:"Лот от Андрюши №37", owner:"Андрюша №37", price:137, rarity:"common", history:[{from:"Андрюша №36",to:"Андрюша №37",price:100}], meme:"МНОГОУВАЖАЕМЫЕ АНДРЕИ"},
+  {id:"bredit-004", title:"Привет-бредик с догоном чатика", owner:"justdavidcool", price:420, rarity:"common", history:[{from:"Gedo0",to:"justdavidcool",price:300}], meme:"плюс в чай"},
+  {id:"pods-005", title:"Привет «подПИВсался»", owner:"Gedo0", price:310, rarity:"common", history:[{from:"vavasha",to:"Gedo0",price:210}], meme:"подПИВсался"},
+  {id:"mayonez-006", title:"Привет «сущность, противоположная майонезу»", owner:"gRiBoCheQuE", price:500, rarity:"common", history:[{from:"nyamuras",to:"gRiBoCheQuE",price:320}], meme:"Я — чатерс"},
+  {id:"zhpeg-007", title:"Привет от ЖПЕГтубера", owner:"vavasha", price:260, rarity:"common", history:[{from:"pepelnayaa",to:"vavasha",price:180}], meme:"ЖПЕГтубер"},
+  {id:"zhosko-008", title:"Привет «пойжем жоско»", owner:"Guit88man", price:390, rarity:"common", history:[{from:"bradhi",to:"Guit88man",price:250}], meme:"пойжем жоско читать правила"},
+  {id:"chemodan-009", title:"Привет с чемодана «продам привет»", owner:"bradhi", price:750, rarity:"rare", history:[{from:"Guit88man",to:"bradhi",price:500},{from:"aLySQuE",to:"Guit88man",price:300}], meme:"наклейка на чемодане ЧПЗ"},
+];
+const NAMES = {A:"A (Hero + сетка)", B:"B (Сайдбар + строки)", C:"C (Чат-лента)"};
+const ORDER = ["A","B","C"];
+let pending = null;
+function getBal(){ return parseInt(localStorage.getItem("pivkoiny_balance") ?? "1000", 10); }
+function setBal(v){ localStorage.setItem("pivkoiny_balance", String(v)); renderBal(); }
+function renderBal(){ document.getElementById("bal").textContent = getBal(); renderState(); }
+function renderState(){ document.getElementById("state").textContent = "variant=" + cur() + " balance=" + getBal() + " lots=" + LOTS.length; }
+function toast(t){ const e=document.getElementById("toast"); e.textContent=t; e.style.display="block"; setTimeout(()=>e.style.display="none",2600); }
+function askBuy(id){
+  const lot = LOTS.find(l=>l.id===id);
+  if(lot.price >= 9999){ toast("ЛУК не продается. Хозяин не менялся."); return; }
+  pending = lot;
+  document.getElementById("mTitle").textContent = lot.title;
+  document.getElementById("mText").textContent = "Потратить " + lot.price + " Пивкойнов? Владелец: " + lot.owner;
+  document.getElementById("modal").classList.add("open");
+}
+function closeModal(){ document.getElementById("modal").classList.remove("open"); pending=null; }
+document.getElementById("mYes").onclick = ()=>{
+  if(!pending) return;
+  const b = getBal();
+  if(b < pending.price){ closeModal(); toast("Не хватает Пивкойнов, пойжем жоско на стрим заработать"); return; }
+  setBal(b - pending.price);
+  closeModal(); toast("Поздравляем! Привет твой: " + pending.title);
+};
+// Variant A render
+function renderA(){
+  const g = document.getElementById("gridA"); g.innerHTML = "";
+  LOTS.forEach(l=>{
+    const d = document.createElement("div"); d.className = "card";
+    d.innerHTML = '<span class="badge '+l.rarity+'">'+l.rarity+'</span><h3>'+l.title+'</h3><div class="mono">владелец: '+l.owner+'</div><div class="price mono">'+l.price+' 🪙</div><div style="margin-top:8px"><button class="cta">Купить</button></div>';
+    d.querySelector("button").onclick = (e)=>{ e.stopPropagation(); askBuy(l.id); };
+    d.onclick = ()=>{
+      document.getElementById("detailA").innerHTML = '<span class="badge '+l.rarity+'">'+l.rarity+'</span><h2>'+l.title+'</h2><div class="mono">Владелец: '+l.owner+' · Цена: '+l.price+' Пивкойнов</div><p>'+ (l.meme||"") +'</p><div class="mono">История: '+ l.history.map(h=>h.from+" → "+h.to+" ("+h.price+")").join(" · ") +'</div><div style="margin-top:10px"><button class="cta" onclick="askBuy(\''+l.id+'\')">Купить привет</button></div>';
+    };
+    g.appendChild(d);
+  });
+}
+function renderB(){
+  const r = document.getElementById("rowsB"); r.innerHTML = "";
+  LOTS.forEach(l=>{
+    const d = document.createElement("div"); d.className = "row";
+    d.innerHTML = '<div><b>'+l.title+'</b><br><span class="mono" style="color:#888">'+l.owner+' · '+l.meme+'</span></div><span class="badge '+l.rarity+'">'+l.rarity+'</span><span><span class="price mono">'+l.price+' 🪙</span> <button class="cta" style="margin-left:8px">Купить</button></span>';
+    d.querySelector("button").onclick = ()=>askBuy(l.id);
+    r.appendChild(d);
+  });
+}
+function renderC(){
+  const f = document.getElementById("feedC"); f.innerHTML = "";
+  LOTS.forEach((l,i)=>{
+    const d = document.createElement("div"); d.className = "msg";
+    d.innerHTML = '<span class="nick">'+l.owner+'</span> <span class="mono" style="color:#666">21:'+(10+i)+'</span><br>продам привет: <b>'+l.title+'</b><br><span class="price mono" style="color:var(--beer)">'+l.price+' Пивкойнов</span> <span class="badge '+l.rarity+'">'+l.rarity+'</span><div class="buy"><button class="cta">Купить привет</button></div>';
+    d.querySelector("button").onclick = ()=>askBuy(l.id);
+    f.appendChild(d);
+  });
+}
+// switcher
+function cur(){ return new URLSearchParams(location.search).get("variant") ?? "A"; }
+function show(v){
+  ORDER.forEach(k=>document.getElementById("v"+k).classList.toggle("active", k===v));
+  document.getElementById("vlabel").textContent = v + " (" + NAMES[v] + ")";
+  const u = new URL(location.href); u.searchParams.set("variant", v); history.replaceState(null,"",u);
+  renderState();
+}
+function step(d){ const i = ORDER.indexOf(cur()); show(ORDER[(i+d+ORDER.length)%ORDER.length]); }
+document.getElementById("prev").onclick = ()=>step(-1);
+document.getElementById("next").onclick = ()=>step(1);
+document.addEventListener("keydown", (e)=>{
+  if(/INPUT|TEXTAREA/.test(document.activeElement?.tagName||"") || document.activeElement?.isContentEditable) return;
+  if(e.key==="ArrowLeft") step(-1); if(e.key==="ArrowRight") step(1);
+  if(e.key==="Escape") closeModal();
+});
+renderA(); renderB(); renderC(); renderBal();
+show(ORDER.includes(cur()) ? cur() : "A");
+</script>
+</body>
+</html>
