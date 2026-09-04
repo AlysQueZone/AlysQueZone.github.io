@@ -9,7 +9,7 @@ const topLots = lots.slice(0, 4);
 
 <BaseLayout title="AlysQueZone — БИРЖА ПРИВЕТОВ">
   <!-- HERO -->
-  <section class="overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-panel to-void p-6 sm:p-10">
+  <section class="overflow-hidden rounded-2xl border border-card bg-gradient-to-b from-panel to-void p-6 sm:p-10">
     <div class="flex flex-col items-start gap-8 md:flex-row md:items-center">
       <div class="min-w-0 flex-1">
         <p class="mb-3 inline-block rounded-full bg-ember/15 px-3 py-1 text-xs font-bold tracking-widest text-ember uppercase">
@@ -25,7 +25,7 @@ const topLots = lots.slice(0, 4);
         <div class="mt-6 flex flex-wrap gap-3">
           <a
             href={`${base}lots/`}
-            class="rounded-xl bg-stream px-6 py-3 font-extrabold text-white uppercase transition hover:brightness-110"
+            class="rounded-xl bg-stream px-6 py-3 font-extrabold text-white uppercase transition hover:bg-ctahover"
           >
             К бирже →
           </a>
@@ -35,7 +35,7 @@ const topLots = lots.slice(0, 4);
         </div>
       </div>
       <!-- Чемодан «продам привет» -->
-      <div class="w-full max-w-xs shrink-0 rounded-2xl border border-pivko/40 bg-panel p-6 text-center shadow-[0_0_60px_-15px_#9146FF]">
+      <div class="w-full max-w-xs shrink-0 rounded-2xl border border-card bg-panel p-6 text-center shadow-[0_0_60px_-15px_#C2187B]">
         <div class="text-6xl" aria-hidden="true">🧳</div>
         <p class="mt-3 inline-block -rotate-3 rounded-lg bg-melon px-4 py-2 text-lg font-black tracking-wide text-white uppercase">
           продам привет
@@ -49,17 +49,17 @@ const topLots = lots.slice(0, 4);
   <section class="mt-10">
     <h2 class="text-xl font-black uppercase sm:text-2xl">Как это работает</h2>
     <ol class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-      <li class="rounded-2xl border border-white/10 bg-panel p-5">
+      <li class="rounded-2xl border border-card bg-panel p-5">
         <p class="font-mono text-2xl font-bold text-stream">01</p>
         <p class="mt-2 font-extrabold uppercase">Выбираешь привет</p>
         <p class="mt-1 text-sm text-mist/70">Топ лотов ниже — бери, пока чат не разобрал.</p>
       </li>
-      <li class="rounded-2xl border border-white/10 bg-panel p-5">
+      <li class="rounded-2xl border border-card bg-panel p-5">
         <p class="font-mono text-2xl font-bold text-ember">02</p>
         <p class="mt-2 font-extrabold uppercase">Жмёшь «купить за Пивкойны»</p>
         <p class="mt-1 text-sm text-mist/70">Баланс в шапке, старт — 1000 Пивкойнов.</p>
       </li>
-      <li class="rounded-2xl border border-white/10 bg-panel p-5">
+      <li class="rounded-2xl border border-card bg-panel p-5">
         <p class="font-mono text-2xl font-bold text-pivko">03</p>
         <p class="mt-2 font-extrabold uppercase">Привет твой</p>
         <p class="mt-1 text-sm text-mist/70">Чат в шоке, догон чатика обеспечен. Пойжем жоско!</p>
@@ -78,13 +78,13 @@ const topLots = lots.slice(0, 4);
     <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {
         topLots.map((lot) => (
-          <article class="flex min-w-0 flex-col rounded-2xl border border-white/10 bg-panel p-5 transition hover:border-stream">
+          <article class="flex min-w-0 flex-col rounded-2xl border border-card bg-panel p-5 transition hover:border-stream">
             <span
               class:list={[
                 'inline-block w-fit rounded-full px-3 py-0.5 text-xs font-bold uppercase',
-                lot.rarity === 'rare' && 'bg-ember text-black',
-                lot.rarity === 'legendary' && 'bg-pivko text-black',
-                lot.rarity === 'common' && 'bg-white/10 text-mist',
+                lot.rarity === 'rare' && 'bg-terra text-cream',
+                lot.rarity === 'legendary' && 'bg-legend text-cream',
+                lot.rarity === 'common' && 'bg-bar text-milk',
               ]}
             >
               {lot.rarity}
@@ -101,7 +101,7 @@ const topLots = lots.slice(0, 4);
       <p class="mt-1 text-sm text-mist/70">Жду тебя 🙂🙂🙂 Пойжем жоско на стрим.</p>
       <a
         href={`${base}lots/`}
-        class="mt-4 inline-block rounded-xl bg-stream px-8 py-3 font-extrabold text-white uppercase transition hover:brightness-110"
+        class="mt-4 inline-block rounded-xl bg-stream px-8 py-3 font-extrabold text-white uppercase transition hover:bg-ctahover"
       >
         На биржу →
       </a>

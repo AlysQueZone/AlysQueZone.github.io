@@ -1,19 +1,31 @@
 @import "tailwindcss";
 
 @theme {
-  /* Светлая теплая тема (тикет 15): кремово-персиковый фон */
-  --color-void: #fff3e6;
-  --color-panel: #fffefa;
-  /* Текст на светлом: теплый почти-черный + теплый серо-коричневый */
-  --color-milk: #221a14;
-  --color-mist: #6b5e54;
-  /* Primary CTA — Twitch Purple, без изменений */
-  --color-stream: #9146ff;
+  /* D1 «Маджента CTA» финал (тикет 29, референс colors2.html ?variant=D1):
+     фон #FFF6BF, бар #FFE4A6, карточки #FFE6AC + бордер #F0C46C.
+     Старый CTA-токен перекрашен в мадженту. */
+  --color-void: #fff6bf;
+  --color-panel: #ffe6ac;
+  --color-bar: #ffe4a6;
+  --color-card: #f0c46c;
+  /* Текст D1: чернила #422006 + приглушенный #744210 */
+  --color-milk: #422006;
+  --color-mist: #744210;
+  /* CTA — маджента-пинк D1 */
+  --color-stream: #c2187b;
+  --color-ctahover: #9e145f;
   /* Тёплые акценты */
   --color-ember: #ff9e2c;
   --color-melon: #ff4d6d;
-  /* Хот-пинк — официальный цвет чата канала в Twitch */
+  /* Хот-пинк — официальный цвет чата канала в Twitch (якорь D1) */
   --color-blush: #ff00bc;
+  /* Детали D1 */
+  --color-detail: #92400e;
+  /* Бейджи D1: rare — терракот #9A3412, legendary — маджента #B3127A,
+     текст — крем #FFFBEA (контраст ≥4.5:1). Common — бар #FFE4A6 + чернила. */
+  --color-terra: #9a3412;
+  --color-legend: #b3127a;
+  --color-cream: #fffbea;
   /* Пивное золото, затемнено для контраста на светлом (4.6:1 на cream).
      Бейджи bg-pivko + text-black читаются (4.3:1). */
   --color-pivko: #8a6d00;

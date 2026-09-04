@@ -1,6 +1,6 @@
 /** Лёгкое confetti без зависимостей: взрыв в брендовых цветах канала. */
 
-const COLORS = ['#F5C518', '#FF9E2C', '#FF4D6D', '#9146FF', '#3ECF6E', '#FFFFFF'];
+const COLORS = ['#F5C518', '#FF9E2C', '#FF4D6D', '#C2187B', '#3ECF6E', '#FFFFFF'];
 
 interface Particle {
   x: number;

@@ -16,10 +16,10 @@ const base = import.meta.env.BASE_URL;
 
 const badgeClass =
   lot.rarity === 'legendary'
-    ? 'bg-pivko text-black'
+    ? 'bg-legend text-cream'
     : lot.rarity === 'rare'
-      ? 'bg-ember text-black'
-      : 'bg-white/10 text-mist';
+      ? 'bg-terra text-cream'
+      : 'bg-bar text-milk';
 
 const rarityLabel =
   lot.rarity === 'legendary' ? 'ЛЕГЕНДА' : lot.rarity === 'rare' ? 'РЕДКИЙ' : 'ОБЫЧНЫЙ';
@@ -31,7 +31,7 @@ const catalog = lots.map((l) => ({ id: l.id, title: l.title, price: l.price }));
 <BaseLayout title={`${lot.title} — AlysQueZone`}>
   <a href={`${base}lots/`} class="text-sm font-bold text-stream hover:underline">← Назад на биржу</a>
 
-  <article class="mt-4 rounded-2xl border border-white/10 bg-panel p-5 sm:p-8">
+  <article class="mt-4 rounded-2xl border border-card bg-panel p-5 sm:p-8">
     <span class={`inline-block w-fit rounded-full px-2.5 py-0.5 text-xs font-bold ${badgeClass}`}>
       {rarityLabel}
     </span>
@@ -49,7 +49,7 @@ const catalog = lots.map((l) => ({ id: l.id, title: l.title, price: l.price }));
         lot.forSale ? (
           <button
             type="button"
-            class="cursor-pointer rounded-xl bg-stream px-6 py-3 font-extrabold text-white uppercase hover:brightness-110"
+            class="cursor-pointer rounded-xl bg-stream px-6 py-3 font-extrabold text-white uppercase hover:bg-ctahover"
             data-buy-lot={lot.id}
             data-lot-title={lot.title}
             data-lot-price={lot.price}
@@ -73,7 +73,7 @@ const catalog = lots.map((l) => ({ id: l.id, title: l.title, price: l.price }));
     </div>
   </article>
 
-  <section aria-label="История перепродаж" class="mt-6 rounded-2xl border border-white/10 bg-panel p-5 sm:p-8" data-lot-history data-lot-id={lot.id} data-lot-owner={lot.owner}>
+  <section aria-label="История перепродаж" class="mt-6 rounded-2xl border border-card bg-panel p-5 sm:p-8" data-lot-history data-lot-id={lot.id} data-lot-owner={lot.owner}>
     <h2 class="text-xl font-black uppercase">История перепродаж</h2>
     {
       lot.history.length === 0 && (
@@ -85,7 +85,7 @@ const catalog = lots.map((l) => ({ id: l.id, title: l.title, price: l.price }));
     <ul data-history-list class="mt-3 flex flex-col gap-2 font-mono text-sm">
       {
         lot.history.map((h) => (
-          <li class="rounded-xl border border-white/10 bg-void px-3 py-2">
+          <li class="rounded-xl border border-card bg-void px-3 py-2">
             {h.from} → {h.to} <span class="text-pivko">· {h.price} 🪙</span>
           </li>
         ))
