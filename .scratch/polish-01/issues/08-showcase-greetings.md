@@ -1,6 +1,10 @@
 # 08: Витрина и карточка: 🍺 + Мои приветы из БД
 
 Status: done (subagent реализовал: 🍺 + Мои приветы из БД + история из shared, `npm run build` зелёный, коммит eb7dd01)
+
+## Comments
+
+- 2026-09-07 fix: при перезагрузке мелькало старое из localStorage — `BuyModal` при старте рисовал локальный инвентарь (`renderInventory()` на init) и писал в него при покупке. Это покрывало решение 05, но не попало ни в тикет 07, ни в 08. Вынесено: импорты/запись/рендер локального инвентаря удалены из `BuyModal`, секцию рисует только витрина из shared. В `wallet.ts` остались мёртвые `addToInventory/getInventory/appendHistory` (баланс/Гамба живы) — кандидат на чистку.
 Blocked by: none
 Owns (другие тикеты эти файлы не трогают): `src/components/LotCard.astro`, `src/pages/lots/index.astro`, `src/pages/lots/[id].astro`. `src/lib/wallet.ts` НЕ трогать (только убрать импорты инвентаря/истории в своих файлах, сам файл живёт ради баланса/Гамбы).
 
