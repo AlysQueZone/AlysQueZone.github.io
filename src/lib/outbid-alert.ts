@@ -63,6 +63,20 @@ function resolveTitle(slug: string): string {
   return readCatalogTitle(slug) ?? slug;
 }
 
+/** Звук лота из уже отрисованной кнопки «Купить» (модалка играет его вместо хлопков). */
+function resolveAudio(slug: string): string | null {
+  try {
+    const btn = document.querySelector(
+      `[data-buy-lot="${CSS.escape(slug)}"]`,
+    );
+    const src =
+      btn instanceof HTMLElement ? (btn as HTMLElement).dataset.lotAudio : undefined;
+    return src && src.length > 0 ? src : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Кнопка перекупа в стиле сайта (как «Купить» на карточках: bg-stream). */
 function makeRebuyButton(ev: OutbidEvent): HTMLButtonElement {
   const next = Math.ceil(ev.price * 1.1);
@@ -81,6 +95,9 @@ function makeRebuyButton(ev: OutbidEvent): HTMLButtonElement {
   btn.dataset.buyLot = ev.slug;
   btn.dataset.lotTitle = ev.title;
   btn.dataset.lotPrice = String(next);
+  btn.dataset.lotOwner = ev.by;
+  const audio = resolveAudio(ev.slug);
+  if (audio) btn.dataset.lotAudio = audio;
   return btn;
 }
 
@@ -258,6 +275,7 @@ export function initOutbidAlert(): void {
 
   function showNotice(ev: OutbidEvent): void {
     const box = document.createElement('div');
+    box.dataset.outbidSlug = ev.slug;
     box.style.border = '2px solid rgba(21,128,61,0.4)';
     box.style.borderRadius = '12px';
     box.style.background = '#ffe6ac';
@@ -387,6 +405,24 @@ export function initOutbidAlert(): void {
     ensureSubscribed();
     getSupabase()?.auth.onAuthStateChange(() => {
       void refreshMine().then(() => ensureSubscribed());
+    });
+    // Купил обратно — записи про этот лот не актуальны: убрать из истории
+    // и закрыть висящие окошки.
+    window.addEventListener('alysque:bought', (e) => {
+      const id = (e as CustomEvent<{ id?: unknown }>).detail?.id;
+      if (typeof id !== 'string' || id.length === 0) return;
+      const before = history.length;
+      for (let i = history.length - 1; i >= 0; i--) {
+        if (history[i].slug === id) history.splice(i, 1);
+      }
+      unread = Math.max(0, unread - (before - history.length));
+      renderBell();
+      if (bellPanel && bellPanel.style.display !== 'none') renderPanel();
+      corner
+        .querySelectorAll('[data-outbid-slug]')
+        .forEach((box) => {
+          if (box instanceof HTMLElement && box.dataset.outbidSlug === id) box.remove();
+        });
     });
   })();
 }
