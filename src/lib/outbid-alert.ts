@@ -218,13 +218,10 @@ export function initOutbidAlert(): void {
     }
   }
 
-  void (async () => {
-    await refreshMine();
-    if (uid === null) {
-      // Гость: алерт не нужен, но вход позже подхватим через смену сессии.
-      getSupabase()?.auth.onAuthStateChange(() => void refreshMine());
-      return;
-    }
+  let subscribed = false;
+
+  function ensureSubscribed(): void {
+    if (subscribed || uid === null) return;
     const sb = getSupabase();
     if (!sb) return;
     try {
@@ -238,9 +235,17 @@ export function initOutbidAlert(): void {
           },
         )
         .subscribe();
+      subscribed = true;
     } catch {
-      // Realtime недоступен — тихий noop
+      // Realtime недоступен — тихий noop, попробуем снова при смене сессии
     }
-    getSupabase()?.auth.onAuthStateChange(() => void refreshMine());
+  }
+
+  void (async () => {
+    await refreshMine();
+    ensureSubscribed();
+    getSupabase()?.auth.onAuthStateChange(() => {
+      void refreshMine().then(() => ensureSubscribed());
+    });
   })();
 }
