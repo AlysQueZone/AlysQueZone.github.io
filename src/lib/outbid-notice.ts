@@ -1,5 +1,5 @@
 /**
- * Алерт «твой лот перекупили» (polish-01/09, решение 06 + правки 2026-09-07).
+ * Уведомление «твой лот перекупили» (polish-01/09, решение 06 + правки 2026-09-07).
  *
  * - триггер — Realtime-смена Владельца лота, где я был прошлым Владельцем
  *   («мои» = текущий Владелец, owner_uid == uid сессии);
@@ -120,7 +120,7 @@ function ensureCorner(): HTMLElement {
 }
 
 /** Один раз за страницу. Повторный вызов — noop. */
-export function initOutbidAlert(): void {
+export function initOutbidNotice(): void {
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
   if (document.documentElement.dataset.outbidInit === '1') return;
   document.documentElement.dataset.outbidInit = '1';

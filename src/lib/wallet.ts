@@ -1,8 +1,8 @@
-/** Фейк-кошелёк Пивкойнов: всё в localStorage, бэкенда нет. */
+/** Баланс Пивкойнов: локальная косметика в localStorage, бэкенда нет.
+ * Инвентарь/история покупок жили тут до polish-01, теперь «Мои приветы»
+ * и история — из shared-БД; старые ключи больше не читаем. */
 
 export const BALANCE_KEY = 'pivkoiny_balance';
-export const INVENTORY_KEY = 'pivkoiny_inventory';
-export const HISTORY_KEY = 'pivkoiny_history';
 export const START_BALANCE = 1000;
 
 function hasStorage(): boolean {
@@ -38,70 +38,4 @@ export function earn(amount: number): number {
   const next = getBalance() + delta;
   localStorage.setItem(BALANCE_KEY, String(next));
   return next;
-}
-
-/** Кладёт id лота в локальный инвентарь «Мои приветы». */
-export function addToInventory(lotId: string): void {
-  if (!hasStorage()) return;
-  const owned = getInventory();
-  if (!owned.includes(lotId)) {
-    owned.push(lotId);
-    localStorage.setItem(INVENTORY_KEY, JSON.stringify(owned));
-  }
-}
-
-export function getInventory(): string[] {
-  if (!hasStorage()) return [];
-  try {
-    const parsed: unknown = JSON.parse(localStorage.getItem(INVENTORY_KEY) ?? '[]');
-    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
-  } catch {
-    return [];
-  }
-}
-
-/** true, если лот уже лежит в «Моих привета». */
-export function owns(lotId: string): boolean {
-  return getInventory().includes(lotId);
-}
-
-export interface PurchaseRecord {
-  from: string;
-  to: string;
-  price: number;
-}
-
-type HistoryMap = Record<string, PurchaseRecord[]>;
-
-function readHistoryMap(): HistoryMap {
-  if (!hasStorage()) return {};
-  try {
-    const parsed: unknown = JSON.parse(localStorage.getItem(HISTORY_KEY) ?? '{}');
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return {};
-    return parsed as HistoryMap;
-  } catch {
-    return {};
-  }
-}
-
-/**
- * Локальные записи истории покупок для лота.
- * Карточка лота (тикет 11) клеит их поверх базовой истории из lots.json:
- * `[...lot.history, ...getLocalHistory(lot.id)]`.
- */
-export function getLocalHistory(lotId: string): PurchaseRecord[] {
-  const entries = readHistoryMap()[lotId];
-  return Array.isArray(entries) ? entries : [];
-}
-
-/** Дописывает «ты → владелец» в локальную историю лота. */
-export function appendHistory(lotId: string, entry: PurchaseRecord): void {
-  if (!hasStorage()) return;
-  const map = readHistoryMap();
-  map[lotId] = [...(Array.isArray(map[lotId]) ? map[lotId] : []), entry];
-  try {
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(map));
-  } catch {
-    // localStorage переполнен/недоступен — покупка уже учтена, молча пропускаем
-  }
 }
