@@ -245,7 +245,7 @@ export function subscribeSharedLots(onChange: () => void, slug?: string): () => 
 //
 // Контракт с БД (см. supabase/migrations/*_shared_lots.sql): клиент делает один
 // INSERT в purchases только с lot_id + buyer_uid. Цену (ceil +10%), identity
-// (twitch_id/login из JWT), блок ЛУКа, кулдаун 30с и кап 10 покупок/10мин
+// (twitch_id/login из JWT), блок ЛУКа, паузу 30с per-(user,lot) и кап 10 покупок/10мин
 // считает BEFORE-триггер — клиентские значения цены/identity игнорируются.
 // Успех — только после confirm сервера (ответ без error).
 // ---------------------------------------------------------------------------
@@ -268,12 +268,12 @@ export type BuyErrorKind =
 
 export interface BuyErrorInfo {
   kind: BuyErrorKind;
-  /** Для кулдауна — сколько секунд ждать (парсится из текста триггера). */
+  /** Для паузы — сколько секунд ждать (парсится из текста триггера). */
   retryAfterSec?: number;
   raw: string;
 }
 
-/** Запасной кулдаун, если текст триггера не распарсился (в миграции — 30с). */
+/** Запасная пауза, если текст триггера не распарсился (в миграции — 30с). */
 export const BUY_COOLDOWN_FALLBACK_SEC = 30;
 
 function buyErrorMessage(err: unknown): string {
