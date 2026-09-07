@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PROTOTYPE throwaway — монетка Пивкойна</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 24px; background: #fff; color: #111; }
+  body.dark { background: #141013; color: #f5e6f2; }
+  .row { display: grid; grid-template-columns: 90px 1fr 1fr 1fr; gap: 12px; align-items: center; margin: 10px 0; padding: 10px; border: 1px solid #ccc; border-radius: 10px; }
+  .tag { font-size: 12px; opacity: .7; }
+  .price { font-family: ui-monospace, monospace; font-size: 22px; font-weight: bold; color: #a16207; }
+  body.dark .price { color: #fbbf24; }
+  .coin-svg { width: 22px; height: 22px; vertical-align: -4px; }
+  .coin-css { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fde68a, #f59e0b 60%, #92400e); color: #451a03; font-size: 13px; font-weight: 800; vertical-align: -4px; border: 1px solid #92400e; }
+  .coin-txt { font-size: 13px; font-weight: 700; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 6px; padding: 1px 6px; vertical-align: 2px; }
+  body.dark .coin-txt { background: #3a2a10; border-color: #f59e0b; color: #fde68a; }
+  .bar { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); background: #111; color: #fff; padding: 8px 14px; border-radius: 999px; font-size: 14px; }
+  .bar button { margin-left: 8px; }
+</style>
+</head>
+<body>
+<h1>PROTOTYPE throwaway — чем заменить 🪙</h1>
+<p class="tag">Открой файл дабл-кликом. Строки — контексты (витрина / карточка / история). Колонки — варианты. Выбери глазами, номера — в вопрос тикета.</p>
+
+<div class="row"><div class="tag">витрина</div>
+  <div class="price">1 250 🪙 <div class="tag">V1 emoji как есть</div></div>
+  <div class="price">1 250 <svg class="coin-svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#f59e0b" stroke="#92400e"/><text x="12" y="16" text-anchor="middle" font-size="12" font-weight="800" fill="#451a03">П</text></svg> <div class="tag">V2 инлайн-SVG</div></div>
+  <div class="price">1 250 <span class="coin-css">П</span> <div class="tag">V3 CSS-кружок</div></div>
+  <div class="price">1 250 <span class="coin-txt">пив.</span> <div class="tag">V4 текст</div></div>
+</div>
+<div class="row"><div class="tag">баланс</div>
+  <div>Баланс: <b>1 000 🪙</b> <div class="tag">V1</div></div>
+  <div>Баланс: <b>1 000</b> <svg class="coin-svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#f59e0b" stroke="#92400e"/><text x="12" y="16" text-anchor="middle" font-size="12" font-weight="800" fill="#451a03">П</text></svg> <div class="tag">V2</div></div>
+  <div>Баланс: <b>1 000</b> <span class="coin-css">П</span> <div class="tag">V3</div></div>
+  <div>Баланс: <b>1 000 пив.</b> <div class="tag">V4</div></div>
+</div>
+<div class="row"><div class="tag">история</div>
+  <div class="tag">rea → alysque · 500 🪙 (V1)</div>
+  <div class="tag">rea → alysque · 500 [svg] (V2)</div>
+  <div class="tag">rea → alysque · 500 [П-кружок] (V3)</div>
+  <div class="tag">rea → alysque · 500 пив. (V4)</div>
+</div>
+
+<div class="row"><div class="tag">НОВОЕ витрина</div>
+  <div class="price">1 250 🍺 <div class="tag">V5 кружка пива (emoji старше 🪙, поддержка шире)</div></div>
+  <div class="price">1 250 <svg class="coin-svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#f59e0b" stroke="#92400e" stroke-width="1.5"/><text x="12" y="17" text-anchor="middle" font-size="12">🍺</text></svg> <div class="tag">V6 монета + 🍺 внутри (свой SVG, без бинарников)</div></div>
+  <div class="price">1 250 <svg class="coin-svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#f59e0b" stroke="#92400e" stroke-width="1.5"/><g stroke="#451a03" stroke-width="1.6" fill="#fde68a"><rect x="8.5" y="8" width="7" height="8" rx="1.5"/><line x1="15.5" y1="10" x2="17.5" y2="10" /><line x1="15.5" y1="14" x2="17.5" y2="14" /></g><rect x="7.5" y="6.5" width="9" height="2.5" rx="1" fill="#fff7ed" stroke="#451a03" stroke-width="1.2"/></svg> <div class="tag">V7 монета с рисованной кружкой (чистый вектор)</div></div>
+  <div class="tag">V8 = 7TV-эмоут канала (хотлинк cdn.7tv.app) — скажи какой именно эмоут, подставлю в прототип</div>
+</div>
+
+<div class="bar">V1 emoji · V2 SVG · V3 CSS · V4 текст <button onclick="document.body.classList.toggle('dark')">светлая/тёмная</button></div>
+</body>
+</html>

@@ -9,11 +9,12 @@
 ## Реализация
 
 - Добавляй в AGENTS.md полезные ссылки, информацию и инструкции(краткие) по тому где и какая информация(связанная с twitch каналом) доступна для проекта.
+  Также добавляй кратко, важную информацию о реализации проекта(которая пригодится AI который его делает).
 - Делай коммиты сам когда надо
 - В README.md должна быть простая инструкция(без лишних подробностей) для меня, что это и как этим пользоваться.
 - Перед публикацией (deploy) всегда сначала локально: `npm run build` + открыть и покликать (preview/double-click), проверять только потом деплоить.
 
-## Twitch-источники (кратко)
+## Twitch-источники
 
 - Канал: <https://www.twitch.tv/alysque> (ID `224473232`, ник `aLySQuE`). Цвет чата `#FF00BC`, аватар/баннер — `static-cdn.jtvnw.net` (хотлинк можно, бинарники не коммитить).
 - TG с анонсами/мемами: <https://t.me/alysque> (читать через `https://t.me/s/alysque`).
@@ -23,6 +24,15 @@
 - Архив чата VOD: `TwitchDownloaderCLI chatdownload --id <VOD_ID>` либо анонимный Twitch GQL `VideoCommentsByOffsetOrCursor` (хеш `b70a3591...adf6a`, пагинация через `contentOffsetSeconds`); VOD ID — число из `twitch.tv/videos/<id>`, живут 14–60 дней, качать только чат (`chat.json`).
 - Мемы канала: страница <https://memealerts.com/alysque> публичного API не имеет (нужен токен стримера); прямые файлы `https://cdns.memealerts.com/p/.../alert_orig.webm` качаются curl, звук — `ffmpeg -i in.webm -vn -codec:a libmp3lame -q:a 5 out.mp3`.
 - Пасты/тон чата: <https://twitchpaste.ru/channels/alysque>. Стата: <https://twitchtracker.com/alysque>.
+
+## Supabase
+
+- MCP `supabase` настроен в `opencode.json` (project scope) и обязателен к использованию для всех операций с Supabase: схема, миграции, данные, логи, edge functions.
+- Deploy to production ВКЛ: мерж в `main` сам применяет миграции. Схему менять только миграциями; правки из дашборда забирать через `db pull`.
+
+## Другое
+
+- В директории privets(gitignored) лежат оригиналы аудио/видео приветов. Туда их добавляет человек, для последующего использования на сайте.
 
 ## Agent skills
 
