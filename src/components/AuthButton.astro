@@ -1,0 +1,97 @@
+---
+// Шапка-вход через Twitch (тикет 09, shared-state):
+// «Войти через Twitch» гостю / логин + «Выйти» Чатерсу.
+// Сессия долгая (persist + авторефреш, см. src/lib/supabase.ts).
+// Термины — из CONTEXT.md, тон — как на сайте.
+---
+
+<div data-auth class="flex items-center gap-2">
+  <button
+    type="button"
+    data-auth-login
+    class="cursor-pointer rounded-full bg-twitch px-5 py-2 text-sm font-extrabold text-white uppercase hover:brightness-110"
+  >
+    Войти через Twitch
+  </button>
+  <span data-auth-user-wrap class="hidden items-center gap-2">
+    <span
+      data-auth-user
+      class="max-w-36 truncate rounded-full border border-rind/50 bg-void px-3 py-1 font-mono text-sm text-milk"
+      title="Ты на бирже, чатерс"
+    ></span>
+    <button
+      type="button"
+      data-auth-logout
+      class="cursor-pointer rounded-full border border-white/20 px-4 py-2 text-sm font-bold text-mist hover:bg-white/10"
+    >
+      Выйти
+    </button>
+  </span>
+  <p data-auth-hint class="hidden font-mono text-xs text-melon"></p>
+</div>
+
+<script>
+  import {
+    getSupabase,
+    isSupabaseConfigured,
+    displayLogin,
+    signInWithTwitch,
+    signOut,
+  } from '../lib/supabase.ts';
+
+  const root = document.querySelector('[data-auth]');
+  const loginBtn = root?.querySelector('[data-auth-login]');
+  const userWrap = root?.querySelector('[data-auth-user-wrap]');
+  const userEl = root?.querySelector('[data-auth-user]');
+  const logoutBtn = root?.querySelector('[data-auth-logout]');
+  const hint = root?.querySelector('[data-auth-hint]');
+
+  function showHint(text: string): void {
+    if (!(hint instanceof HTMLElement)) return;
+    hint.textContent = text;
+    hint.classList.remove('hidden');
+  }
+
+  function render(login: string | null): void {
+    const authed = login !== null;
+    loginBtn?.classList.toggle('hidden', authed);
+    userWrap?.classList.toggle('hidden', !authed);
+    userWrap?.classList.toggle('flex', authed);
+    if (authed && userEl) userEl.textContent = `@${login}`;
+  }
+
+  async function refresh(): Promise<void> {
+    const sb = getSupabase();
+    if (!sb) return;
+    const { data } = await sb.auth.getSession();
+    render(data.session ? displayLogin(data.session.user) : null);
+  }
+
+  loginBtn?.addEventListener('click', async () => {
+    if (!isSupabaseConfigured()) {
+      showHint('СТРИМ ВКЛЮЧИЛСЯ, А ТЫ? Вход пока спит — человек ещё не вбил ключи.');
+      return;
+    }
+    await signInWithTwitch();
+  });
+
+  logoutBtn?.addEventListener('click', async () => {
+    await signOut();
+    render(null);
+  });
+
+  if (!isSupabaseConfigured()) {
+    loginBtn?.setAttribute('title', 'Вход спит: не вбиты PUBLIC_SUPABASE_* (см. .env.example)');
+  } else {
+    void refresh();
+    getSupabase()?.auth.onAuthStateChange((_event, session) => {
+      render(session ? displayLogin(session.user) : null);
+    });
+  }
+</script>
+
+<style>
+  .bg-twitch {
+    background-color: #9146ff;
+  }
+</style>

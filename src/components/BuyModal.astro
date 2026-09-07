@@ -62,6 +62,16 @@ const clapSound = `${base}sounds/clap.mp3`;
     appendHistory,
   } from '../lib/wallet.ts';
   import { boom } from '../lib/confetti.ts';
+  import {
+    getSupabase,
+    isSupabaseConfigured,
+    signInWithTwitch,
+    stashPendingBuy,
+    takePendingBuy,
+    returnUrlForLot,
+    buyLotShared,
+    mapBuyError,
+  } from '../lib/supabase.ts';
 
   interface CatalogEntry {
     id: string;
@@ -78,6 +88,9 @@ const clapSound = `${base}sounds/clap.mp3`;
 
   let pending: { id: string; title: string; price: number; owner: string; audio?: string } | null = null;
   let toastTimer: number | undefined;
+  let cooldownTimer: number | undefined;
+
+  const YES_LABEL = 'Да, забираю';
 
   const CLAP_URL =
     'https://static-cdn.jtvnw.net/emoticons/v2/emotesv2_1075070639054e5d8cacb8a0ef4872d7/default/dark/3.0';
@@ -119,6 +132,53 @@ const clapSound = `${base}sounds/clap.mp3`;
     toast.classList.add(ok ? 'border-rind' : 'border-melon');
     window.clearTimeout(toastTimer);
     toastTimer = window.setTimeout(() => toast.classList.add('hidden'), 2600);
+  }
+
+  function setBusy(busy: boolean): void {
+    if (yesBtn instanceof HTMLButtonElement) yesBtn.disabled = busy;
+    if (noBtn instanceof HTMLButtonElement) noBtn.disabled = busy;
+  }
+
+  function restoreYes(): void {
+    window.clearInterval(cooldownTimer);
+    setBusy(false);
+    if (yesBtn instanceof HTMLButtonElement) yesBtn.textContent = YES_LABEL;
+  }
+
+  /** Кулдаун виден явно: обратный отсчёт на кнопке + тост «подожди N сек». */
+  function startCooldown(sec: number): void {
+    if (!(yesBtn instanceof HTMLButtonElement)) return;
+    window.clearInterval(cooldownTimer);
+    let left = sec > 0 ? sec : 30;
+    setBusy(true);
+    yesBtn.textContent = `Жди ${left}с…`;
+    showToast(`Кулдаун: подожди ${left} сек, потом жми ещё.`, false);
+    cooldownTimer = window.setInterval(() => {
+      left -= 1;
+      if (!(yesBtn instanceof HTMLButtonElement)) {
+        window.clearInterval(cooldownTimer);
+        return;
+      }
+      if (left <= 0) {
+        restoreYes();
+      } else {
+        yesBtn.textContent = `Жди ${left}с…`;
+      }
+    }, 1000);
+  }
+
+  /** Локальная косметика успеха: Пивкойны + «Мои приветы» + confetti/звук. */
+  function celebrate(entry: { id: string; title: string; price: number; owner: string; audio?: string }): void {
+    spend(entry.price);
+    addToInventory(entry.id);
+    appendHistory(entry.id, { from: entry.owner, to: 'ты', price: entry.price });
+    closeModal();
+    renderBalances();
+    renderInventory();
+    boom();
+    playClap(entry.audio);
+    showToast(`ЗАБРАЛ! Привет твой: ${entry.title}`, true);
+    window.dispatchEvent(new CustomEvent('alysque:bought', { detail: { id: entry.id, price: entry.price } }));
   }
 
   function renderBalances(): void {
@@ -173,12 +233,13 @@ const clapSound = `${base}sounds/clap.mp3`;
 
   function closeModal(): void {
     pending = null;
+    restoreYes();
     if (!modal) return;
     modal.classList.add('hidden');
     modal.classList.remove('flex');
   }
 
-  document.addEventListener('click', (e) => {
+  document.addEventListener('click', async (e) => {
     const target = e.target as HTMLElement | null;
     const btn = target?.closest?.('[data-buy-lot]');
     if (!(btn instanceof HTMLElement)) return;
@@ -187,6 +248,18 @@ const clapSound = `${base}sounds/clap.mp3`;
     if (forSale === 'false') {
       showToast('ЛУК не продаётся. Хозяин не менялся.', false);
       return;
+    }
+    // Без сессии — в логин через Twitch с возвратом к тому же Лоту (тикет 09).
+    // Витрина открыта всем, модалка переоткроется после возврата.
+    if (isSupabaseConfigured()) {
+      const sb = getSupabase();
+      const { data } = (await sb?.auth.getSession()) ?? { data: { session: null } };
+      if (!data.session) {
+        stashPendingBuy(id);
+        showToast('СТРИМ ВКЛЮЧИЛСЯ, А ТЫ? Сначала вход через Twitch — потом вернём к лоту.', false);
+        await signInWithTwitch(returnUrlForLot(id));
+        return;
+      }
     }
     pending = {
       id,
@@ -198,7 +271,7 @@ const clapSound = `${base}sounds/clap.mp3`;
     openModal();
   });
 
-  yesBtn?.addEventListener('click', () => {
+  yesBtn?.addEventListener('click', async () => {
     if (!pending) return;
     const { id, title, price, owner, audio } = pending;
     if (!canAfford(price)) {
@@ -206,16 +279,65 @@ const clapSound = `${base}sounds/clap.mp3`;
       showToast('Не хватает Пивкойнов, пойжем жоско на стрим', false);
       return;
     }
-    spend(price);
-    addToInventory(id);
-    appendHistory(id, { from: owner, to: 'ты', price });
-    closeModal();
-    renderBalances();
-    renderInventory();
-    boom();
-    playClap(audio);
-    showToast(`ЗАБРАЛ! Привет твой: ${title}`, true);
-    window.dispatchEvent(new CustomEvent('alysque:bought', { detail: { id } }));
+    // Без настроенного хранилища — старое локальное поведение (подтверждать нечему).
+    if (!isSupabaseConfigured()) {
+      celebrate({ id, title, price, owner, audio });
+      return;
+    }
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      showToast('Офлайн: покупка не записана, Пивкойны целы. Вернись с сетью.', false);
+      return;
+    }
+    // Сессия могла кончиться после открытия модалки — в логин с возвратом к Лоту.
+    const sb = getSupabase();
+    const { data } = (await sb?.auth.getSession()) ?? { data: { session: null } };
+    if (!data.session) {
+      stashPendingBuy(id);
+      showToast('СТРИМ ВКЛЮЧИЛСЯ, А ТЫ? Сессия кончилась — войди через Twitch, потом вернём к лоту.', false);
+      await signInWithTwitch(returnUrlForLot(id));
+      return;
+    }
+    // Shared-покупка (тикет 10): INSERT + ожидание confirm сервера.
+    setBusy(true);
+    if (yesBtn instanceof HTMLButtonElement) yesBtn.textContent = 'Ждём сервер…';
+    try {
+      const done = await buyLotShared(id);
+      const paid = Number.isFinite(done.price_paid) && done.price_paid > 0 ? done.price_paid : price;
+      celebrate({ id, title, price: paid, owner, audio });
+    } catch (err) {
+      const info = mapBuyError(err);
+      if (info.kind === 'cooldown') {
+        startCooldown(info.retryAfterSec ?? 30);
+        return;
+      }
+      restoreYes();
+      if (info.kind === 'unauthenticated') {
+        stashPendingBuy(id);
+        showToast('СТРИМ ВКЛЮЧИЛСЯ, А ТЫ? Сессия кончилась — войди через Twitch, потом вернём к лоту.', false);
+        await signInWithTwitch(returnUrlForLot(id));
+        return;
+      }
+      switch (info.kind) {
+        case 'rate-limit':
+          showToast('Кап окна: 10 покупок за 10 минут — приходи позже, Пивкойны целы.', false);
+          break;
+        case 'locked':
+          showToast('ЛУК не продаётся. Хозяин не менялся.', false);
+          break;
+        case 'missing-lot':
+          showToast('Лот ещё не переехал в общее хранилище — покупка не записана, Пивкойны целы.', false);
+          break;
+        case 'price-cap':
+          showToast('Цена упёрлась в потолок — дальше некуда, Пивкойны целы.', false);
+          break;
+        case 'offline':
+          showToast('Сеть упала: покупка не записана, Пивкойны целы. Попробуй ещё.', false);
+          break;
+        default:
+          showToast('Не записалось в общее хранилище — Пивкойны целы, попробуй ещё.', false);
+          break;
+      }
+    }
   });
 
   noBtn?.addEventListener('click', closeModal);
@@ -228,4 +350,20 @@ const clapSound = `${base}sounds/clap.mp3`;
 
   renderBalances();
   renderInventory();
+
+  // Возврат из логина (тикет 09): Чатерс залогинен — переоткрыть модалку того же Лота.
+  void (async () => {
+    if (!isSupabaseConfigured()) return;
+    const sb = getSupabase();
+    if (!sb) return;
+    const { data } = await sb.auth.getSession();
+    if (!data.session) return;
+    const id = takePendingBuy();
+    if (!id) return;
+    const sel = `[data-buy-lot="${typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(id) : id}"]`;
+    const btn = document.querySelector(sel);
+    if (btn instanceof HTMLElement) {
+      window.setTimeout(() => btn.click(), 350);
+    }
+  })();
 </script>

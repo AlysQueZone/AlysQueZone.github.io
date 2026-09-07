@@ -33,3 +33,73 @@ const catalog = lots.map((lot) => ({ id: lot.id, title: lot.title, price: lot.pr
   <span data-lots-catalog class="hidden" set:html={JSON.stringify(catalog)} />
   <BuyModal />
 </BaseLayout>
+
+<script>
+  // Живая витрина (тикет 11): shared-Владелец/цена поверх статики каталога.
+  // Названия, Редкость, постеры/звуки не трогаем — только владелец, цена,
+  // свежие данные кнопки «Купить» и бейдж «ТВОЙ» (owner_uid == сессия).
+  // Без PUBLIC_SUPABASE_* — честная деградация: остаётся статика.
+  import {
+    getSupabase,
+    isSupabaseConfigured,
+    fetchSharedLots,
+    getSessionUid,
+    subscribeSharedLots,
+  } from '../../lib/supabase.ts';
+
+  if (isSupabaseConfigured()) {
+    const applyCard = (
+      card: HTMLElement,
+      owner: string,
+      price: number,
+      mine: boolean,
+    ): void => {
+      const ownerEl = card.querySelector('[data-shared-owner]');
+      if (ownerEl) ownerEl.textContent = owner;
+      const priceEl = card.querySelector('[data-shared-price]');
+      if (priceEl) priceEl.textContent = `${price} 🪙`;
+      const badge = card.querySelector('[data-mine-badge]');
+      if (badge) badge.classList.toggle('hidden', !mine);
+      const buyBtn = card.querySelector('[data-buy-lot]');
+      if (buyBtn instanceof HTMLElement) {
+        if (buyBtn.dataset.lotOwner !== undefined) buyBtn.dataset.lotOwner = owner;
+        if (buyBtn.dataset.lotPrice !== undefined) buyBtn.dataset.lotPrice = String(price);
+      }
+    };
+
+    let refreshing = false;
+    async function refresh(): Promise<void> {
+      if (refreshing) return;
+      refreshing = true;
+      try {
+        const [states, uid] = await Promise.all([fetchSharedLots(), getSessionUid()]);
+        document.querySelectorAll('[data-lot-card]').forEach((node) => {
+          if (!(node instanceof HTMLElement)) return;
+          const id = node.dataset.lotCard ?? '';
+          const shared = states.get(id);
+          if (!shared || !Number.isFinite(shared.price)) return;
+          applyCard(
+            node,
+            shared.owner_login ?? node.querySelector('[data-shared-owner]')?.textContent ?? '?',
+            shared.price,
+            uid !== null && shared.owner_uid !== null && shared.owner_uid === uid,
+          );
+        });
+      } finally {
+        refreshing = false;
+      }
+    }
+
+    void refresh();
+    subscribeSharedLots(() => void refresh());
+    // Свежесть при возврате на вкладку (Realtime мог пропустить): перезапрос.
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) void refresh();
+    });
+    window.addEventListener('focus', () => void refresh());
+    // Своя покупка — сразу, не дожидаясь Realtime-круга.
+    window.addEventListener('alysque:bought', () => void refresh());
+    // Вход/выход меняет только бейдж «ТВОЙ».
+    getSupabase()?.auth.onAuthStateChange(() => void refresh());
+  }
+</script>

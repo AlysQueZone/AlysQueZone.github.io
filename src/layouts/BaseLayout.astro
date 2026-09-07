@@ -1,6 +1,7 @@
 ---
 import '../styles/global.css';
 import GambaModal from '../components/GambaModal.astro';
+import AuthButton from '../components/AuthButton.astro';
 
 interface Props {
   title?: string;
@@ -29,22 +30,25 @@ const base = import.meta.env.BASE_URL;
     <div aria-hidden="true" class="pointer-events-none fixed inset-0 -z-10 bg-[rgba(255,246,191,0.88)]">
     </div>
     <header class="sticky top-0 z-10 border-b border-black/10 bg-bar/90 backdrop-blur">
-      <div class="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+      <div class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-3">
         <a href={`${base}`} class="text-lg font-black tracking-tight uppercase">
           Alys<span class="text-stream">Que</span>Zone<span class="text-blush">.</span>
         </a>
-        <div class="flex items-center gap-2 rounded-full border border-pivko/50 bg-void px-3 py-1 text-sm font-bold">
-          <span class="text-melon">◉</span>
-          <span data-wallet-balance>1000</span>
-          <span class="text-mist/70">Пивкойнов</span>
+        <div class="flex flex-wrap items-center gap-2">
+          <div class="flex items-center gap-2 rounded-full border border-pivko/50 bg-void px-3 py-1 text-sm font-bold">
+            <span class="text-melon">◉</span>
+            <span data-wallet-balance>1000</span>
+            <span class="text-mist/70">Пивкойнов</span>
+          </div>
+          <AuthButton />
+          <button
+            type="button"
+            data-gamba-button
+            class="cursor-pointer rounded-full border border-stream/50 px-5 py-2 text-sm font-extrabold text-stream uppercase hover:bg-stream/10"
+          >
+            гамба на пивкойны
+          </button>
         </div>
-        <button
-          type="button"
-          data-gamba-button
-          class="cursor-pointer rounded-full border border-stream/50 px-5 py-2 text-sm font-extrabold text-stream uppercase hover:bg-stream/10"
-        >
-          гамба на пивкойны
-        </button>
       </div>
     </header>
     <main class="mx-auto max-w-6xl px-4 py-8">
