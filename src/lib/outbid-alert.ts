@@ -166,9 +166,10 @@ export function initOutbidAlert(): void {
 
   function ensureBell(): void {
     if (document.getElementById(BELL_ID)) return;
-    const actions = document
-      .querySelector('[data-wallet-balance]')
-      ?.closest('div')?.parentElement;
+    const actions =
+      document.getElementById('topbar-right') ??
+      document.querySelector('[data-wallet-balance]')?.closest('div')?.parentElement ??
+      null;
     if (!actions) return;
     const btn = document.createElement('button');
     btn.id = BELL_ID;
@@ -177,11 +178,11 @@ export function initOutbidAlert(): void {
     btn.style.position = 'relative';
     btn.style.cursor = 'pointer';
     btn.style.borderRadius = '999px';
-    btn.style.border = '1px solid rgba(194,24,123,0.5)';
-    btn.style.background = '#fff';
-    btn.style.color = '#111';
+    btn.style.border = '1px solid rgba(138,109,0,0.5)';
+    btn.style.background = '#fff6bf';
+    btn.style.color = '#422006';
     btn.style.fontSize = '16px';
-    btn.style.padding = '6px 12px';
+    btn.style.padding = '4px 12px';
     btn.textContent = '🔔';
     const count = document.createElement('span');
     count.id = BELL_COUNT_ID;
@@ -257,10 +258,10 @@ export function initOutbidAlert(): void {
 
   function showNotice(ev: OutbidEvent): void {
     const box = document.createElement('div');
-    box.style.border = '2px solid #a855f7';
+    box.style.border = '2px solid rgba(21,128,61,0.4)';
     box.style.borderRadius = '12px';
-    box.style.background = '#faf5ff';
-    box.style.color = '#111';
+    box.style.background = '#ffe6ac';
+    box.style.color = '#422006';
     box.style.padding = '10px 12px';
     box.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.2)';
     const head = document.createElement('b');
