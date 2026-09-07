@@ -58,6 +58,8 @@ const base = import.meta.env.BASE_URL;
     <GambaModal />
     <script>
       import { getBalance, BALANCE_KEY } from '../lib/wallet.ts';
+      import { initOutbidAlert } from '../lib/outbid-alert.ts';
+      initOutbidAlert();
       const render = () => {
         document.querySelectorAll('[data-wallet-balance]').forEach((el) => {
           el.textContent = String(getBalance());
