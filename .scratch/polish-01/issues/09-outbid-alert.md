@@ -1,0 +1,21 @@
+# 09: Алерт «твой лот перекупили» (звук + угол)
+
+Status: done (subagent реализовал: outbid.mp3 + модуль + угол, 1-в-1 с прототипом, `npm run build` зелёный, коммит fab6645; живой двухбраузерный чек — за человеком)
+Blocked by: none
+Owns (другие тикеты эти файлы не трогают): новый `src/lib/outbid-alert.ts`, `src/layouts/BaseLayout.astro` (только подключение), новый `public/sounds/outbid.mp3`.
+
+## What to build
+
+Спека: `.scratch/polish-01/spec.md` (раздел про алерт).
+Решение + прототип: `.scratch/polish-01/issues/06-outbid-alert.md`, `.scratch/polish-01/prototype/outbid-alert.html` (повторить поведение 1-в-1).
+«Мои» = текущий Владелец (`owner_uid == uid` сессии) — решение тикета 05.
+
+1. `public/sounds/outbid.mp3`: скачать `https://cdns.memealerts.com/p/644a705d5c87d011a6d1fb60/1f02feb4-b11f-46f3-b3dc-c6e66bfebcc1/alert_orig.webm` через curl и вытащить звук `ffmpeg -i in.webm -vn -codec:a libmp3lame -q:a 5 public/sounds/outbid.mp3`. webm-файл в репо не коммитить.
+2. `src/lib/outbid-alert.ts`: свой Realtime-канал на таблицу лотов (не править `subscribeSharedLots`, только импортировать `getSessionUid`/`getSupabase`); слепок моих slug (`owner_uid == мой uid`); смена Владельца лота из моего слепка на чужого = перекуп. Только залогиненным; только онлайн.
+3. UI: контейнер справа-снизу (инициализация из `BaseLayout.astro`); уведомление «Твой лот перекупили! X забрал Y за N 🍺 — забрать за M 🍺?» + кнопка-перекуп как `<button data-buy-lot="<id>" data-lot-title="..." data-lot-price="...">` (модалку открывает существующий делегированный обработчик BuyModal — BuyModal править НЕ надо); звук `new Audio(/sounds/outbid.mp3)` после первого взаимодействия; макс 3 уведомления; `document.hidden` — без звука, счётчик пропущенных, сброс при возврате.
+
+## Done when
+
+- [ ] Перекуп моего лота во 2-м браузере → уведомление + звук + кнопка открывает модалку с новой ценой.
+- [ ] ×3 перекупа подряд → максимум 3 уведомления; свёрнутая вкладка → тихо + счётчик.
+- [ ] `npm run build` зелёный; в репо нет webm/лишних бинарников кроме `outbid.mp3`.
