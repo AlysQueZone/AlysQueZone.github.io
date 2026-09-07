@@ -57,9 +57,6 @@ const clapSound = `${base}sounds/clap.mp3`;
     getBalance,
     canAfford,
     spend,
-    addToInventory,
-    getInventory,
-    appendHistory,
   } from '../lib/wallet.ts';
   import { boom } from '../lib/confetti.ts';
   import {
@@ -75,12 +72,6 @@ const clapSound = `${base}sounds/clap.mp3`;
     getSessionUid,
     subscribeSharedLots,
   } from '../lib/supabase.ts';
-
-  interface CatalogEntry {
-    id: string;
-    title: string;
-    price: number;
-  }
 
   const modal = document.getElementById('buy-modal');
   const modalText = document.getElementById('buy-modal-text');
@@ -242,14 +233,11 @@ const clapSound = `${base}sounds/clap.mp3`;
     }
   }
 
-  /** Локальная косметика успеха: Пивкойны + «Мои приветы» + confetti/звук. */
+  /** Успех: Пивкойны + confetti/звук. «Мои приветы» обновит витрина из shared по событию. */
   function celebrate(entry: { id: string; title: string; price: number; owner: string; audio?: string }): void {
     spend(entry.price);
-    addToInventory(entry.id);
-    appendHistory(entry.id, { from: entry.owner, to: 'ты', price: entry.price });
     closeModal();
     renderBalances();
-    renderInventory();
     boom();
     playClap(entry.audio);
     showNotice(`ЗАБРАЛ! Привет твой: ${entry.title}`, true);
@@ -261,41 +249,6 @@ const clapSound = `${base}sounds/clap.mp3`;
     document.querySelectorAll('[data-wallet-balance]').forEach((el) => {
       el.textContent = balance;
     });
-  }
-
-  function readCatalog(): CatalogEntry[] {
-    const tag = document.querySelector('[data-lots-catalog]');
-    if (!tag) return [];
-    try {
-      const parsed: unknown = JSON.parse(tag.textContent ?? '[]');
-      return Array.isArray(parsed) ? (parsed as CatalogEntry[]) : [];
-    } catch {
-      return [];
-    }
-  }
-
-  /** Перерисовывает секцию «Мои приветы» ([data-my-privety]), если она есть на странице. */
-  function renderInventory(): void {
-    const slot = document.querySelector('[data-my-privety]');
-    if (!slot) return;
-    const owned = getInventory();
-    const catalog = readCatalog();
-    const byId = new Map(catalog.map((l) => [l.id, l]));
-    if (owned.length === 0) {
-      slot.innerHTML =
-        '<p class="font-mono text-sm text-mist/60">Пока пусто. СТРИМ ВКЛЮЧИЛСЯ, А ТЫ?</p>';
-      return;
-    }
-    slot.innerHTML = owned
-      .map((id) => {
-        const lot = byId.get(id);
-        const title = lot ? lot.title : id;
-        const price = lot ? ` <span class="text-pivko">${lot.price} 🍺</span>` : '';
-        return `<div class="rounded-xl border border-rind/40 bg-panel px-3 py-2 text-sm"><b>${title}</b>${price} <span class="text-rind">· ТВОЙ</span></div>`;
-      })
-      .join('');
-    const counter = document.querySelector('[data-my-privety-count]');
-    if (counter) counter.textContent = String(owned.length);
   }
 
   function openModal(): void {
@@ -439,7 +392,6 @@ const clapSound = `${base}sounds/clap.mp3`;
   });
 
   renderBalances();
-  renderInventory();
 
   // Возврат из логина (тикет 09): Чатерс залогинен — переоткрыть модалку того же Лота.
   void (async () => {
