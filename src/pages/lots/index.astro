@@ -4,7 +4,7 @@ import LotCard from '../../components/LotCard.astro';
 import BuyModal from '../../components/BuyModal.astro';
 import { lots } from '../../lib/lots.ts';
 
-// Каталог для клиентского рендера «Моих приветов» (читает скрипт BuyModal).
+// Каталог для клиентского рендера «Моих приветов» (читает скрипт витрины).
 const catalog = lots.map((lot) => ({ id: lot.id, title: lot.title, price: lot.price }));
 ---
 
@@ -38,6 +38,8 @@ const catalog = lots.map((lot) => ({ id: lot.id, title: lot.title, price: lot.pr
   // Живая витрина (тикет 11): shared-Владелец/цена поверх статики каталога.
   // Названия, Редкость, постеры/звуки не трогаем — только владелец, цена,
   // свежие данные кнопки «Купить» и бейдж «ТВОЙ» (owner_uid == сессия).
+  // «Мои приветы» — только из БД: лоты, где owner_uid == uid сессии.
+  // Локальный инвентарь не читаем; перерисовка — от shared/Realtime.
   // Без PUBLIC_SUPABASE_* — честная деградация: остаётся статика.
   import {
     getSupabase,
@@ -46,6 +48,73 @@ const catalog = lots.map((lot) => ({ id: lot.id, title: lot.title, price: lot.pr
     getSessionUid,
     subscribeSharedLots,
   } from '../../lib/supabase.ts';
+  import type { SharedLotState } from '../../lib/supabase.ts';
+
+  const GUEST_TEXT = 'Войди через Twitch — тут будут твои приветы';
+  const EMPTY_TEXT = 'Пока пусто — забери первый привет ниже';
+
+  function readCatalog(): { id: string; title: string; price: number }[] {
+    const tag = document.querySelector('[data-lots-catalog]');
+    if (!tag) return [];
+    try {
+      const parsed: unknown = JSON.parse(tag.textContent ?? '[]');
+      return Array.isArray(parsed) ? (parsed as { id: string; title: string; price: number }[]) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function showMyNote(text: string, count: number): void {
+    const slot = document.querySelector('[data-my-privety]');
+    const counter = document.querySelector('[data-my-privety-count]');
+    if (counter) counter.textContent = String(count);
+    if (!slot) return;
+    slot.innerHTML = '';
+    const p = document.createElement('p');
+    p.className = 'font-mono text-sm text-mist/60';
+    p.textContent = text;
+    slot.appendChild(p);
+  }
+
+  function renderMyGreetings(states: Map<string, SharedLotState>, uid: string | null): void {
+    const slot = document.querySelector('[data-my-privety]');
+    const counter = document.querySelector('[data-my-privety-count]');
+    if (!slot) return;
+    if (uid === null) {
+      showMyNote(GUEST_TEXT, 0);
+      return;
+    }
+    const catalog = readCatalog();
+    const byId = new Map(catalog.map((l) => [l.id, l]));
+    const mine = [...states.entries()].filter(([, s]) => s.owner_uid !== null && s.owner_uid === uid);
+    if (counter) counter.textContent = String(mine.length);
+    if (mine.length === 0) {
+      showMyNote(EMPTY_TEXT, 0);
+      return;
+    }
+    slot.innerHTML = '';
+    for (const [id, s] of mine) {
+      const known = byId.get(id);
+      const title = known ? known.title : id;
+      const price = Number.isFinite(s.price) ? s.price : (known?.price ?? 0);
+      const row = document.createElement('div');
+      row.className = 'rounded-xl border border-rind/40 bg-panel px-3 py-2 text-sm';
+      const link = document.createElement('a');
+      link.href = `./${encodeURIComponent(id)}/`;
+      link.className = 'font-bold hover:underline';
+      link.textContent = title;
+      row.appendChild(link);
+      const priceSpan = document.createElement('span');
+      priceSpan.className = 'text-pivko';
+      priceSpan.textContent = ` ${price} 🍺`;
+      row.appendChild(priceSpan);
+      const badge = document.createElement('span');
+      badge.className = 'text-rind';
+      badge.textContent = ' · ТВОЙ';
+      row.appendChild(badge);
+      slot.appendChild(row);
+    }
+  }
 
   if (isSupabaseConfigured()) {
     const applyCard = (
@@ -57,7 +126,7 @@ const catalog = lots.map((lot) => ({ id: lot.id, title: lot.title, price: lot.pr
       const ownerEl = card.querySelector('[data-shared-owner]');
       if (ownerEl) ownerEl.textContent = owner;
       const priceEl = card.querySelector('[data-shared-price]');
-      if (priceEl) priceEl.textContent = `${price} 🪙`;
+      if (priceEl) priceEl.textContent = `${price} 🍺`;
       const badge = card.querySelector('[data-mine-badge]');
       if (badge) badge.classList.toggle('hidden', !mine);
       const buyBtn = card.querySelector('[data-buy-lot]');
@@ -85,6 +154,7 @@ const catalog = lots.map((lot) => ({ id: lot.id, title: lot.title, price: lot.pr
             uid !== null && shared.owner_uid !== null && shared.owner_uid === uid,
           );
         });
+        renderMyGreetings(states, uid);
       } finally {
         refreshing = false;
       }
@@ -97,9 +167,11 @@ const catalog = lots.map((lot) => ({ id: lot.id, title: lot.title, price: lot.pr
       if (!document.hidden) void refresh();
     });
     window.addEventListener('focus', () => void refresh());
-    // Своя покупка — сразу, не дожидаясь Realtime-круга.
+    // Своя покупка — перезапрос shared (локальные данные события не используем).
     window.addEventListener('alysque:bought', () => void refresh());
-    // Вход/выход меняет только бейдж «ТВОЙ».
+    // Вход/выход меняет только бейдж «ТВОЙ» и секцию «Мои приветы».
     getSupabase()?.auth.onAuthStateChange(() => void refresh());
+  } else {
+    showMyNote(GUEST_TEXT, 0);
   }
 </script>
