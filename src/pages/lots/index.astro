@@ -134,9 +134,13 @@ const catalog = lots.map((lot) => ({ id: lot.id, title: lot.title, price: lot.pr
       const badge = card.querySelector('[data-mine-badge]');
       if (badge) badge.classList.toggle('hidden', !mine);
       const buyBtn = card.querySelector('[data-buy-lot]');
-      if (buyBtn instanceof HTMLElement) {
+      if (buyBtn instanceof HTMLButtonElement) {
         if (buyBtn.dataset.lotOwner !== undefined) buyBtn.dataset.lotOwner = owner;
         if (buyBtn.dataset.lotPrice !== undefined) buyBtn.dataset.lotPrice = String(price);
+        // Свой лот купить нельзя (перекуп у себя бессмыслен): кнопка гаснет.
+        buyBtn.disabled = mine;
+        buyBtn.textContent = mine ? 'Твой привет' : 'Купить';
+        buyBtn.classList.toggle('opacity-50', mine);
       }
     };
 

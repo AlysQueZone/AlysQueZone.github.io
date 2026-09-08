@@ -132,18 +132,23 @@ const catalog = (await fetchCatalogLots()).map((l) => ({ id: l.id, title: l.titl
       if (shared && Number.isFinite(shared.price)) {
         if (ownerEl) ownerEl.textContent = shared.owner_login ?? ownerEl.textContent;
         if (priceEl) priceEl.textContent = `${shared.price} 🍺`;
+        const mine = uid !== null && shared.owner_uid !== null && shared.owner_uid === uid;
         if (mineBadge instanceof HTMLElement) {
-          const mine = uid !== null && shared.owner_uid !== null && shared.owner_uid === uid;
           mineBadge.classList.toggle('hidden', !mine);
         }
-        if (buyBtn instanceof HTMLElement) {
+        if (buyBtn instanceof HTMLButtonElement) {
           if (buyBtn.dataset.lotOwner !== undefined && shared.owner_login) {
             buyBtn.dataset.lotOwner = shared.owner_login;
           }
           if (buyBtn.dataset.lotPrice !== undefined) {
             buyBtn.dataset.lotPrice = String(shared.price);
           }
-          buyBtn.textContent = `Купить за ${shared.price} Пивкойнов`;
+          // Свой лот купить нельзя: кнопка гаснет.
+          buyBtn.disabled = mine;
+          buyBtn.textContent = mine
+            ? 'Твой привет'
+            : `Купить за ${shared.price} Пивкойнов`;
+          buyBtn.classList.toggle('opacity-50', mine);
         }
       }
       renderSharedHistory(tail, uid);

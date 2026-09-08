@@ -137,6 +137,7 @@ const clapSound = s3Sound('clap.mp3');
   function showNotice(text: string, ok: boolean, videoUrl?: string): void {
     if (!notice) return;
     notice.innerHTML = '';
+    let videoEl: HTMLVideoElement | null = null;
     // Сброс варианта: текстовый — пилюля, с видео — карточка.
     notice.classList.remove(
       'rounded-full',
@@ -169,7 +170,7 @@ const clapSound = s3Sound('clap.mp3');
       video.playsInline = true;
       video.setAttribute('playsinline', '');
       video.preload = 'auto';
-      video.className = 'mt-1 w-64 max-w-full rounded-xl';
+      video.className = 'mt-1 w-full rounded-xl';
       notice.appendChild(video);
       try {
         const p = video.play();
@@ -178,6 +179,13 @@ const clapSound = s3Sound('clap.mp3');
         playClapFallback();
       }
       video.addEventListener('error', () => playClapFallback());
+      // Окно живёт до конца видео (+2.5с), а не 2.6с: иначе ролик обрывается.
+      // Фолбэк-таймер 30с — на случай если 'ended' не выстрелит.
+      video.addEventListener('ended', () => {
+        window.clearTimeout(noticeTimer);
+        noticeTimer = window.setTimeout(() => notice.classList.add('hidden'), 2500);
+      });
+      videoEl = video;
     } else if (ok) {
       const img = document.createElement('img');
       img.src = CLAP_URL;
@@ -194,7 +202,9 @@ const clapSound = s3Sound('clap.mp3');
     notice.classList.remove('hidden', 'border-rind', 'border-melon');
     notice.classList.add(ok ? 'border-rind' : 'border-melon');
     window.clearTimeout(noticeTimer);
-    noticeTimer = window.setTimeout(() => notice.classList.add('hidden'), 2600);
+    // С видео окно не прячем через 2.6с — его закроет 'ended' (+2.5с); 30с — страховка.
+    const ttl = videoEl ? 30000 : 2600;
+    noticeTimer = window.setTimeout(() => notice.classList.add('hidden'), ttl);
   }
 
   function setBusy(busy: boolean): void {
@@ -327,6 +337,7 @@ const clapSound = s3Sound('clap.mp3');
     const target = e.target as HTMLElement | null;
     const btn = target?.closest?.('[data-buy-lot]');
     if (!(btn instanceof HTMLElement)) return;
+    if (btn instanceof HTMLButtonElement && btn.disabled) return;
     const { buyLot: id, lotTitle, lotPrice, lotOwner, lotVideo } = btn.dataset;
     if (!id) return;
     // Без сессии — в логин через Twitch с возвратом к тому же Лоту (тикет 09).
