@@ -11,7 +11,7 @@
 
 ## Decisions so far
 
-<!-- пусто: карта только создана -->
+- [Математика казино для гамбы](scratch/pivkoiny-backend/issues/01-casino-math.md): готовая слот-схема, ставка 100, RTP 90% (0/100/500), daily-календарь без сброса streak, сброс цен отклонён (факты — в ветке `research/casino-math`).
 
 ## Not yet specified
 
