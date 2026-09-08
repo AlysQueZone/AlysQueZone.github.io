@@ -4,6 +4,8 @@
 
 ## Сделанное:
 
+### 001
+
 - подключение репо к supabase. Там есть кнопка "Deploy to production Apply changes to your production database when you merge into your configured production GitHub branch". Стоит ее включить? Она будет применять миграции в случае если они не были применены вручную?
 - emoji 🪙 не отображается у некоторых.
 - сменить слово "кулдаун" на что-то понятное.
@@ -12,12 +14,30 @@
 - "мои приветы" должны быть подключены к информации из бд.
 - Звук и уведомление когда твой привет выкупили(WS) https://cdns.memealerts.com/p/644a705d5c87d011a6d1fb60/1f02feb4-b11f-46f3-b3dc-c6e66bfebcc1/alert_orig.webm
 
----
+### 002
+
+- Переехать на s3 supabase вместо хранения в репозитории
+  Вместе с эти заменить аудио-приветы на видео-приветы(просто показывать мемы целиком) или свои видео.
+  Для существующих карточек подобрать видео с мемаллертс. Т.е. использовать "их s3", а не наш.
+  Для своих(новых) использовать свой s3 из supabase.
+  - Под новыми и своими подразумеваются новые карточки "приветов", которые я буду делать. Сейчас несколько из них лежат в директории privets. Добавлять их в проект - другая задача.
+
+Маппинг существующих приветов на видео:
+Второй повторный привет https://cdns.memealerts.com/p/672ba6a81135f4340a61a4d0/debfc8c4-16a3-45b0-89ed-9b81f92100e6/alert_orig.webm
+Миф о бесплатном пивете https://cdns.memealerts.com/p/649b210acfd0d2a8f427e00f/1870f6b6-c0d7-45c9-b39f-f7c00c5220b7/alert_orig.webm
+Привет для Салата https://cdns.memealerts.com/p/672ba6a81135f4340a61a4d0/fe6b3373-284a-438a-b6f7-041394b31c77/alert_orig.webm
+Массовый привет (коты одобряют) https://cdns.memealerts.com/p/64f8378906d68898c5b8e508/2d11fea1-bda2-493a-9774-510e15c6a589/alert_orig.webm
+Привет для Quevizar https://cdns.memealerts.com/p/649b210acfd0d2a8f427e00f/5d46287f-92a9-4897-a7cb-dbd4449e8d15/alert_orig.webm
+Здраствуйте, nyanyachos https://cdns.memealerts.com/p/66961426e904cc2377372321/a24b3e2f-5f63-42bc-b40a-346eb305464d/alert_orig.webm
+Привет для remolol https://cdns.memealerts.com/p/66961426e904cc2377372321/0acec35f-0179-466e-a2ca-7995d46328ea/alert_orig.webm
+Привет Evilzeg https://cdns.memealerts.com/p/66961426e904cc2377372321/cdd80a79-9dd9-4a44-a5a7-016de293f8d6/alert_orig.webm
+Привет сразу всем (оптом) https://cdns.memealerts.com/p/672ba6a81135f4340a61a4d0/6e47bcfc-453d-47da-8b6f-958c2a25bc4a/alert_orig.webm
 
 ## Не сделанное
 
 ### Карточки
 
+- убрать карточки без видео-мема(скорее всего можно убрать связанное с ним поле в бд о смайлике)
 - Новые карточки "приветов":
   - Те что в директории "privets"
   - Привет я не мем https://cdns.memealerts.com/p/64ceae64bde979e95d878442/d9700c9e-e658-49b6-ae98-8ca1b3da9350/alert_orig.webm
@@ -49,23 +69,6 @@
 
 В работе:
 
-- Переехать на s3 supabase вместо хранения в репозитории
-  Вместе с эти заменить аудио-приветы на видео-приветы(просто показывать мемы целиком) или свои видео.
-  Для существующих карточек подобрать видео с мемаллертс. Т.е. использовать "их s3", а не наш.
-  Для своих(новых) использовать свой s3 из supabase.
-  - Под новыми и своими подразумеваются новые карточки "приветов", которые я буду делать. Сейчас несколько из них лежат в директории privets. Добавлять их в проект - другая задача.
-
-Маппинг существующих приветов на видео:
-Второй повторный привет https://cdns.memealerts.com/p/672ba6a81135f4340a61a4d0/debfc8c4-16a3-45b0-89ed-9b81f92100e6/alert_orig.webm
-Миф о бесплатном пивете https://cdns.memealerts.com/p/649b210acfd0d2a8f427e00f/1870f6b6-c0d7-45c9-b39f-f7c00c5220b7/alert_orig.webm
-Привет для Салата https://cdns.memealerts.com/p/672ba6a81135f4340a61a4d0/fe6b3373-284a-438a-b6f7-041394b31c77/alert_orig.webm
-Массовый привет (коты одобряют) https://cdns.memealerts.com/p/64f8378906d68898c5b8e508/2d11fea1-bda2-493a-9774-510e15c6a589/alert_orig.webm
-Привет для Quevizar https://cdns.memealerts.com/p/649b210acfd0d2a8f427e00f/5d46287f-92a9-4897-a7cb-dbd4449e8d15/alert_orig.webm
-Здраствуйте, nyanyachos https://cdns.memealerts.com/p/66961426e904cc2377372321/a24b3e2f-5f63-42bc-b40a-346eb305464d/alert_orig.webm
-Привет для remolol https://cdns.memealerts.com/p/66961426e904cc2377372321/0acec35f-0179-466e-a2ca-7995d46328ea/alert_orig.webm
-Привет Evilzeg https://cdns.memealerts.com/p/66961426e904cc2377372321/cdd80a79-9dd9-4a44-a5a7-016de293f8d6/alert_orig.webm
-Привет сразу всем (оптом) https://cdns.memealerts.com/p/672ba6a81135f4340a61a4d0/6e47bcfc-453d-47da-8b6f-958c2a25bc4a/alert_orig.webm
-
 Планы:
 
 - Скорее всего надо заменить S3 от supabase на timeweb. Т.к. из России не доступен один из ip адресов supabase s3.
@@ -76,6 +79,7 @@
   - Например, можно использовать классические модели FTP игр. Давать бесплатные "пивкойны" за ежедневный вход. А в "гамбе" будет именно игра со ставкой "пивкойнов".
   - Как идея - ежемесячный сброс цен(хотя звучит так себе).
   - После надо изучить как можно реализовать выдуманное на supabase.
+  - Кнопке "перекупа" должна получать актуальную цену из бд, а не считать сама.
 
 ## Абстрактные идеи
 

@@ -8,10 +8,11 @@
 - Коммить сам, когда изменение готово.
 - README — простая инструкция для человека, без подробностей.
 - Преддеплой-гейт: `npm run build` + покликать сборку в `preview`. Гейт красный — деплоя нет.
+- Простые команды(вроде запуска проекта), которые могут пригодится человеку добавляй в `justfile`.
 
 ## Преддеплой-проверка (`preview` + `agent-browser`)
 
-Бинарь `./node_modules/.bin/agent-browser` (Chrome скачан 2026-09-08; перепроверка — `doctor --offline --quick`). Цикл: поднять `npm run preview`, затем `export AGENT_BROWSER_SESSION="<задача>"` → `open http://localhost:4321/` → `snapshot -i` → `click/fill @eN` (после каждого изменения страницы заново `snapshot -i`, рефы протухают). В конце `close` + остановить preview. Справочник — в самом CLI (`--help`, `skills get`).
+Бинарь `./node_modules/.bin/agent-browser`. Цикл: поднять `npm run preview`, затем `export AGENT_BROWSER_SESSION="<задача>"` → `open http://localhost:4321/` → `snapshot -i` → `click/fill @eN` (после каждого изменения страницы заново `snapshot -i`, рефы протухают). В конце `close` + остановить preview. Справочник — в самом CLI (`--help`, `skills get`).
 
 ## Supabase
 
