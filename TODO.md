@@ -20,10 +20,25 @@
 
 - Новые карточки "приветов":
   - Те что в директории "privets"
+  - Привет я не мем https://cdns.memealerts.com/p/64ceae64bde979e95d878442/d9700c9e-e658-49b6-ae98-8ca1b3da9350/alert_orig.webm
+  - Грубый привет от Брадхи https://cdns.memealerts.com/p/64ceae64bde979e95d878442/708a27b8-3213-4b8d-aead-2190c17ad493/alert_orig.webm
+  - Привет, я ваш виртуальный помощник https://cdns.memealerts.com/p/64ceae64bde979e95d878442/30feb2e2-3eed-4878-8f80-895746b46d32/alert_orig.webm
+  - Привет Аврора https://cdns.memealerts.com/p/67192f892e1f470e296d67ca/7fb39f55-2e3a-42aa-80fd-95a0835d3e09/alert_orig.webm
+  - Доброе утро Монах https://cdns.memealerts.com/p/694ade20c4649c766c8e3d80/70c03e18-173a-4d8e-8cb3-22b7507dce86/alert_orig.webm
+
 - Добавить дополнительные звуки для колеса:
-  - https://cdns.memealerts.com/p/66bb271a732c61af9b72709c/bb8289ea-5bab-4c34-8af5-a9a36855f7c4/alert_orig.webm
-  - https://cdns.memealerts.com/p/64beee9c05b8e6cffeefb79c/8c860fa5-2f38-4e49-b6b7-91c4c9a539e5/alert_orig.webm
-    пусть они играют случайно.
+  пусть они играют случайно.
+  - сова https://cdns.memealerts.com/p/66bb271a732c61af9b72709c/bb8289ea-5bab-4c34-8af5-a9a36855f7c4/alert_orig.webm (кручение колеса)
+  - макнагенс https://cdns.memealerts.com/p/64beee9c05b8e6cffeefb79c/8c860fa5-2f38-4e49-b6b7-91c4c9a539e5/alert_orig.webm (кручение колеса)
+  - Топ топ топ топ https://cdns.memealerts.com/p/67c028c60654268564ea2e2d/5c04210b-87a2-42ec-a665-b48df32d9329/alert_orig.webm (кручение колеса)
+  - идеальное попадание https://cdns.memealerts.com/p/672ba6a81135f4340a61a4d0/bd079c62-cf91-4f1a-b0e9-bfdbb7ed4250/alert_orig.webm (выигрыш)
+  - оооооо, https://cdns.memealerts.com/p/672ba6a81135f4340a61a4d0/3056f9e0-11a3-4c77-be77-bb0fa462196c/alert_orig.webm (выигрыш)
+  - Тактактакуе https://cdns.memealerts.com/p/672ba6a81135f4340a61a4d0/bd079c62-cf91-4f1a-b0e9-bfdbb7ed4250/alert_orig.webm (выигрыш)
+  - обожаю пиво https://cdns.memealerts.com/p/66961426e904cc2377372321/b73c33c2-20f0-4cdd-8964-f93e586aefc3/alert_orig.webm (выигрыш)
+  - ванна пивы https://cdns.memealerts.com/p/649b210acfd0d2a8f427e00f/05caad83-43a5-4097-9c35-b1b400047467/alert_orig.webm (супер выигрыш)
+  - Сноу, Идеально https://cdns.memealerts.com/p/656259dec18a3d4f3edea083/f6c747f1-e9b7-489d-b3a9-c3d66ca2f6c3/alert_orig.webm (супер выигрыш)
+  - браткуе https://cdns.memealerts.com/p/64a6e8098fcda1e79a4a064b/a1eb63d8-9e13-401c-a6b7-a7c900d91dc6/alert_orig.webm (проигрыш, сомнительно)
+  - хиган, не грусти https://cdns.memealerts.com/p/66f070ac0482277b53a558d2/6c11958b-ef83-4888-ad06-fd9925033428/alert_orig.webm (проигрыш)
 
 ### UI
 
@@ -32,16 +47,45 @@
 
 ### backend
 
+В работе:
+
 - Переехать на s3 supabase вместо хранения в репозитории
-  Вместо с эти заменить аудио-приветы на видео-приветы(просто показывать мемы целиком) или свои видео.
-  Для существующих карточек подобрать видео с мемаллертс. Для своих(новых) использовать s3.
+  Вместе с эти заменить аудио-приветы на видео-приветы(просто показывать мемы целиком) или свои видео.
+  Для существующих карточек подобрать видео с мемаллертс. Т.е. использовать "их s3", а не наш.
+  Для своих(новых) использовать свой s3 из supabase.
+  - Под новыми и своими подразумеваются новые карточки "приветов", которые я буду делать. Сейчас несколько из них лежат в директории privets. Добавлять их в проект - другая задача.
+
+Маппинг существующих приветов на видео:
+Второй повторный привет https://cdns.memealerts.com/p/672ba6a81135f4340a61a4d0/debfc8c4-16a3-45b0-89ed-9b81f92100e6/alert_orig.webm
+Миф о бесплатном пивете https://cdns.memealerts.com/p/649b210acfd0d2a8f427e00f/1870f6b6-c0d7-45c9-b39f-f7c00c5220b7/alert_orig.webm
+Привет для Салата https://cdns.memealerts.com/p/672ba6a81135f4340a61a4d0/fe6b3373-284a-438a-b6f7-041394b31c77/alert_orig.webm
+Массовый привет (коты одобряют) https://cdns.memealerts.com/p/64f8378906d68898c5b8e508/2d11fea1-bda2-493a-9774-510e15c6a589/alert_orig.webm
+Привет для Quevizar https://cdns.memealerts.com/p/649b210acfd0d2a8f427e00f/5d46287f-92a9-4897-a7cb-dbd4449e8d15/alert_orig.webm
+Здраствуйте, nyanyachos https://cdns.memealerts.com/p/66961426e904cc2377372321/a24b3e2f-5f63-42bc-b40a-346eb305464d/alert_orig.webm
+Привет для remolol https://cdns.memealerts.com/p/66961426e904cc2377372321/0acec35f-0179-466e-a2ca-7995d46328ea/alert_orig.webm
+Привет Evilzeg https://cdns.memealerts.com/p/66961426e904cc2377372321/cdd80a79-9dd9-4a44-a5a7-016de293f8d6/alert_orig.webm
+Привет сразу всем (оптом) https://cdns.memealerts.com/p/672ba6a81135f4340a61a4d0/6e47bcfc-453d-47da-8b6f-958c2a25bc4a/alert_orig.webm
+
+Планы:
+
 - Пивкойны теперь должны отслеживаться в БД, а не в localStorage.
   - Соответственно "гамба" тоже должна быть на бэке.
   - Для этого надо будет продумать математику "гамбы". Надо отправить сабагента изучать как делать подобные "казино". Нужно воспользоваться готовой механикой и математикой. Минимизируя свои решения в этом.
   - Например, можно использовать классические модели FTP игр. Давать бесплатные "пивкойны" за ежедневный вход. А в "гамбе" будет именно игра со ставкой "пивкойнов".
   - Как идея - ежемесячный сброс цен(хотя звучит так себе).
+  - После надо изучить как можно реализовать выдуманное на supabase.
 
 ## Абстрактные идеи
 
 - Начисление баллов канала за донаты -> Пивкойны за баллы канала
+  research: `.scratch/shared-state/research/06-channel-points-pivkoiny.md`
 - "Уведомления" на экране стримера о покупке привета ни бирже.
+  Т.е. слой для OBS который отображает события с backend.
+- Скилл по написанию текста в стиле AlysQuE.
+
+## Мемы(на будущее)
+
+Тактактакуе https://cdns.memealerts.com/p/66961426e904cc2377372321/bb69caef-8ca8-46dc-a658-4906f9a7db2f/alert_orig.webm
+На этом канале все скам https://cdns.memealerts.com/p/67703e376aca378b12d6202f/d7d3f098-37b5-46cd-84fb-17837401f737/alert_orig.webm
+Я не буду думать я буду бахать пиво и смотреть на сиськи https://cdns.memealerts.com/p/672ba6a81135f4340a61a4d0/0b3f11ac-8702-427f-a634-25120351c183/alert_orig.webm
+ЧО ГОВОРИШЬ? https://cdns.memealerts.com/p/66961426e904cc2377372321/bd0df642-442f-4489-93a3-b31886ad7523/alert_orig.webm
