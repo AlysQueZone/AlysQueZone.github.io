@@ -1,63 +1,28 @@
-# О проекте
+# AlysQueZone
 
-Это шуточный проект для зрителей twitch-канала <https://www.twitch.tv/alysque>
-Называется AlysQueZone
-Основная идея это платформа для "продаже приветов".
-Стример здоровается с участикам чата(чатерсами), его привет это ценность.
-Поэтому чатерсы перепродают приветы на сайте.
+Шуточная биржа приветов чата Twitch-канала alysque. Что это и как запустить — в README.md.
 
-## Реализация
+## Правила
 
-- Добавляй в AGENTS.md полезные ссылки, информацию и инструкции(краткие) по тому где и какая информация(связанная с twitch каналом) доступна для проекта.
-  Также добавляй кратко, важную информацию о реализации проекта(которая пригодится AI который его делает).
-- Делай коммиты сам когда надо
-- В README.md должна быть простая инструкция(без лишних подробностей) для меня, что это и как этим пользоваться.
-- Перед публикацией (deploy) всегда сначала локально: `npm run build` + открыть и покликать (preview/double-click), проверять только потом деплоить.
+- Дописывай сюда кратко новые Twitch-источники и решения реализации.
+- Коммить сам, когда изменение готово.
+- README — простая инструкция для человека, без подробностей.
+- Преддеплой-гейт: `npm run build` + покликать сборку в `preview`. Гейт красный — деплоя нет.
 
-## agent-browser
+## Преддеплой-проверка (`preview` + `agent-browser`)
 
-- Преддеплой-проверка — через проектный `agent-browser` (`dependencies`, бинарь `./node_modules/.bin/agent-browser` или `npx agent-browser`); Chrome уже скачан (`install` сделан 2026-09-08, перепроверка — `doctor --offline --quick`).
-- Цикл: поднять `npm run preview`, затем `export AGENT_BROWSER_SESSION="<задача>"` → `open http://localhost:4321/` → `snapshot -i` → `click/fill @eN` по рефам → после каждого изменения страницы заново `snapshot -i` (рефы протухают). В конце `close` + остановить preview.
-- Полный справочник команд — в самом CLI (`--help`, `skills get`), сюда его не копировать.
-
-## Twitch-источники
-
-- Канал: <https://www.twitch.tv/alysque> (ID `224473232`, ник `aLySQuE`). Цвет чата `#FF00BC`, аватар/баннер — `static-cdn.jtvnw.net` (хотлинк можно, бинарники не коммитить).
-- TG с анонсами/мемами: <https://t.me/alysque> (читать через `https://t.me/s/alysque`).
-- 7TV-сет канала (895 эмоутов): `GET https://7tv.io/v3/users/twitch/224473232` (поле `emote_set.emotes`); картинки `https://cdn.7tv.app/emote/<id>/2x.webp` (хотлинк ок).
-- Нативный эмоут alysqueCLAP (gif): `https://static-cdn.jtvnw.net/emoticons/v2/emotesv2_1075070639054e5d8cacb8a0ef4872d7/default/light|dark/3.0` (хотлинк ок).
-- Все эмоуты разом: `https://emotes.adamcy.pl/v1/channel/alysque/emotes/all`.
-- Архив чата VOD: `TwitchDownloaderCLI chatdownload --id <VOD_ID>` либо анонимный Twitch GQL `VideoCommentsByOffsetOrCursor` (хеш `b70a3591...adf6a`, пагинация через `contentOffsetSeconds`); VOD ID — число из `twitch.tv/videos/<id>`, живут 14–60 дней, качать только чат (`chat.json`).
-- Мемы канала: страница <https://memealerts.com/alysque> публичного API не имеет (нужен токен стримера); прямые файлы `https://cdns.memealerts.com/p/.../alert_orig.webm` качаются curl, звук — `ffmpeg -i in.webm -vn -codec:a libmp3lame -q:a 5 out.mp3`.
-- Пасты/тон чата: <https://twitchpaste.ru/channels/alysque>. Стата: <https://twitchtracker.com/alysque>.
+Бинарь `./node_modules/.bin/agent-browser` (Chrome скачан 2026-09-08; перепроверка — `doctor --offline --quick`). Цикл: поднять `npm run preview`, затем `export AGENT_BROWSER_SESSION="<задача>"` → `open http://localhost:4321/` → `snapshot -i` → `click/fill @eN` (после каждого изменения страницы заново `snapshot -i`, рефы протухают). В конце `close` + остановить preview. Справочник — в самом CLI (`--help`, `skills get`).
 
 ## Supabase
 
-- Предпочитаем реализовывать backend логику на supabase, вместо клиенского кода.
-- MCP `supabase` настроен в `opencode.json` (project scope) и обязателен к использованию для всех операций с Supabase: схема, миграции, данные, логи, edge functions.
+- Backend-логика — на supabase, не в клиентском коде; skill `supabase` — на схему/RLS/миграции/отладку.
+- MCP `supabase` (`opencode.json`) — на все операции: схема, миграции, данные, логи, edge functions.
 - Deploy to production ВКЛ: мерж в `main` сам применяет миграции. Схему менять только миграциями; правки из дашборда забирать через `db pull`.
 
-## Видео и звуки (пайплайн)
+## Указатели (грузить по ветке)
 
-- Раскладка в бакете `media`: `sounds/*.mp3`, `videos/<slug>.webm|mp4|webp` (тройка на 1 привет; mp4/webp выводятся заменой расширения).
-- Тройка из `privets/<name>.mp4` (проверено 2026-09-08): `ffmpeg -i in.mp4 -c:v libvpx-vp9 -b:v 0 -crf 32 -c:a libopus out.webm`; `ffmpeg -i in.mp4 -c:v libx264 -crf 23 -preset veryfast -c:a aac -movflags +faststart out.mp4`; `ffmpeg -i in.mp4 -vframes 1 -q:v 80 out.webp`. Работать в `/tmp`, бинарники не коммитить.
-- Заливка байтов — скриптом `scripts/storage_upload.py` (MCP заливки нет, SQL байты не несёт; ключ `SUPABASE_SERVICE_ROLE_KEY` в `.env`, запуск из корня репо, ключ никогда не печатается): `python3 scripts/storage_upload.py --bucket media --dest sounds/ a.mp3 b.mp3` или `--dir /tmp/out/ --pattern "*.mp3"`; URL `https://<ref>.supabase.co/storage/v1/object/public/media/<path>`.
-- Новый лот — миграцией `INSERT INTO public.lots (slug,title,price,rarity,meme_text,video_url)` с NULL-владельцами; хотлинк-мемам `UPDATE ... SET video_url=... WHERE video_url IS NULL`. Звук из чужого webm: `ffmpeg -i in.webm -vn -codec:a libmp3lame -q:a 5 out.mp3` → в `sounds/`.
-
-## Другое
-
-- В директории privets(gitignored) лежат оригиналы аудио/видео приветов. Туда их добавляет человек, для последующего использования на сайте.
-
-## Agent skills
-
-### Issue tracker
-
-Issues live as local markdown files under `.scratch/`. See `docs/agents/issue-tracker.md`.
-
-### Triage labels
-
-Default five canonical triage labels (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
-
-### Domain docs
-
-Single-context layout: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+- Эмоуты/чат VOD/мемы/пасты/стата канала → `docs/agents/twitch-sources.md`.
+- Новый привет/лот (конверт `ffmpeg`, заливка в `media`, `INSERT INTO lots`) → `docs/agents/media-pipeline.md`.
+- Issues-трекинг (файлы в `.scratch/`) → `docs/agents/issue-tracker.md`.
+- Триаж-лейблы (`needs-triage` … `wontfix`) → `docs/agents/triage-labels.md`.
+- Термины/глоссарий/ADR-конфликт → `docs/agents/domain.md` (`CONTEXT.md` + `docs/adr/`).
