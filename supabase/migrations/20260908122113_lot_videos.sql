@@ -1,5 +1,5 @@
 -- [Стройка video-s3, тикет 11] Маппинг 9 мем-лотов → MemeAlerts webm (§4 спеки).
--- Источник URL: .scratch/video-s3/meme-mapping.md (webm целиком из таблицы,
+-- Источник URL: scratch/video-s3/meme-mapping.md (webm целиком из таблицы,
 -- проверены 2026-09-08; mp4/webp фронт выводит заменой хвоста alert_orig.webm).
 -- Идемпотентна: каждый UPDATE guarded `and video_url is null` — повторный прогон
 -- не затирает уже выставленные URL (в т.ч. будущие собственные video_url из Storage).

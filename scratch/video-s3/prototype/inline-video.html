@@ -1,0 +1,108 @@
+<!doctype html>
+<!-- PROTOTYPE, throwaway. Тикет 04 карты video-s3: как показывать видео-привет в карточке.
+     Открыть двойным кликом. В прод не тащить. Видео: хотлинк MemeAlerts (тикет 02). -->
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Прототип 04: инлайн-видео в карточке (throwaway)</title>
+<style>
+  body { background:#14101a; color:#eee; font-family:system-ui,sans-serif; margin:0; padding:24px; }
+  h1 { font-size:20px; }
+  .sub { color:#aaa; font-size:13px; max-width:900px; }
+  .grid { display:flex; gap:20px; flex-wrap:wrap; margin-top:20px; }
+  .card { width:320px; border:1px solid #444; border-radius:16px; padding:16px; background:#1e1830; }
+  .card h2 { font-size:15px; margin:0 0 4px; }
+  .card .meta { font-size:12px; color:#aaa; margin-bottom:10px; }
+  .stage { position:relative; width:100%; aspect-ratio:1/1; border-radius:12px; overflow:hidden; background:#000; }
+  .stage img, .stage video { width:100%; height:100%; object-fit:cover; display:block; }
+  .play { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+          background:rgba(0,0,0,.35); border:0; width:100%; cursor:pointer; }
+  .play span { font-size:15px; color:#fff; background:#c2187b; border-radius:999px; padding:10px 18px; }
+  .tag { display:inline-block; font-size:12px; background:#c2187b; border-radius:8px; padding:2px 10px; margin-bottom:8px; }
+  .note { font-size:12px; color:#bbb; margin-top:10px; min-height:90px; }
+  dialog { background:#1e1830; color:#eee; border:1px solid #555; border-radius:16px; padding:12px; }
+  dialog video { width:min(80vw,480px); border-radius:12px; }
+  dialog button { margin-top:8px; }
+</style>
+</head>
+<body>
+<h1>Прототип 04 — видео в карточке (V1 / V2 / V3)</h1>
+<p class="sub">Видео одно и то же (хотлинк MemeAlerts, webm + mp4-фолбэк + webp-постер).
+V1 — живое превью, V2 — клик и смотрит в карточке, V3 — клик и смотрит в модалке.
+Выбери глазами один вариант. Файл throwaway: <code>scratch/video-s3/prototype/inline-video.html</code></p>
+
+<div class="grid">
+  <div class="card">
+    <div class="tag">V1 — автоплей без звука</div>
+    <h2>Привет я не мем</h2>
+    <div class="meta">Владелец: — · 600 🍺</div>
+    <div class="stage">
+      <video id="v1" muted loop playsinline autoplay preload="metadata"
+        poster="https://cdns.memealerts.com/p/64ceae64bde979e95d878442/d9700c9e-e658-49b6-ae98-8ca1b3da9350/alert_orig.webp">
+        <source src="https://cdns.memealerts.com/p/64ceae64bde979e95d878442/d9700c9e-e658-49b6-ae98-8ca1b3da9350/alert_orig.webm" type="video/webm">
+        <source src="https://cdns.memealerts.com/p/64ceae64bde979e95d878442/d9700c9e-e658-49b6-ae98-8ca1b3da9350/alert_orig.mp4" type="video/mp4">
+      </video>
+    </div>
+    <p class="note">Играет само, без звука, по кругу. Клик — пауза/плей, кнопка — звук.
+    Плюс: витрина «живая». Минус: трафик на каждую карточку (мобильные), звук всё равно по клику.</p>
+    <button id="v1mute">🔊 звук</button>
+  </div>
+
+  <div class="card">
+    <div class="tag">V2 — постер + play в карточке</div>
+    <h2>Привет я не мем</h2>
+    <div class="meta">Владелец: — · 600 🍺</div>
+    <div class="stage" id="v2stage">
+      <img src="https://cdns.memealerts.com/p/64ceae64bde979e95d878442/d9700c9e-e658-49b6-ae98-8ca1b3da9350/alert_orig.webp" alt="постер">
+      <button class="play" id="v2btn"><span>▶ смотреть</span></button>
+    </div>
+    <p class="note">Тихо и дёшево: грузится только webp-постер (7 КБ). Клик — видео со звуком
+    и контролами прямо в карточке. Плюс: ноль трафика до клика. Минус: витрина статичная.</p>
+  </div>
+
+  <div class="card">
+    <div class="tag">V3 — постер + модалка</div>
+    <h2>Привет я не мем</h2>
+    <div class="meta">Владелец: — · 600 🍺</div>
+    <div class="stage">
+      <img src="https://cdns.memealerts.com/p/64ceae64bde979e95d878442/d9700c9e-e658-49b6-ae98-8ca1b3da9350/alert_orig.webp" alt="постер">
+      <button class="play" id="v3btn"><span>▶ смотреть</span></button>
+    </div>
+    <p class="note">Как V2 до клика, но видео открывается поверх страницы (больше экран, затемнение).
+    Плюс: удобно на телефоне. Минус: лишний слой, закрывать крестиком.</p>
+  </div>
+</div>
+
+<dialog id="v3dlg">
+  <video controls autoplay playsinline preload="metadata">
+    <source src="https://cdns.memealerts.com/p/64ceae64bde979e95d878442/d9700c9e-e658-49b6-ae98-8ca1b3da9350/alert_orig.webm" type="video/webm">
+    <source src="https://cdns.memealerts.com/p/64ceae64bde979e95d878442/d9700c9e-e658-49b6-ae98-8ca1b3da9350/alert_orig.mp4" type="video/mp4">
+  </video><br>
+  <button id="v3close">закрыть</button>
+</dialog>
+
+<script>
+const WEBM = 'https://cdns.memealerts.com/p/64ceae64bde979e95d878442/d9700c9e-e658-49b6-ae98-8ca1b3da9350/alert_orig.webm';
+const MP4 = 'https://cdns.memealerts.com/p/64ceae64bde979e95d878442/d9700c9e-e658-49b6-ae98-8ca1b3da9350/alert_orig.mp4';
+const v1 = document.getElementById('v1');
+v1.addEventListener('click', () => { v1.paused ? v1.play() : v1.pause(); });
+document.getElementById('v1mute').addEventListener('click', (e) => {
+  v1.muted = !v1.muted; e.target.textContent = v1.muted ? '🔊 звук' : '🔇 тихо';
+});
+document.getElementById('v2btn').addEventListener('click', () => {
+  const st = document.getElementById('v2stage');
+  st.innerHTML = '';
+  const v = document.createElement('video');
+  v.controls = true; v.autoplay = true; v.playsInline = true; v.preload = 'metadata';
+  v.innerHTML = `<source src="${WEBM}" type="video/webm"><source src="${MP4}" type="video/mp4">`;
+  st.appendChild(v);
+});
+const dlg = document.getElementById('v3dlg');
+document.getElementById('v3btn').addEventListener('click', () => dlg.showModal());
+document.getElementById('v3close').addEventListener('click', () => {
+  dlg.querySelector('video').pause(); dlg.close();
+});
+</script>
+</body>
+</html>

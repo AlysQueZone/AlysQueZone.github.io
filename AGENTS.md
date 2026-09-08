@@ -25,6 +25,6 @@
 
 - Эмоуты/чат VOD/мемы/пасты/стата канала → `docs/agents/twitch-sources.md`.
 - Новый привет/лот (конверт `ffmpeg`, заливка в `media`, `INSERT INTO lots`) → `docs/agents/media-pipeline.md`.
-- Issues-трекинг (файлы в `.scratch/`) → `docs/agents/issue-tracker.md`.
+- Issues-трекинг (файлы в `scratch/`) → `docs/agents/issue-tracker.md`.
 - Триаж-лейблы (`needs-triage` … `wontfix`) → `docs/agents/triage-labels.md`.
 - Термины/глоссарий/ADR-конфликт → `docs/agents/domain.md` (`CONTEXT.md` + `docs/adr/`).

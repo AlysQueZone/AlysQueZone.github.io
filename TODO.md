@@ -84,7 +84,7 @@
 ## Абстрактные идеи
 
 - Начисление баллов канала за донаты -> Пивкойны за баллы канала
-  research: `.scratch/shared-state/research/06-channel-points-pivkoiny.md`
+  research: `scratch/shared-state/research/06-channel-points-pivkoiny.md`
 - "Уведомления" на экране стримера о покупке привета ни бирже.
   Т.е. слой для OBS который отображает события с backend.
 - Скилл по написанию текста в стиле AlysQuE.

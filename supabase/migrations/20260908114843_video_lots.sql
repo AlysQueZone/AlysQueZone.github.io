@@ -1,5 +1,5 @@
 -- [Стройка video-s3, тикет 07] Видеополя лотов, снос ЛУКа, бакет media.
--- Спека: .scratch/video-s3/spec.md §1. Идемпотентна к живым данным:
+-- Спека: scratch/video-s3/spec.md §1. Идемпотентна к живым данным:
 -- повторный прогон не затирает живых владельцев/цен (guard NOT EXISTS purchases,
 -- ON CONFLICT DO NOTHING, IF NOT EXISTS).
 -- Применение: Deploy to production при мерже в main. НЕ применять к проду вручную.
