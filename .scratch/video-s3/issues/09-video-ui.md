@@ -1,7 +1,7 @@
 # [Стройка] Видео-UI: карточки, страница лота, каталог из БД
 
 Type: task
-Status: open (ready-for-agent)
+Status: resolved
 Blocked by: 07
 
 ## Question
@@ -16,3 +16,4 @@ Blocked by: 07
 ## Comments
 
 - Приёмка: постер→видео по клику; нет владельца — нет бейджа, покупка активна; билд без env падает явно.
+- 2026-09-08: готово — LotVideo V2, каталог/топ-4/getStaticPaths из БД, `npm run build` зелёный (23 стр.).

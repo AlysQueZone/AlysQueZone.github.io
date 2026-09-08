@@ -1,10 +1,11 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { lots } from '../lib/lots.ts';
+import { fetchCatalogLots } from '../lib/lots.ts';
 
 const base = import.meta.env.BASE_URL;
-// Топ приветов — первые 4 лота из data/lots.json, не хардкод.
-const topLots = lots.slice(0, 4);
+// Топ приветов — первые 4 лота каталога из БД на билде (тикет 09),
+// без PUBLIC_SUPABASE_* билд падает явно. Не хардкод.
+const topLots = (await fetchCatalogLots()).slice(0, 4);
 ---
 
 <BaseLayout title="AlysQueZone — БИРЖА ПРИВЕТОВ">
@@ -90,7 +91,7 @@ const topLots = lots.slice(0, 4);
               {lot.rarity}
             </span>
             <h3 class="mt-3 font-extrabold break-words">{lot.title}</h3>
-            <p class="mt-1 truncate text-sm text-mist/60">владелец: {lot.owner}</p>
+            <p class="mt-1 truncate text-sm text-mist/60">владелец: {lot.owner ?? '—'}</p>
             <p class="mt-3 font-mono text-xl font-bold text-pivko">{lot.price} 🍺</p>
           </article>
         ))

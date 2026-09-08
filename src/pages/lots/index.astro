@@ -2,7 +2,10 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import LotCard from '../../components/LotCard.astro';
 import BuyModal from '../../components/BuyModal.astro';
-import { lots } from '../../lib/lots.ts';
+import { fetchCatalogLots } from '../../lib/lots.ts';
+
+// Каталог — из БД на билде (тикет 09): без PUBLIC_SUPABASE_* билд падает явно.
+const lots = await fetchCatalogLots();
 
 // Каталог для клиентского рендера «Моих приветов» (читает скрипт витрины).
 const catalog = lots.map((lot) => ({ id: lot.id, title: lot.title, price: lot.price }));
@@ -35,12 +38,13 @@ const catalog = lots.map((lot) => ({ id: lot.id, title: lot.title, price: lot.pr
 </BaseLayout>
 
 <script>
-  // Живая витрина (тикет 11): shared-Владелец/цена поверх статики каталога.
-  // Названия, Редкость, постеры/звуки не трогаем — только владелец, цена,
-  // свежие данные кнопки «Купить» и бейдж «ТВОЙ» (owner_uid == сессия).
+  // Живая витрина (тикет 09): shared-Владелец/цена поверх каталога из БД.
+  // Названия, Редкость, мем-тексты и видео запечены на билде из БД —
+  // скрипт дотягивает только владельца, цену, свежие данные кнопки «Купить»
+  // и бейдж «ТВОЙ» (owner_uid == сессия). Владелец NULL — бейдж скрыт.
   // «Мои приветы» — только из БД: лоты, где owner_uid == uid сессии.
   // Локальный инвентарь не читаем; перерисовка — от shared/Realtime.
-  // Без PUBLIC_SUPABASE_* — честная деградация: остаётся статика.
+  // Без PUBLIC_SUPABASE_* — честная деградация: остаётся запечённый каталог.
   import {
     getSupabase,
     isSupabaseConfigured,
@@ -149,7 +153,7 @@ const catalog = lots.map((lot) => ({ id: lot.id, title: lot.title, price: lot.pr
           if (!shared || !Number.isFinite(shared.price)) return;
           applyCard(
             node,
-            shared.owner_login ?? node.querySelector('[data-shared-owner]')?.textContent ?? '?',
+            shared.owner_login ?? node.querySelector('[data-shared-owner]')?.textContent ?? '—',
             shared.price,
             uid !== null && shared.owner_uid !== null && shared.owner_uid === uid,
           );

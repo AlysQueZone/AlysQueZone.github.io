@@ -1,0 +1,104 @@
+---
+// V2 инлайн-видео лота (тикет 09, прототип .scratch/video-s3/prototype/inline-video.html):
+// webp-постер + оверлей «▶ смотреть»; клик → инлайн-<video controls autoplay
+// playsinline> (source webm из video_url + mp4 заменой хвоста
+// alert_orig.webm→alert_orig.mp4; постер — заменой на .webp).
+// При мёртвом URL скрипт возвращает постер обратно.
+// Один компонент на LotCard.astro и lots/[id].astro.
+interface Props {
+  videoUrl?: string | null;
+  title: string;
+}
+
+const { videoUrl, title } = Astro.props;
+const webm = videoUrl ?? '';
+const mp4 = webm.replace(/\.webm(\?.*)?$/i, '.mp4$1');
+const poster = webm.replace(/\.webm(\?.*)?$/i, '.webp$1');
+const hasVideo = webm.length > 0;
+---
+
+{
+  hasVideo && (
+    <div
+      data-lot-video-root
+      data-video-webm={webm}
+      data-video-mp4={mp4}
+      data-video-poster={poster}
+      data-video-title={title}
+      class="relative aspect-square w-full overflow-hidden rounded-xl bg-black"
+    >
+      <img
+        src={poster}
+        alt={title}
+        loading="lazy"
+        class="h-full w-full object-cover"
+        data-lot-video-poster
+      />
+      <button
+        type="button"
+        data-lot-video-play
+        class="absolute inset-0 flex cursor-pointer items-center justify-center bg-black/35"
+      >
+        <span class="rounded-full bg-stream px-4 py-2 text-sm font-extrabold text-white">
+          ▶ смотреть
+        </span>
+      </button>
+    </div>
+  )
+}
+
+<script>
+  function playInlineVideo(root: HTMLElement): void {
+    const webm = root.dataset.videoWebm ?? '';
+    const mp4 = root.dataset.videoMp4 ?? '';
+    const poster = root.dataset.videoPoster ?? '';
+    if (!webm) return;
+    const original = root.innerHTML;
+    let restored = false;
+    const restorePoster = (): void => {
+      if (restored) return;
+      restored = true;
+      root.innerHTML = original;
+      delete root.dataset.videoInit;
+      initLotVideos();
+    };
+    const video = document.createElement('video');
+    video.controls = true;
+    video.autoplay = true;
+    video.playsInline = true;
+    video.setAttribute('playsinline', '');
+    video.preload = 'metadata';
+    if (poster) video.poster = poster;
+    video.className = 'h-full w-full object-cover';
+    const webmSrc = document.createElement('source');
+    webmSrc.src = webm;
+    webmSrc.type = 'video/webm';
+    video.appendChild(webmSrc);
+    let lastSrc: HTMLSourceElement = webmSrc;
+    if (mp4 && mp4 !== webm) {
+      const mp4Src = document.createElement('source');
+      mp4Src.src = mp4;
+      mp4Src.type = 'video/mp4';
+      video.appendChild(mp4Src);
+      lastSrc = mp4Src;
+    }
+    // Мёртвый URL: оба сорса битые → остаётся постер.
+    lastSrc.addEventListener('error', restorePoster);
+    video.addEventListener('error', restorePoster);
+    root.innerHTML = '';
+    root.appendChild(video);
+  }
+
+  function initLotVideos(): void {
+    document.querySelectorAll('[data-lot-video-root]').forEach((node) => {
+      if (!(node instanceof HTMLElement)) return;
+      if (node.dataset.videoInit === '1') return;
+      node.dataset.videoInit = '1';
+      node.querySelector('[data-lot-video-play]')?.addEventListener('click', () => {
+        playInlineVideo(node);
+      });
+    });
+  }
+
+  initLotVideos();
+</script>
