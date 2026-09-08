@@ -5,8 +5,7 @@
 // кнопка покупки активна (первый покупатель — первый владелец).
 // Видео — общий V2-компонент LotVideo (прототип
 // .scratch/video-s3/prototype/inline-video.html).
-// Шов для тикета 10: data-lot-audio НЕ переименовывать здесь,
-// data-lot-video уже лежит рядом.
+// Кнопка покупки несёт data-lot-video (тикет 10): BuyModal играет его при покупке.
 import type { Lot } from '../lib/lots.ts';
 import { lotEmote } from '../lib/emotes.ts';
 import LotVideo from './LotVideo.astro';
@@ -50,7 +49,6 @@ const rarityLabel =
       data-lot-title={lot.title}
       data-lot-price={lot.price}
       data-lot-owner={lot.owner ?? '—'}
-      data-lot-audio={undefined}
       data-lot-video={lot.video_url ?? undefined}
       data-for-sale="true"
     >

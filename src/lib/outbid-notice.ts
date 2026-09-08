@@ -3,7 +3,8 @@
  *
  * - триггер — Realtime-смена Владельца лота, где я был прошлым Владельцем
  *   («мои» = текущий Владелец, owner_uid == uid сессии);
- * - уведомление справа-снизу + звук `/sounds/outbid.mp3` через `new Audio`
+ * - уведомление справа-снизу + звук с S3
+ *   (`.../media/sounds/outbid.mp3` через `new Audio`)
  *   (звук только после первого взаимодействия — автоплей-политика);
  *   звук играет и при свёрнутой вкладке;
  * - максимум 3 уведомления, старые вытесняются, висят 20с, hover удерживает;
@@ -36,8 +37,7 @@ interface OutbidEvent {
 }
 
 function soundUrl(): string {
-  const base = (import.meta.env.BASE_URL as string | undefined) ?? '/';
-  return `${base}sounds/outbid.mp3`;
+  return 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/sounds/outbid.mp3';
 }
 
 function readCatalogTitle(slug: string): string | null {
@@ -63,14 +63,14 @@ function resolveTitle(slug: string): string {
   return readCatalogTitle(slug) ?? slug;
 }
 
-/** Звук лота из уже отрисованной кнопки «Купить» (модалка играет его вместо хлопков). */
-function resolveAudio(slug: string): string | null {
+/** Видео лота из уже отрисованной кнопки «Купить» (модалка играет его вместо хлопков). */
+function resolveVideo(slug: string): string | null {
   try {
     const btn = document.querySelector(
       `[data-buy-lot="${CSS.escape(slug)}"]`,
     );
     const src =
-      btn instanceof HTMLElement ? (btn as HTMLElement).dataset.lotAudio : undefined;
+      btn instanceof HTMLElement ? (btn as HTMLElement).dataset.lotVideo : undefined;
     return src && src.length > 0 ? src : null;
   } catch {
     return null;
@@ -96,8 +96,8 @@ function makeRebuyButton(ev: OutbidEvent): HTMLButtonElement {
   btn.dataset.lotTitle = ev.title;
   btn.dataset.lotPrice = String(next);
   btn.dataset.lotOwner = ev.by;
-  const audio = resolveAudio(ev.slug);
-  if (audio) btn.dataset.lotAudio = audio;
+  const video = resolveVideo(ev.slug);
+  if (video) btn.dataset.lotVideo = video;
   return btn;
 }
 

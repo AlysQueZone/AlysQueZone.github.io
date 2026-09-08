@@ -5,15 +5,17 @@
 // Использование: положить <GambaModal /> в layout; кнопка в шапке с
 // атрибутом data-gamba-button сама откроет модалку (скрипт делегированный).
 // Начисления — только через earn() из wallet и только на выигрышах.
-const base = import.meta.env.BASE_URL;
+//
+// Звуки — публичный бакет media (тикет 10, §3 спеки): абсолютные S3-URL без ${base}.
+const S3_SOUNDS = 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/sounds';
 ---
 
 <div
   id="gamba-modal"
-  data-bg={`${base}sounds/gamba-bg.mp3`}
-  data-win1k={`${base}sounds/gamba-win1k.mp3`}
-  data-lose={`${base}sounds/m4-scum.mp3`}
-  data-win100k={`${base}sounds/gamba-win100k.mp3`}
+  data-bg={`${S3_SOUNDS}/gamba-bg.mp3`}
+  data-win1k={`${S3_SOUNDS}/gamba-win1k.mp3`}
+  data-lose={`${S3_SOUNDS}/m4-scum.mp3`}
+  data-win100k={`${S3_SOUNDS}/gamba-win100k.mp3`}
   class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4"
   role="dialog"
   aria-modal="true"

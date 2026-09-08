@@ -4,13 +4,15 @@
 //
 // Использование: положить <BuyModal /> на страницу и вешать на кнопки
 // data-buy-lot="<id>" data-lot-title="<title>" data-lot-price="<n>"
-// data-lot-owner="<owner>" data-for-sale="<true|false>".
+// data-lot-owner="<owner>" data-lot-video="<video_url>" data-for-sale="<true|false>".
+// При покупке играет видео лота со звуком; без video_url — clap с S3.
 // Клик по такой кнопке сам откроет модалку — скрипт ниже делегированный.
 // После покупки кидается window CustomEvent('alysque:bought', { detail: { id } }).
 import { ALYSQUE_CLAP_DARK } from '../lib/emotes.ts';
 
-const base = import.meta.env.BASE_URL;
-const clapSound = `${base}sounds/clap.mp3`;
+// UI-звуки — публичный бакет media (тикет 10, §3 спеки): абсолютный S3-URL без ${base}.
+const clapSound =
+  'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/sounds/clap.mp3';
 ---
 
 <div
@@ -80,7 +82,7 @@ const clapSound = `${base}sounds/clap.mp3`;
   const noBtn = document.getElementById('buy-modal-no');
   const notice = document.getElementById('buy-notice');
 
-  let pending: { id: string; title: string; price: number; owner: string; audio?: string } | null = null;
+  let pending: { id: string; title: string; price: number; owner: string; video?: string } | null = null;
   let noticeTimer: number | undefined;
   let pauseTimer: number | undefined;
   /** Сколько секунд паузы осталось на кнопке (0 — кнопка свободна). */
@@ -104,10 +106,9 @@ const clapSound = `${base}sounds/clap.mp3`;
   const CLAP_URL =
     'https://static-cdn.jtvnw.net/emoticons/v2/emotesv2_1075070639054e5d8cacb8a0ef4872d7/default/dark/3.0';
 
-  function playClap(prefer?: string): void {
+  function playClapFallback(): void {
     try {
-      // Мем-лот играет свой звук (тикет 17), остальные — clap.mp3.
-      const src = prefer ?? modal?.dataset.clapSound;
+      const src = modal?.dataset.clapSound;
       if (!src) return;
       const audio = new Audio(src);
       audio.volume = 0.8;
@@ -115,6 +116,38 @@ const clapSound = `${base}sounds/clap.mp3`;
       if (p && typeof p.catch === 'function') p.catch(() => {});
     } catch {
       // graceful-fallback: без звука, покупка всё равно засчитана
+    }
+  }
+
+  function playBuyVideo(videoUrl?: string): void {
+    if (!videoUrl) {
+      playClapFallback();
+      return;
+    }
+    try {
+      const video = document.createElement('video');
+      video.src = videoUrl;
+      video.autoplay = true;
+      video.playsInline = true;
+      video.setAttribute('playsinline', '');
+      video.preload = 'auto';
+      video.volume = 0.8;
+      video.muted = false;
+      video.style.position = 'fixed';
+      video.style.width = '1px';
+      video.style.height = '1px';
+      video.style.opacity = '0';
+      video.style.pointerEvents = 'none';
+      document.body.appendChild(video);
+      const cleanup = (): void => {
+        video.remove();
+      };
+      video.addEventListener('ended', cleanup);
+      window.setTimeout(cleanup, 15000);
+      const p = video.play();
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+    } catch {
+      playClapFallback();
     }
   }
 
@@ -233,13 +266,13 @@ const clapSound = `${base}sounds/clap.mp3`;
     }
   }
 
-  /** Успех: Пивкойны + confetti/звук. «Мои приветы» обновит витрина из shared по событию. */
-  function celebrate(entry: { id: string; title: string; price: number; owner: string; audio?: string }): void {
+  /** Успех: Пивкойны + confetti/видео лота (без video_url — clap с S3). «Мои приветы» обновит витрина из shared по событию. */
+  function celebrate(entry: { id: string; title: string; price: number; owner: string; video?: string }): void {
     spend(entry.price);
     closeModal();
     renderBalances();
     boom();
-    playClap(entry.audio);
+    playBuyVideo(entry.video);
     showNotice(`ЗАБРАЛ! Привет твой: ${entry.title}`, true);
     window.dispatchEvent(new CustomEvent('alysque:bought', { detail: { id: entry.id, price: entry.price } }));
   }
@@ -284,7 +317,7 @@ const clapSound = `${base}sounds/clap.mp3`;
     const target = e.target as HTMLElement | null;
     const btn = target?.closest?.('[data-buy-lot]');
     if (!(btn instanceof HTMLElement)) return;
-    const { buyLot: id, lotTitle, lotPrice, lotOwner, lotAudio, forSale } = btn.dataset;
+    const { buyLot: id, lotTitle, lotPrice, lotOwner, lotVideo, forSale } = btn.dataset;
     if (!id) return;
     if (forSale === 'false') {
       showNotice('ЛУК не продаётся. Хозяин не менялся.', false);
@@ -307,14 +340,14 @@ const clapSound = `${base}sounds/clap.mp3`;
       title: lotTitle ?? id,
       price: Number(lotPrice ?? 0),
       owner: lotOwner ?? '?',
-      audio: lotAudio,
+      video: lotVideo,
     };
     openModal();
   });
 
   yesBtn?.addEventListener('click', async () => {
     if (!pending) return;
-    const { id, title, price, owner, audio } = pending;
+    const { id, title, price, owner, video } = pending;
     if (!canAfford(price)) {
       closeModal();
       showNotice('Не хватает Пивкойнов, пойжем жоско на стрим', false);
@@ -322,7 +355,7 @@ const clapSound = `${base}sounds/clap.mp3`;
     }
     // Без настроенного хранилища — старое локальное поведение (подтверждать нечему).
     if (!isSupabaseConfigured()) {
-      celebrate({ id, title, price, owner, audio });
+      celebrate({ id, title, price, owner, video });
       return;
     }
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
@@ -344,7 +377,7 @@ const clapSound = `${base}sounds/clap.mp3`;
     try {
       const done = await buyLotShared(id);
       const paid = Number.isFinite(done.price_paid) && done.price_paid > 0 ? done.price_paid : price;
-      celebrate({ id, title, price: paid, owner, audio });
+      celebrate({ id, title, price: paid, owner, video });
     } catch (err) {
       const info = mapBuyError(err);
       if (info.kind === 'cooldown') {
