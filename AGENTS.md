@@ -31,13 +31,12 @@
 - MCP `supabase` настроен в `opencode.json` (project scope) и обязателен к использованию для всех операций с Supabase: схема, миграции, данные, логи, edge functions.
 - Deploy to production ВКЛ: мерж в `main` сам применяет миграции. Схему менять только миграциями; правки из дашборда забирать через `db pull`.
 
-## Видео и звуки (пайплайн, карта video-s3)
+## Видео и звуки (пайплайн)
 
-- Бакет `media` (публичный, создаётся SQL-миграцией `insert into storage.buckets`): `sounds/*.mp3` — UI/гамба-звуки; `videos/<slug>.webm|mp4|webp` — свои видео (тройка на 1 привет; mp4/webp выводятся заменой расширения `video_url`).
-- Новое видео из `privets/<name>.mp4` (там H.264+AAC, вертикаль ~290x500): `ffmpeg -i in.mp4 -c:v libvpx-vp9 -b:v 0 -crf 32 -c:a libopus out.webm`; `ffmpeg -i in.mp4 -c:v libx264 -crf 23 -preset veryfast -c:a aac -movflags +faststart out.mp4`; `ffmpeg -i in.mp4 -vframes 1 -q:v 80 out.webp`. Бинарники в репо не класть, работать в `/tmp`.
-- Заливка байтов — Dashboard/SDK/S3-API (не миграцией); публичный URL `https://<ref>.supabase.co/storage/v1/object/public/media/<path>`.
-- Новый лот — миграцией: `INSERT INTO public.lots (slug,title,price,rarity,meme_text,video_url)` (владельцы NULL — первый покупатель первый владелец); хотлинк-мемам `UPDATE ... SET video_url=... WHERE video_url IS NULL` (цен/владельцев не трогать). Звук из чужого webm: скачать curl, `ffmpeg -i in.webm -vn -codec:a libmp3lame -q:a 5 out.mp3`, залить в `sounds/`.
-- Звуки (гамба/UI) живут только в нашем S3; хотлинк `cdns.memealerts.com` — только видео мем-лотов. `public/sounds|memes` удаляем тем же релизом, когда фронт переключён на новые источники.
+- Раскладка в бакете `media`: `sounds/*.mp3`, `videos/<slug>.webm|mp4|webp` (тройка на 1 привет; mp4/webp выводятся заменой расширения).
+- Тройка из `privets/<name>.mp4` (проверено 2026-09-08): `ffmpeg -i in.mp4 -c:v libvpx-vp9 -b:v 0 -crf 32 -c:a libopus out.webm`; `ffmpeg -i in.mp4 -c:v libx264 -crf 23 -preset veryfast -c:a aac -movflags +faststart out.mp4`; `ffmpeg -i in.mp4 -vframes 1 -q:v 80 out.webp`. Работать в `/tmp`, бинарники не коммитить.
+- Заливка байтов — Dashboard/SDK/S3-API (в MCP заливки нет, SQL байты не несёт); URL `https://<ref>.supabase.co/storage/v1/object/public/media/<path>`.
+- Новый лот — миграцией `INSERT INTO public.lots (slug,title,price,rarity,meme_text,video_url)` с NULL-владельцами; хотлинк-мемам `UPDATE ... SET video_url=... WHERE video_url IS NULL`. Звук из чужого webm: `ffmpeg -i in.webm -vn -codec:a libmp3lame -q:a 5 out.mp3` → в `sounds/`.
 
 ## Другое
 
