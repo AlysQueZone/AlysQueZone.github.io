@@ -1,6 +1,7 @@
 ---
 import '../styles/global.css';
 import GambaModal from '../components/GambaModal.astro';
+import DailyLogin from '../components/DailyLogin.astro';
 import AuthButton from '../components/AuthButton.astro';
 
 interface Props {
@@ -47,6 +48,8 @@ const base = import.meta.env.BASE_URL;
             <span data-wallet-balance>1000</span>
             <span class="text-mist/70">Пивкойнов</span>
           </div>
+          <!-- Ежедневный вход (тикет 10): точка входа рядом с балансом. -->
+          <DailyLogin />
         </div>
         <div id="topbar-right" class="flex flex-wrap items-center gap-2">
           <AuthButton />
