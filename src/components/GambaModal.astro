@@ -1,12 +1,13 @@
 ---
-// Рулетка «гамба на пивкойны» (тикет 32): колесо-canvas из 10 сегментов,
-// крутка ≤5с с ease-out, щелчки через WebAudio, взвешенный исход 50/40/10.
-//
-// Использование: положить <GambaModal /> в layout; кнопка в шапке с
-// атрибутом data-gamba-button сама откроет модалку (скрипт делегированный).
-// Начисления — только через earn() из wallet и только на выигрышах.
-//
-// Звуки — публичный бакет media (тикет 10, §3 спеки): абсолютные S3-URL без ${base}.
+ // Рулетка «гамба на пивкойны» (тикет 09, pivkoiny-backend): исход считает
+ // сервер одним вызовом spin_gamba (ставка 100, дебет + кредит + возврат
+ // исхода в одной транзакции), клиент лишь рисует присланное.
+ // Клиентского RNG и локальных грантов нет; wallet.ts здесь не используется.
+ //
+ // Использование: положить <GambaModal /> в layout; кнопка в шапке с
+ // атрибутом data-gamba-button сама откроет модалку (скрипт делегированный).
+ //
+ // Звуки — публичный бакет media (тикет 10, §3 спеки): абсолютные S3-URL без ${base}.
 import { S3_MEDIA_BASE } from '../lib/media.ts';
 const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
 ---
@@ -14,9 +15,9 @@ const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
 <div
   id="gamba-modal"
   data-bg={`${S3_SOUNDS}/gamba-bg.mp3`}
-  data-win1k={`${S3_SOUNDS}/gamba-win1k.mp3`}
+  data-win={`${S3_SOUNDS}/gamba-win1k.mp3`}
   data-lose={`${S3_SOUNDS}/m4-scum.mp3`}
-  data-win100k={`${S3_SOUNDS}/gamba-win100k.mp3`}
+  data-jackpot={`${S3_SOUNDS}/gamba-win100k.mp3`}
   class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4"
   role="dialog"
   aria-modal="true"
@@ -24,7 +25,12 @@ const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
 >
   <div class="w-full max-w-sm rounded-2xl border border-stream bg-panel p-5 text-center">
     <h3 id="gamba-title" class="text-lg font-black uppercase">Гамба на пивкойны</h3>
-    <p class="mt-1 font-mono text-xs text-mist">+1000 — 50% · мимо — 40% · +100000 — 10%</p>
+    <p class="mt-1 font-mono text-xs text-mist">Ставка 100 · крутит сервер, подкрутить из консоли нельзя</p>
+    <ul class="mx-auto mt-2 grid max-w-70 grid-cols-3 gap-1 font-mono text-xs text-mist" aria-label="Таблица выплат">
+      <li class="rounded-lg border border-white/10 px-1 py-1">мимо · 50%<br /><span class="text-milk">+0</span></li>
+      <li class="rounded-lg border border-white/10 px-1 py-1">возврат · 40%<br /><span class="text-milk">+100</span></li>
+      <li class="rounded-lg border border-white/10 px-1 py-1">джекпот · 10%<br /><span class="text-milk">+500</span></li>
+    </ul>
     <div class="relative mx-auto mt-3 h-70 w-70">
       <canvas id="gamba-wheel" width="560" height="560" class="h-70 w-70"></canvas>
       <div
@@ -40,7 +46,7 @@ const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
         type="button"
         class="cursor-pointer rounded-xl bg-stream px-6 py-2 font-extrabold text-white uppercase hover:bg-ctahover disabled:opacity-50"
       >
-        Крутить
+        Крутить за 100
       </button>
       <button
         id="gamba-close"
@@ -54,30 +60,38 @@ const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
 </div>
 
 <script>
-  import { getBalance, earn } from '../lib/wallet.ts';
+  import { getSupabase, isSupabaseConfigured, signInWithTwitch } from '../lib/supabase.ts';
+  import { fetchMyBalance } from '../lib/balance.ts';
+  import { GAMBA_STAKE, mapGambaError, spinGamba, type GambaOutcome } from '../lib/gamba.ts';
 
-  // 10 сегментов: 5×«+1000», 4×«мимо», 1×«+100000» — веса видны сразу.
-  type Outcome = 'win1k' | 'lose' | 'win100k';
-  const SEGMENTS: { label: string; outcome: Outcome; color: string }[] = [
-    { label: '+1000', outcome: 'win1k', color: '#FF9E2C' },
-    { label: 'мимо', outcome: 'lose', color: '#FFE6AC' },
-    { label: '+1000', outcome: 'win1k', color: '#FF9E2C' },
-    { label: 'мимо', outcome: 'lose', color: '#FFE6AC' },
-    { label: '+1000', outcome: 'win1k', color: '#FF9E2C' },
-    { label: '+100000', outcome: 'win100k', color: '#FF00BC' },
-    { label: '+1000', outcome: 'win1k', color: '#FF9E2C' },
-    { label: 'мимо', outcome: 'lose', color: '#FFE6AC' },
-    { label: '+1000', outcome: 'win1k', color: '#FF9E2C' },
-    { label: 'мимо', outcome: 'lose', color: '#FFE6AC' },
+  // 10 сегментов под серверную таблицу A: 5×«мимо», 4×«+100», 1×«+500».
+  // Колесо лишь докручивается до сегмента присланного сервером исхода.
+  const SEGMENTS: { label: string; outcome: GambaOutcome; color: string }[] = [
+    { label: 'мимо', outcome: 'miss', color: '#FFE6AC' },
+    { label: '+100', outcome: 'return', color: '#FF9E2C' },
+    { label: 'мимо', outcome: 'miss', color: '#FFE6AC' },
+    { label: '+100', outcome: 'return', color: '#FF9E2C' },
+    { label: 'мимо', outcome: 'miss', color: '#FFE6AC' },
+    { label: '+500', outcome: 'jackpot', color: '#FF00BC' },
+    { label: 'мимо', outcome: 'miss', color: '#FFE6AC' },
+    { label: '+100', outcome: 'return', color: '#FF9E2C' },
+    { label: 'мимо', outcome: 'miss', color: '#FFE6AC' },
+    { label: '+100', outcome: 'return', color: '#FF9E2C' },
   ];
   const SEG = (Math.PI * 2) / SEGMENTS.length;
   const SPIN_MS = 4200;
 
-  const RESULT_TEXT: Record<Outcome, string> = {
-    win1k: 'ПОЙЖЕМ! +1000 Пивкойнов — чат в шоке 🙂',
-    lose: 'МИМО! Пивкойны целы, пойжем дальше',
-    win100k: 'ДЖЕКПОТ ЖОСКО! +100000 Пивкойнов — ты богат 🍺',
+  const RESULT_TEXT: Record<GambaOutcome, string> = {
+    miss: 'МИМО! Ставка ушла в котёл, пойжем дальше 🍺',
+    return: 'ПОЙЖЕМ! Возврат 100 — ставка вернулась, крути ещё 🙂',
+    jackpot: 'ДЖЕКПОТ ЖОСКО! +500 Пивкойнов — чат в шоке 🍺',
   };
+  const GATE_TEXT =
+    'В котле меньше сотни — ставка 100 не влезла. Забери Ежедневный вход и возвращайся пойжемать 🙂';
+  const GUEST_TEXT = 'Гамба только для своих — войди через Twitch, и пойжем вместе 🍺';
+  const RATE_TEXT = 'Не жми так жоско — дай колесу отдышаться пару секунд 🙂';
+  const OFFLINE_TEXT = 'Офлайн: спин не записан, Пивкойны целы. Вернись с сетью.';
+  const ERROR_TEXT = 'Не крутанулось — Пивкойны целы, попробуй ещё.';
 
   const modal = document.getElementById('gamba-modal');
   const canvas = document.getElementById('gamba-wheel');
@@ -116,8 +130,8 @@ const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
       ctx.save();
       ctx.rotate(i * SEG + SEG / 2);
       ctx.textAlign = 'right';
-      ctx.fillStyle = s.outcome === 'lose' ? '#422006' : '#FFFBEA';
-      ctx.font = `bold ${s.outcome === 'win100k' ? 30 : 34}px monospace`;
+      ctx.fillStyle = s.outcome === 'miss' ? '#422006' : '#FFFBEA';
+      ctx.font = `bold ${s.outcome === 'jackpot' ? 30 : 34}px monospace`;
       ctx.fillText(s.label, r - 26, 12);
       ctx.restore();
     }
@@ -193,43 +207,33 @@ const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
     }
   }
 
-  function renderBalances(): void {
-    const balance = String(getBalance());
+  function setBusy(busy: boolean): void {
+    if (spinBtn instanceof HTMLButtonElement) spinBtn.disabled = busy;
+  }
+
+  function paintBalance(balance: number): void {
     document.querySelectorAll('[data-wallet-balance]').forEach((el) => {
-      el.textContent = balance;
+      el.textContent = String(balance);
     });
   }
 
-  function open(): void {
-    if (!modal || spinning) return;
-    if (result) result.textContent = '';
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-    draw(0);
-  }
-
-  function close(): void {
-    if (spinning) {
-      spinning = false;
-      cancelAnimationFrame(raf);
-      stopAll();
+  function newIdempotencyKey(): string {
+    try {
+      if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+      }
+    } catch {
+      // fallback ниже
     }
-    if (!modal) return;
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
-    if (spinBtn instanceof HTMLButtonElement) spinBtn.disabled = false;
+    return `gamba-${Date.now()}-${Math.floor(Math.random() * 1e9)}`;
   }
 
-  function spin(): void {
-    if (spinning || !modal) return;
-    // Взвешенный исход 50/40/10 — определяется ДО анимации,
-    // колесо лишь докручивается до сегмента выигравшего типа.
-    const roll = Math.random();
-    const outcome: Outcome = roll < 0.5 ? 'win1k' : roll < 0.9 ? 'lose' : 'win100k';
+  /** Докрутка колеса до сегмента присланного сервером исхода. */
+  function animateToOutcome(outcome: GambaOutcome): void {
     const candidates = SEGMENTS.map((s, i) => (s.outcome === outcome ? i : -1)).filter(
       (i) => i >= 0,
     );
-    const target = candidates[Math.floor(Math.random() * candidates.length)];
+    const target = candidates[Math.floor(Math.random() * candidates.length)] ?? 0;
     // Центр целевого сегмента под стрелку сверху (-PI/2).
     const targetAngle = -Math.PI / 2 - (target * SEG + SEG / 2);
     const start = 0;
@@ -239,9 +243,9 @@ const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
     const total = turns + delta;
 
     spinning = true;
-    if (spinBtn instanceof HTMLButtonElement) spinBtn.disabled = true;
+    setBusy(true);
     if (result) result.textContent = 'Крутится, пойжем жоско…';
-    playBg(modal.dataset.bg);
+    if (modal) playBg(modal.dataset.bg);
     const t0 = performance.now();
     let lastTick = 0;
 
@@ -264,21 +268,115 @@ const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
         return;
       }
       spinning = false;
-      if (spinBtn instanceof HTMLButtonElement) spinBtn.disabled = false;
-      if (outcome === 'win1k') {
-        earn(1000);
-        renderBalances();
-        playOutcome(modal.dataset.win1k);
-      } else if (outcome === 'win100k') {
-        earn(100000);
-        renderBalances();
-        playOutcome(modal.dataset.win100k);
+      setBusy(false);
+      if (!modal) return;
+      if (outcome === 'return') {
+        playOutcome(modal.dataset.win);
+      } else if (outcome === 'jackpot') {
+        playOutcome(modal.dataset.jackpot);
       } else {
         playOutcome(modal.dataset.lose);
       }
       if (result) result.textContent = RESULT_TEXT[outcome];
     };
     raf = requestAnimationFrame(frame);
+  }
+
+  function open(): void {
+    if (!modal || spinning) return;
+    if (result) result.textContent = '';
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    draw(0);
+    // Дружелюбный гейт заранее: при балансе меньше ставки — подсказка
+    // про Ежедневный вход, а не ошибка после клика.
+    void (async () => {
+      if (!isSupabaseConfigured()) return;
+      try {
+        const balance = await fetchMyBalance();
+        if (balance !== null && balance < GAMBA_STAKE && result && result.textContent === '') {
+          result.textContent = GATE_TEXT;
+        }
+      } catch {
+        // гейт — best effort, правда придёт с сервера
+      }
+    })();
+  }
+
+  function close(): void {
+    if (spinning) {
+      spinning = false;
+      cancelAnimationFrame(raf);
+      stopAll();
+    }
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    setBusy(false);
+  }
+
+  async function spin(): Promise<void> {
+    if (spinning || !modal) return;
+    if (!isSupabaseConfigured()) {
+      if (result) result.textContent = ERROR_TEXT;
+      return;
+    }
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      if (result) result.textContent = OFFLINE_TEXT;
+      return;
+    }
+    const sb = getSupabase();
+    const { data } = (await sb?.auth.getSession()) ?? { data: { session: null } };
+    if (!data.session) {
+      if (result) result.textContent = GUEST_TEXT;
+      await signInWithTwitch(window.location.href.split('#')[0]);
+      return;
+    }
+    // Предгейт по живому балансу — сервер всё равно перепроверит под локом.
+    try {
+      const balance = await fetchMyBalance();
+      if (balance !== null && balance < GAMBA_STAKE) {
+        if (result) result.textContent = GATE_TEXT;
+        return;
+      }
+    } catch {
+      // баланс не прочитался — дальше правда сервера
+    }
+    setBusy(true);
+    if (result) result.textContent = 'Стучимся к серверу за исходом…';
+    let spinOutcome: GambaOutcome;
+    let spinBalance: number | null = null;
+    try {
+      const done = await spinGamba(newIdempotencyKey());
+      spinOutcome = done.outcome;
+      spinBalance = done.balance;
+    } catch (err) {
+      setBusy(false);
+      const info = mapGambaError(err);
+      if (!result) return;
+      if (info.kind === 'insufficient-funds') {
+        result.textContent = GATE_TEXT;
+        return;
+      }
+      if (info.kind === 'unauthenticated') {
+        result.textContent = GUEST_TEXT;
+        await signInWithTwitch(window.location.href.split('#')[0]);
+        return;
+      }
+      if (info.kind === 'rate-limit') {
+        result.textContent = RATE_TEXT;
+        return;
+      }
+      if (info.kind === 'offline') {
+        result.textContent = OFFLINE_TEXT;
+        return;
+      }
+      result.textContent = ERROR_TEXT;
+      return;
+    }
+    // Баланс из ответа сервера — сразу в шапку (realtime дотянет остальных).
+    if (spinBalance !== null) paintBalance(spinBalance);
+    animateToOutcome(spinOutcome);
   }
 
   document.addEventListener('click', (e) => {
@@ -288,7 +386,9 @@ const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
       return;
     }
   });
-  spinBtn?.addEventListener('click', spin);
+  spinBtn?.addEventListener('click', () => {
+    void spin();
+  });
   closeBtn?.addEventListener('click', close);
   modal?.addEventListener('click', (e) => {
     if (e.target === modal) close();
