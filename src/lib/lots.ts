@@ -71,17 +71,18 @@ export async function fetchCatalogLots(): Promise<Lot[]> {
   const { url, key } = buildEnv();
   const sb = createClient(url, key);
   // Таймаут на случай stall сети: билд должен падать явно, а не висеть.
+  // NB: postgrest-js игнорирует `signal` в опциях .select() — рабочий API
+  // только .abortSignal() (тикет 11, drive-by: иначе SSG виснет навсегда).
   const signal = AbortSignal.timeout(20000);
   let rows: LotRow[] | null = null;
   const full = await sb
     .from('lots')
-    .select('slug,title,rarity,meme_text,video_url,price,owner_login,owner_uid,updated_at', {
-      signal,
-    });
+    .select('slug,title,rarity,meme_text,video_url,price,owner_login,owner_uid,updated_at')
+    .abortSignal(signal);
   if (!full.error && Array.isArray(full.data)) {
     rows = full.data as unknown as LotRow[];
   } else {
-    const legacy = await sb.from('lots').select('slug,title,price,owner_login', { signal });
+    const legacy = await sb.from('lots').select('slug,title,price,owner_login').abortSignal(signal);
     if (legacy.error || !Array.isArray(legacy.data)) {
       throw new Error(
         `SSG каталога: не смог прочитать таблицу lots из БД: ${legacy.error?.message ?? full.error?.message ?? 'unknown'}`,
