@@ -188,11 +188,11 @@ const clapSound = s3Sound('clap.mp3');
         playClapFallback();
       }
       video.addEventListener('error', () => playClapFallback());
-      // Окно живёт до конца видео (+2.5с), а не 2.6с: иначе ролик обрывается.
-      // Фолбэк-таймер 30с — на случай если 'ended' не выстрелит.
+      // Окно живёт до конца видео и прячется сразу; 30с — страховка,
+      // если 'ended' не выстрелит.
       video.addEventListener('ended', () => {
         window.clearTimeout(noticeTimer);
-        noticeTimer = window.setTimeout(() => notice.classList.add('hidden'), 2500);
+        notice.classList.add('hidden');
       });
       videoEl = video;
     } else if (ok) {
