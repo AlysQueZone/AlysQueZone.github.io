@@ -60,16 +60,44 @@ const base = import.meta.env.BASE_URL;
     <GambaModal />
     <script>
       import { getBalance, BALANCE_KEY } from '../lib/wallet.ts';
+      import { getSupabase } from '../lib/supabase.ts';
+      import { fetchMyBalance, getBalanceUid, subscribeMyBalance } from '../lib/balance.ts';
       import { initOutbidNotice } from '../lib/outbid-notice.ts';
       initOutbidNotice();
-      const render = () => {
+      // Баланс в шапке (тикет 07, expand): у вошедшего Чатерса — из БД
+      // (таблица profiles, live-подписка), у гостя — локальный кошелёк.
+      // Локальный wallet.ts пока жив и умрёт в тикете 11.
+      let unsubscribeDb: (() => void) | null = null;
+      const paint = (value: number) => {
         document.querySelectorAll('[data-wallet-balance]').forEach((el) => {
-          el.textContent = String(getBalance());
+          el.textContent = String(value);
         });
       };
-      render();
+      const renderLocal = () => paint(getBalance());
+      async function renderDbOrLocal(): Promise<void> {
+        const db = await fetchMyBalance();
+        if (db !== null) {
+          paint(db);
+          return;
+        }
+        // Гость / счёт ещё не создан триггером / офлайн — деньги целы,
+        // показываем локальную косметику как раньше.
+        renderLocal();
+      }
+      async function resubscribe(): Promise<void> {
+        unsubscribeDb?.();
+        unsubscribeDb = null;
+        await renderDbOrLocal();
+        const uid = await getBalanceUid();
+        if (!uid || !getSupabase()) return;
+        unsubscribeDb = subscribeMyBalance(uid, (balance) => paint(balance));
+      }
+      void resubscribe();
+      getSupabase()?.auth.onAuthStateChange(() => {
+        void resubscribe();
+      });
       window.addEventListener('storage', (e) => {
-        if (e.key === BALANCE_KEY) render();
+        if (e.key === BALANCE_KEY) void renderDbOrLocal();
       });
 
     </script>
