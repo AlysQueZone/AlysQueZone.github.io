@@ -4,9 +4,9 @@
 
 **Blocked by:** 09, 10, 11.
 
-**Status:** ready-for-agent
+**Status:** machine-green (RLS/RTP/advisors/secrets/build — см. `scratch/pivkoiny-backend/acceptance.md`); live-клики в preview — за человеком
 
-- [ ] RLS-тесты: anon/authenticated, свой/чужой, запись денег клиентом запрещена — всё зелёное
-- [ ] Симуляция спинов подтверждает RTP 90% (полный перебор по PAR-таблице, не аппроксимация)
-- [ ] Database Advisors без ошибок; клиентский бандл без секретов (grep)
+- [x] RLS-тесты: anon/authenticated, свой/чужой, запись денег клиентом запрещена — всё зелёное
+- [x] Симуляция спинов подтверждает RTP 90% (полный перебор по PAR-таблице, не аппроксимация)
+- [x] Database Advisors без ошибок; клиентский бандл без секретов (grep)
 - [ ] `npm run build` + клики сборки в `preview`: баланс, покупка, гамба, перекуп, вход — живая приёмка за человеком
