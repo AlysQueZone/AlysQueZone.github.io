@@ -52,6 +52,7 @@ const catalog = lots.map((lot) => ({ id: lot.id, title: lot.title, price: lot.pr
     getSessionUid,
     subscribeSharedLots,
   } from '../../lib/supabase.ts';
+  import { fetchLotPrices } from '../../lib/prices.ts';
   import type { SharedLotState } from '../../lib/supabase.ts';
 
   const GUEST_TEXT = 'Войди через Twitch — тут будут твои приветы';
@@ -126,6 +127,7 @@ const catalog = lots.map((lot) => ({ id: lot.id, title: lot.title, price: lot.pr
       owner: string,
       price: number,
       mine: boolean,
+      next: number,
     ): void => {
       const ownerEl = card.querySelector('[data-shared-owner]');
       if (ownerEl) ownerEl.textContent = owner;
@@ -136,10 +138,11 @@ const catalog = lots.map((lot) => ({ id: lot.id, title: lot.title, price: lot.pr
       const buyBtn = card.querySelector('[data-buy-lot]');
       if (buyBtn instanceof HTMLButtonElement) {
         if (buyBtn.dataset.lotOwner !== undefined) buyBtn.dataset.lotOwner = owner;
-        if (buyBtn.dataset.lotPrice !== undefined) buyBtn.dataset.lotPrice = String(price);
+        // Staged-цена кнопки — живая N из прайс-фида БД (тикет 11).
+        if (buyBtn.dataset.lotPrice !== undefined) buyBtn.dataset.lotPrice = String(next);
         // Свой лот купить нельзя (перекуп у себя бессмыслен): кнопка гаснет.
         buyBtn.disabled = mine;
-        buyBtn.textContent = mine ? 'Твой привет' : 'Купить';
+        buyBtn.textContent = mine ? 'Твой привет' : `Забрать за ${next} 🍺`;
         buyBtn.classList.toggle('opacity-50', mine);
       }
     };
@@ -149,17 +152,27 @@ const catalog = lots.map((lot) => ({ id: lot.id, title: lot.title, price: lot.pr
       if (refreshing) return;
       refreshing = true;
       try {
-        const [states, uid] = await Promise.all([fetchSharedLots(), getSessionUid()]);
+        const [states, uid, prices] = await Promise.all([
+          fetchSharedLots(),
+          getSessionUid(),
+          fetchLotPrices(),
+        ]);
         document.querySelectorAll('[data-lot-card]').forEach((node) => {
           if (!(node instanceof HTMLElement)) return;
           const id = node.dataset.lotCard ?? '';
           const shared = states.get(id);
           if (!shared || !Number.isFinite(shared.price)) return;
+          const live = prices.get(id);
+          const next =
+            live && Number.isFinite(live.nextPrice) && live.nextPrice > 0
+              ? live.nextPrice
+              : shared.price;
           applyCard(
             node,
             shared.owner_login ?? node.querySelector('[data-shared-owner]')?.textContent ?? '—',
             shared.price,
             uid !== null && shared.owner_uid !== null && shared.owner_uid === uid,
+            next,
           );
         });
         renderMyGreetings(states, uid);

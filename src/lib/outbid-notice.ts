@@ -17,7 +17,8 @@
  * отсюда только `getSessionUid`/`getSupabase`).
  */
 
-import { getSessionUid, getSupabase, fetchSharedLots } from './supabase.ts';
+import { getSessionUid, getSupabase, fetchSharedLots, subscribeSharedLots } from './supabase.ts';
+import { fetchLotPrices } from './prices.ts';
 import { s3Sound } from './media.ts';
 
 const MAX_NOTICES = 3;
@@ -78,9 +79,15 @@ function resolveVideo(slug: string): string | null {
   }
 }
 
-/** Кнопка перекупа в стиле сайта (как «Купить» на карточках: bg-stream). */
+/** Живая N из прайс-фида БД (src/lib/prices.ts): slug → следующая цена.
+ *  Формулы в клиенте нет — карту наполняет refreshPrices() по подписке. */
+const liveNext = new Map<string, number>();
+
+/** Кнопка перекупа в стиле сайта (как «Купить» на карточках: bg-stream).
+ *  N — из подписки на БД; пока прайс не приехал — факт уплаченной цены
+ *  (сервер при записи всё равно подтвердит настоящую). */
 function makeRebuyButton(ev: OutbidEvent): HTMLButtonElement {
-  const next = Math.ceil(ev.price * 1.1);
+  const next = liveNext.get(ev.slug) ?? ev.price;
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.textContent = `Забрать за ${next} 🍺`;
@@ -97,6 +104,8 @@ function makeRebuyButton(ev: OutbidEvent): HTMLButtonElement {
   btn.dataset.lotTitle = ev.title;
   btn.dataset.lotPrice = String(next);
   btn.dataset.lotOwner = ev.by;
+  // Живая кнопка: refreshPrices() правит текст и staged-цену по подписке.
+  btn.dataset.rebuyLive = '1';
   const video = resolveVideo(ev.slug);
   if (video) btn.dataset.lotVideo = video;
   return btn;
@@ -257,6 +266,32 @@ export function initOutbidNotice(): void {
     renderBell();
   }
 
+  /** Живые кнопки возврата: текст и staged-цена из прайс-фида БД. */
+  function refreshRebuyButtons(): void {
+    document.querySelectorAll('button[data-rebuy-live]').forEach((node) => {
+      if (!(node instanceof HTMLButtonElement)) return;
+      const slug = node.dataset.buyLot;
+      if (!slug) return;
+      const next = liveNext.get(slug);
+      if (next === undefined) return;
+      node.textContent = `Забрать за ${next} 🍺`;
+      node.dataset.lotPrice = String(next);
+    });
+  }
+
+  /** Перечитать N из БД и освежить живые кнопки (+ открытую панель колокола). */
+  async function refreshPrices(): Promise<void> {
+    try {
+      const map = await fetchLotPrices();
+      liveNext.clear();
+      for (const [slug, p] of map) liveNext.set(slug, p.nextPrice);
+      refreshRebuyButtons();
+      if (bellPanel && bellPanel.style.display !== 'none') renderPanel();
+    } catch {
+      // прайс — best effort, факт цены в уведомлении уже показан
+    }
+  }
+
   function playSound(): void {
     if (!interacted) return;
     try {
@@ -288,8 +323,8 @@ export function initOutbidNotice(): void {
     head.style.marginBottom = '4px';
     head.textContent = 'Твой лот перекупили!';
     const text = document.createElement('span');
-    const next = Math.ceil(ev.price * 1.1);
-    text.textContent = `${ev.by} забрал «${ev.title}» за ${ev.price} 🍺 — забрать за ${next} 🍺?`;
+    // Факт уплаченной цены сервера; живая N — на кнопке возврата ниже.
+    text.textContent = `${ev.by} забрал «${ev.title}» за ${ev.price} 🍺`;
     const btn = makeRebuyButton(ev);
     btn.addEventListener('click', () => {
       window.setTimeout(() => box.remove(), 0);
@@ -323,6 +358,7 @@ export function initOutbidNotice(): void {
       const fresh = missed.splice(0).slice(-MAX_NOTICES);
       for (const ev of fresh) showNotice(ev);
       void refreshMine();
+      void refreshPrices();
     }
   });
 
@@ -404,6 +440,11 @@ export function initOutbidNotice(): void {
     await refreshMine();
     ensureBell();
     ensureSubscribed();
+    // Живая N кнопок возврата: перечитываем прайс-фид по каждому тику лотов.
+    void refreshPrices();
+    subscribeSharedLots(() => {
+      void refreshPrices();
+    });
     getSupabase()?.auth.onAuthStateChange(() => {
       void refreshMine().then(() => ensureSubscribed());
     });

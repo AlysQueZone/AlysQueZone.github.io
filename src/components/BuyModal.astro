@@ -55,11 +55,12 @@ const clapSound = s3Sound('clap.mp3');
 ></div>
 
 <script>
-  // Локальный spend — только фолбэк без настроенного хранилища (подтверждать
-  // нечему, сервера нет); серверный путь денег локально не трогает (тикет 08).
-  // wallet.ts умрёт в тикете 11 вместе с этим фолбэком.
-  import { spend } from '../lib/wallet.ts';
+  // Денег в клиенте нет: гейт «хватит/не хватит» — серверный (`insufficient
+  // funds`), итог — price_paid сервера, N — из прайс-фида БД (тикет 11).
+  // Локальный кошелёк удалён, фолбэка без настроенного хранилища нет:
+  // подтверждать нечему — говорим честно.
   import { boom } from '../lib/confetti.ts';
+  import { fetchLotPrice, fetchNextPrice } from '../lib/prices.ts';
   import {
     getSupabase,
     isSupabaseConfigured,
@@ -88,8 +89,8 @@ const clapSound = s3Sound('clap.mp3');
   let pauseLeft = 0;
   /** Кап окна сработал: кнопка показывает лимит до закрытия модалки. */
   let limitHit = false;
-  /** Живая подписка на лот открытой модалки (снимается при закрытии). */
-  let pauseUnsub: (() => void) | null = null;
+  /** Живая подписка на лот открытой модалки (пауза + цена, снимается при закрытии). */
+  let lotUnsub: (() => void) | null = null;
 
   const PAUSE_SEC = 30;
   const LIMIT_LABEL = 'Лимит: 10 покупок за 10 минут';
@@ -252,6 +253,9 @@ const clapSound = s3Sound('clap.mp3');
       }
       if (left <= 0) {
         restoreBuyButton();
+        // Пауза отпустила — цена могла уйти: подтянуть живую N из БД.
+        const id = pending?.id;
+        if (id) void refreshPriceProjection(id);
       } else {
         yesBtn.textContent = pauseLabel(left);
       }
@@ -268,14 +272,14 @@ const clapSound = s3Sound('clap.mp3');
     yesBtn.textContent = LIMIT_LABEL;
   }
 
-  function stopPauseProjection(): void {
-    if (pauseUnsub) {
+  function stopLotProjection(): void {
+    if (lotUnsub) {
       try {
-        pauseUnsub();
+        lotUnsub();
       } catch {
         // отписка — best effort
       }
-      pauseUnsub = null;
+      lotUnsub = null;
     }
   }
 
@@ -307,28 +311,62 @@ const clapSound = s3Sound('clap.mp3');
     }
   }
 
+  /**
+   * Проекция цены из прайс-фида БД (тикет 11): лот перекупили при открытой
+   * модалке — новая N видна до нажатия, отдельного ретрая нет.
+   * Пауза/лимит владеют кнопкой — их не затираем; когда отпустят,
+   * цена подтянется (см. конец startPause).
+   */
+  async function refreshPriceProjection(lotId: string): Promise<void> {
+    if (!pending || pending.id !== lotId || limitHit || pauseLeft > 0) return;
+    if (!isSupabaseConfigured()) return;
+    try {
+      const row = await fetchLotPrice(lotId);
+      if (!row || !pending || pending.id !== lotId || limitHit || pauseLeft > 0) return;
+      if (row.owner_login) pending.owner = row.owner_login;
+      if (!Number.isFinite(row.nextPrice) || row.nextPrice <= 0) return;
+      if (row.nextPrice === pending.price) {
+        if (modalText && row.owner_login) {
+          modalText.textContent = `Потратить ${pending.price} Пивкойнов? Владелец: ${pending.owner}`;
+        }
+        return;
+      }
+      pending.price = row.nextPrice;
+      if (modalText) {
+        modalText.textContent = `Потратить ${row.nextPrice} Пивкойнов? Владелец: ${pending.owner}`;
+      }
+      if (yesBtn instanceof HTMLButtonElement && !yesBtn.disabled) {
+        yesBtn.textContent = buyLabel(row.nextPrice);
+      }
+    } catch {
+      // проекция — best effort, правда придёт с сервера
+    }
+  }
+
   function openModal(): void {
     if (!modal || !pending || !modalText || !modalTitle) return;
     modalTitle.textContent = pending.title;
     modalText.textContent = `Потратить ${pending.price} Пивкойнов? Владелец: ${pending.owner}`;
-    stopPauseProjection();
+    stopLotProjection();
     restoreBuyButton();
     modal.classList.remove('hidden');
     modal.classList.add('flex');
-    // Живая проекция паузы: моя последняя покупка этого лота из shared-истории.
+    // Живые проекции: пауза (моя последняя покупка этого лота) + цена (N из БД).
     const lotId = pending.id;
     try {
-      pauseUnsub = subscribeSharedLots(() => {
+      lotUnsub = subscribeSharedLots(() => {
         void refreshPauseProjection(lotId);
+        void refreshPriceProjection(lotId);
       }, lotId);
     } catch {
-      pauseUnsub = null;
+      lotUnsub = null;
     }
     void refreshPauseProjection(lotId);
+    void refreshPriceProjection(lotId);
   }
 
   function closeModal(): void {
-    stopPauseProjection();
+    stopLotProjection();
     pending = null;
     restoreBuyButton();
     if (!modal) return;
@@ -367,13 +405,13 @@ const clapSound = s3Sound('clap.mp3');
 
   yesBtn?.addEventListener('click', async () => {
     if (!pending) return;
-    const { id, title, price, owner, video } = pending;
-    // Гейт «хватит/не хватит» — серверный (тикет 08): локальный кошелёк
-    // цену сервера не знает, BEFORE ответит `insufficient funds`, покажем честно.
-    // Без настроенного хранилища — старое локальное поведение (подтверждать нечему).
+    const { id, title, owner, video } = pending;
+    let price = pending.price;
+    // Гейт «хватит/не хватит» — серверный (тикет 08): BEFORE ответит
+    // `insufficient funds`, покажем честно. Без настроенного хранилища
+    // покупать нечего — честная ошибка, деньги целы.
     if (!isSupabaseConfigured()) {
-      spend(price);
-      celebrate({ id, title, price, owner, video });
+      showNotice('Хранилище не настроено — покупка не записана, Пивкойны целы.', false);
       return;
     }
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
@@ -389,10 +427,16 @@ const clapSound = s3Sound('clap.mp3');
       await signInWithTwitch(returnUrlForLot(id));
       return;
     }
-    // Shared-покупка (тикет 10): INSERT + ожидание confirm сервера.
+    // Shared-покупка (тикет 10): свежий select N перед записью + INSERT
+    // с ожиданием confirm сервера. Итог — фактически уплаченная цена.
     setBusy(true);
     if (yesBtn instanceof HTMLButtonElement) yesBtn.textContent = 'Ждём сервер…';
     try {
+      const fresh = await fetchNextPrice(id);
+      if (fresh !== null && Number.isFinite(fresh) && fresh > 0 && pending && pending.id === id) {
+        price = fresh;
+        pending.price = fresh;
+      }
       const done = await buyLotShared(id);
       const paid = Number.isFinite(done.price_paid) && done.price_paid > 0 ? done.price_paid : price;
       celebrate({ id, title, price: paid, owner, video });

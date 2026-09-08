@@ -86,6 +86,7 @@ const catalog = (await fetchCatalogLots()).map((l) => ({ id: l.id, title: l.titl
     getSessionUid,
     subscribeSharedLots,
   } from '../../lib/supabase.ts';
+  import { fetchLotPrices } from '../../lib/prices.ts';
 
   const section = document.querySelector('[data-lot-history]');
   const lotId = section instanceof HTMLElement ? (section.dataset.lotId ?? '') : '';
@@ -123,13 +124,20 @@ const catalog = (await fetchCatalogLots()).map((l) => ({ id: l.id, title: l.titl
     if (refreshing || !isSupabaseConfigured()) return;
     refreshing = true;
     try {
-      const [states, uid, tail] = await Promise.all([
+      const [states, uid, tail, prices] = await Promise.all([
         fetchSharedLots(),
         getSessionUid(),
         fetchSharedHistory(lotId, lotOwner),
+        fetchLotPrices(),
       ]);
       const shared = states.get(lotId);
       if (shared && Number.isFinite(shared.price)) {
+        const live = prices.get(lotId);
+        // Живая N из прайс-фида БД (тикет 11) — её и уйдёт серверу.
+        const next =
+          live && Number.isFinite(live.nextPrice) && live.nextPrice > 0
+            ? live.nextPrice
+            : shared.price;
         if (ownerEl) ownerEl.textContent = shared.owner_login ?? ownerEl.textContent;
         if (priceEl) priceEl.textContent = `${shared.price} 🍺`;
         const mine = uid !== null && shared.owner_uid !== null && shared.owner_uid === uid;
@@ -141,13 +149,11 @@ const catalog = (await fetchCatalogLots()).map((l) => ({ id: l.id, title: l.titl
             buyBtn.dataset.lotOwner = shared.owner_login;
           }
           if (buyBtn.dataset.lotPrice !== undefined) {
-            buyBtn.dataset.lotPrice = String(shared.price);
+            buyBtn.dataset.lotPrice = String(next);
           }
           // Свой лот купить нельзя: кнопка гаснет.
           buyBtn.disabled = mine;
-          buyBtn.textContent = mine
-            ? 'Твой привет'
-            : `Купить за ${shared.price} Пивкойнов`;
+          buyBtn.textContent = mine ? 'Твой привет' : `Забрать за ${next} 🍺`;
           buyBtn.classList.toggle('opacity-50', mine);
         }
       }

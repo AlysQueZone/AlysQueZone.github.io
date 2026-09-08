@@ -1,9 +1,9 @@
 /**
- * Баланс Пивкойнов из БД (тикет 07, pivkoiny-backend).
+ * Баланс Пивкойнов из БД (тикеты 07–11, pivkoiny-backend).
  *
- * Expand-сторона рядом с локальным кошельком `src/lib/wallet.ts`:
- * новый источник истины (таблица `public.profiles`, RLS — только свой
- * баланс), старый локальный кошелёк пока жив и умрёт в тикете 11.
+ * Единственный источник истины — таблица `public.profiles` (RLS — только свой
+ * баланс). Локальный кошелёк удалён в тикете 11: без сессии деньги не читаются
+ * (гость видит прочерк), межвкладочный `storage`-синк убран — тик даёт Realtime.
  *
  * - Гость без сессии: деньги не читаются → null, витрина видна и так.
  * - Без настроенных PUBLIC_SUPABASE_* → null (честная деградация).
@@ -18,18 +18,6 @@ export const DB_START_BALANCE = 1000;
 export interface MyBalance {
   uid: string;
   balance: number;
-}
-
-/** uid текущей сессии; null — гость или хранилище не настроено. */
-export async function getBalanceUid(): Promise<string | null> {
-  const sb = getSupabase();
-  if (!sb) return null;
-  try {
-    const { data } = await sb.auth.getSession();
-    return data.session?.user.id ?? null;
-  } catch {
-    return null;
-  }
 }
 
 /**

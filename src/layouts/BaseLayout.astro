@@ -45,7 +45,7 @@ const base = import.meta.env.BASE_URL;
           </button>
           <div class="flex items-center gap-2 rounded-full border border-pivko/50 bg-void px-3 py-1 text-sm font-bold">
             <span class="text-melon">◉</span>
-            <span data-wallet-balance>1000</span>
+            <span data-wallet-balance title="Войди через Twitch — тут будет твой баланс">—</span>
             <span class="text-mist/70">Пивкойнов</span>
           </div>
           <!-- Ежедневный вход (тикет 10): точка входа рядом с балансом. -->
@@ -62,45 +62,47 @@ const base = import.meta.env.BASE_URL;
     <!-- Гамба-рулетка (тикет 32): кнопка в шапке открывает модалку-колесо. -->
     <GambaModal />
     <script>
-      import { getBalance, BALANCE_KEY } from '../lib/wallet.ts';
-      import { getSupabase } from '../lib/supabase.ts';
-      import { fetchMyBalance, getBalanceUid, subscribeMyBalance } from '../lib/balance.ts';
+      import { getSupabase, getSessionUid } from '../lib/supabase.ts';
+      import { fetchMyBalance, subscribeMyBalance } from '../lib/balance.ts';
       import { initOutbidNotice } from '../lib/outbid-notice.ts';
       initOutbidNotice();
-      // Баланс в шапке (тикет 07, expand): у вошедшего Чатерса — из БД
-      // (таблица profiles, live-подписка), у гостя — локальный кошелёк.
-      // Локальный wallet.ts пока жив и умрёт в тикете 11.
+      // Баланс в шапке (тикет 11, contract): только из БД (таблица profiles,
+      // live-подписка). Гость без сессии видит прочерк с приглашением войти,
+      // не 1000: без сессии деньги не читаются (спека). Локальный кошелёк
+      // удалён, межвкладочного storage-синка больше нет — тик даёт Realtime.
+      const GUEST_MARK = '—';
+      const GUEST_TITLE = 'Войди через Twitch — тут будет твой баланс';
       let unsubscribeDb: (() => void) | null = null;
-      const paint = (value: number) => {
+      const paint = (value: string, guest: boolean) => {
         document.querySelectorAll('[data-wallet-balance]').forEach((el) => {
-          el.textContent = String(value);
+          el.textContent = value;
+          if (guest) {
+            el.setAttribute('title', GUEST_TITLE);
+          } else {
+            el.removeAttribute('title');
+          }
         });
       };
-      const renderLocal = () => paint(getBalance());
-      async function renderDbOrLocal(): Promise<void> {
+      async function renderDbOrGuest(): Promise<void> {
         const db = await fetchMyBalance();
         if (db !== null) {
-          paint(db);
+          paint(String(db), false);
           return;
         }
-        // Гость / счёт ещё не создан триггером / офлайн — деньги целы,
-        // показываем локальную косметику как раньше.
-        renderLocal();
+        // Гость / счёт ещё не создан триггером / офлайн — прочерк, деньги целы.
+        paint(GUEST_MARK, true);
       }
       async function resubscribe(): Promise<void> {
         unsubscribeDb?.();
         unsubscribeDb = null;
-        await renderDbOrLocal();
-        const uid = await getBalanceUid();
+        await renderDbOrGuest();
+        const uid = await getSessionUid();
         if (!uid || !getSupabase()) return;
-        unsubscribeDb = subscribeMyBalance(uid, (balance) => paint(balance));
+        unsubscribeDb = subscribeMyBalance(uid, (balance) => paint(String(balance), false));
       }
       void resubscribe();
       getSupabase()?.auth.onAuthStateChange(() => {
         void resubscribe();
-      });
-      window.addEventListener('storage', (e) => {
-        if (e.key === BALANCE_KEY) void renderDbOrLocal();
       });
 
     </script>
