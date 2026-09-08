@@ -47,7 +47,7 @@ const catalog = (await fetchCatalogLots()).map((l) => ({ id: l.id, title: l.titl
       владелец: <b data-lot-owner data-shared-owner class="text-mist">{lot.owner ?? '—'}</b> <span data-mine-badge class="hidden font-bold text-rind">· ТВОЙ</span>
     </p>
     <p data-shared-price class="mt-3 font-mono text-2xl font-bold text-pivko">{lot.price} 🍺</p>
-    {lot.meme_text && <p class="mt-3 rounded-xl bg-white/5 px-4 py-3 text-sm text-mist/80">{lot.meme_text}</p>}
+    {lot.meme_text && !lot.video_url && <p class="mt-3 rounded-xl bg-white/5 px-4 py-3 text-sm text-mist/80">{lot.meme_text}</p>}
 
     <div class="mt-5">
       <button
