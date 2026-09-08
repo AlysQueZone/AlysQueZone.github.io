@@ -1,7 +1,11 @@
 # Ручной маппинг 9 мем-лотов на файлы MemeAlerts
 
 Type: task
-Status: claimed
+Status: resolved
+
+## Answer
+
+Человек вернул маппинг 2026-09-08 — все 9 webm URL в `.scratch/video-s3/meme-mapping.md`. Агент проверил: каждый webm — `206 video/webm`, производные mp4 (`200 video/mp4`) и webp (`200 image/webp`) существуют. Маппинг идёт в UPDATE-миграцию (`video_url`, `WHERE video_url IS NULL`) при имплементации. Тикет закрыт приёмкой.
 Blocked by: 02
 
 ## Question

@@ -16,6 +16,7 @@
 - [Хотлинк видео с MemeAlerts: что можно и как достать URL](.scratch/video-s3/issues/02-memealerts-hotlink.md): хотлинк разрешён (проверено curl: нет Referer-защиты, CORS `*`, Range/`206`, из РФ ок); на мем тройка webm+mp4+webp; съём URL человеком через браузер, поле правится без деплоя.
 - [Модель видео-лота и переезд lots.json в БД](.scratch/video-s3/issues/03-video-lot-model.md): одно поле `video_url` (mp4/webp — заменой хвоста), `rarity` + `meme_text` в БД, владельцев на старте нет (первый покупатель — первый), backstory не переносим; ЛУК снесён целиком (строка, `is_locked`, ветка триггера, UI, глоссарий); RLS без изменений.
 - [Инлайн-видео в карточке вместо кнопки «слушать»](.scratch/video-s3/issues/04-inline-video-prototype.md): V2 — webp-постер + «▶ смотреть», клик → инлайн-видео со звуком; при покупке играет видео лота, clap — фолбэк безвидео-лотам. Прототип: `.scratch/video-s3/prototype/inline-video.html`.
+- [Ручной маппинг 9 мем-лотов на файлы MemeAlerts](.scratch/video-s3/issues/05-manual-meme-mapping.md): все 9 webm получены от человека и проверены (206 + живые mp4/webp); таблица — `.scratch/video-s3/meme-mapping.md`, идёт в UPDATE-миграцию.
 
 ## Not yet specified
 
