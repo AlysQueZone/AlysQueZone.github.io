@@ -1,7 +1,7 @@
 # [Стройка] Заливка 6 UI-звуков в S3
 
 Type: task
-Status: open (ready-for-human)
+Status: resolved
 Blocked by: 07
 
 ## Question
@@ -14,3 +14,4 @@ Blocked by: 07
 ## Comments
 
 - Приёмка: 6 публичных URL `.../media/sounds/<file>.mp3` открываются (ref — MCP `get_project_url`).
+- Залито скриптом `scripts/storage_upload.py` (SERVICE_ROLE, upsert) 2026-09-08: 6/6 URL отдают `206`, бакет `media` создан идемпотентным insert'ом (мерж 07 сделает no-op).

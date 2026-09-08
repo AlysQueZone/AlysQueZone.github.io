@@ -35,7 +35,7 @@
 
 - Раскладка в бакете `media`: `sounds/*.mp3`, `videos/<slug>.webm|mp4|webp` (тройка на 1 привет; mp4/webp выводятся заменой расширения).
 - Тройка из `privets/<name>.mp4` (проверено 2026-09-08): `ffmpeg -i in.mp4 -c:v libvpx-vp9 -b:v 0 -crf 32 -c:a libopus out.webm`; `ffmpeg -i in.mp4 -c:v libx264 -crf 23 -preset veryfast -c:a aac -movflags +faststart out.mp4`; `ffmpeg -i in.mp4 -vframes 1 -q:v 80 out.webp`. Работать в `/tmp`, бинарники не коммитить.
-- Заливка байтов — Dashboard/SDK/S3-API (в MCP заливки нет, SQL байты не несёт); URL `https://<ref>.supabase.co/storage/v1/object/public/media/<path>`.
+- Заливка байтов — скриптом `scripts/storage_upload.py` (MCP заливки нет, SQL байты не несёт; ключ `SUPABASE_SERVICE_ROLE_KEY` в `.env`, запуск из корня репо, ключ никогда не печатается): `python3 scripts/storage_upload.py --bucket media --dest sounds/ a.mp3 b.mp3` или `--dir /tmp/out/ --pattern "*.mp3"`; URL `https://<ref>.supabase.co/storage/v1/object/public/media/<path>`.
 - Новый лот — миграцией `INSERT INTO public.lots (slug,title,price,rarity,meme_text,video_url)` с NULL-владельцами; хотлинк-мемам `UPDATE ... SET video_url=... WHERE video_url IS NULL`. Звук из чужого webm: `ffmpeg -i in.webm -vn -codec:a libmp3lame -q:a 5 out.mp3` → в `sounds/`.
 
 ## Другое
