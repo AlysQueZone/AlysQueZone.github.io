@@ -127,7 +127,7 @@ const catalog = lots.map((lot) => ({ id: lot.id, title: lot.title, price: lot.pr
       owner: string,
       price: number,
       mine: boolean,
-      next: number,
+      next: number | null,
     ): void => {
       const ownerEl = card.querySelector('[data-shared-owner]');
       if (ownerEl) ownerEl.textContent = owner;
@@ -138,11 +138,12 @@ const catalog = lots.map((lot) => ({ id: lot.id, title: lot.title, price: lot.pr
       const buyBtn = card.querySelector('[data-buy-lot]');
       if (buyBtn instanceof HTMLButtonElement) {
         if (buyBtn.dataset.lotOwner !== undefined) buyBtn.dataset.lotOwner = owner;
-        // Staged-цена кнопки — живая N из прайс-фида БД (тикет 11).
-        if (buyBtn.dataset.lotPrice !== undefined) buyBtn.dataset.lotPrice = String(next);
+        // Staged-цена кнопки — живая N из прайс-фида БД (тикет 11); N неизвестна —
+        // staged текущая (сервер всё равно посчитает настоящую), а показ — «…».
+        if (buyBtn.dataset.lotPrice !== undefined) buyBtn.dataset.lotPrice = String(next ?? price);
         // Свой лот купить нельзя (перекуп у себя бессмыслен): кнопка гаснет.
         buyBtn.disabled = mine;
-        buyBtn.textContent = mine ? 'Твой привет' : `Забрать за ${next} 🍺`;
+        buyBtn.textContent = mine ? 'Твой привет' : next !== null ? `Забрать за ${next} 🍺` : 'Забрать за … 🍺';
         buyBtn.classList.toggle('opacity-50', mine);
       }
     };
@@ -163,10 +164,14 @@ const catalog = lots.map((lot) => ({ id: lot.id, title: lot.title, price: lot.pr
           const shared = states.get(id);
           if (!shared || !Number.isFinite(shared.price)) return;
           const live = prices.get(id);
+          // Живая N из прайс-фида; null (вью нет) — «…», не текущая цена как N.
           const next =
-            live && Number.isFinite(live.nextPrice) && live.nextPrice > 0
+            live &&
+            typeof live.nextPrice === 'number' &&
+            Number.isFinite(live.nextPrice) &&
+            live.nextPrice > 0
               ? live.nextPrice
-              : shared.price;
+              : null;
           applyCard(
             node,
             shared.owner_login ?? node.querySelector('[data-shared-owner]')?.textContent ?? '—',

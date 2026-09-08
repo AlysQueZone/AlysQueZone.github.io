@@ -26,7 +26,9 @@ const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
   <div class="w-full max-w-sm rounded-2xl border border-stream bg-panel p-5 text-center">
     <h3 id="gamba-title" class="text-lg font-black uppercase">Гамба на пивкойны</h3>
     <p class="mt-1 font-mono text-xs text-mist">Ставка 100 · крутит сервер, подкрутить из консоли нельзя</p>
-    <ul class="mx-auto mt-2 grid max-w-70 grid-cols-3 gap-1 font-mono text-xs text-mist" aria-label="Таблица выплат">
+    <!-- display-mirror, source of truth — DB (public.gamba_payouts): разметка ниже —
+      лишь фолбэк показа, живой плакат дорисовывает скрипт (fetchGambaPaytable). -->
+    <ul id="gamba-paytable" class="mx-auto mt-2 grid max-w-70 grid-cols-3 gap-1 font-mono text-xs text-mist" aria-label="Таблица выплат">
       <li class="rounded-lg border border-white/10 px-1 py-1">мимо · 50%<br /><span class="text-milk">+0</span></li>
       <li class="rounded-lg border border-white/10 px-1 py-1">возврат · 40%<br /><span class="text-milk">+100</span></li>
       <li class="rounded-lg border border-white/10 px-1 py-1">джекпот · 10%<br /><span class="text-milk">+500</span></li>
@@ -62,7 +64,16 @@ const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
 <script>
   import { getSupabase, isSupabaseConfigured, signInWithTwitch } from '../lib/supabase.ts';
   import { fetchMyBalance } from '../lib/balance.ts';
-  import { GAMBA_STAKE, mapGambaError, spinGamba, type GambaOutcome } from '../lib/gamba.ts';
+  import {
+    GAMBA_PAYTABLE,
+    GAMBA_STAKE,
+    fetchGambaPaytable,
+    mapGambaError,
+    newGambaAttemptKey,
+    spinGambaWithRetry,
+    type GambaOutcome,
+    type GambaPayRow,
+  } from '../lib/gamba.ts';
 
   // 10 сегментов под серверную таблицу A: 5×«мимо», 4×«+100», 1×«+500».
   // Колесо лишь докручивается до сегмента присланного сервером исхода.
@@ -98,6 +109,40 @@ const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
   const result = document.getElementById('gamba-result');
   const spinBtn = document.getElementById('gamba-spin');
   const closeBtn = document.getElementById('gamba-close');
+  const paytable = document.getElementById('gamba-paytable');
+
+  /**
+   * Ключ текущей попытки: генерируется на спин, переживает ретрай и
+   * офлайн-повтор той же попытки (повтор шлёт ТОТ ЖЕ ключ — сервер
+   * идемпотентен, дублей нет), истекает только после показанного исхода.
+   */
+  let attemptKey: string | null = null;
+
+  /** Плакат из БД (public.gamba_payouts публична); молча — фолбэк GAMBA_PAYTABLE. */
+  function paintPaytable(rows: GambaPayRow[]): void {
+    if (!(paytable instanceof HTMLUListElement)) return;
+    paytable.innerHTML = '';
+    for (const row of rows) {
+      const li = document.createElement('li');
+      li.className = 'rounded-lg border border-white/10 px-1 py-1';
+      li.appendChild(document.createTextNode(`${row.label} · ${row.chance}`));
+      li.appendChild(document.createElement('br'));
+      const span = document.createElement('span');
+      span.className = 'text-milk';
+      span.textContent = `+${row.payout}`;
+      li.appendChild(span);
+      paytable.appendChild(li);
+    }
+  }
+
+  async function refreshPaytable(): Promise<void> {
+    try {
+      const live = await fetchGambaPaytable();
+      paintPaytable(live ?? GAMBA_PAYTABLE);
+    } catch {
+      paintPaytable(GAMBA_PAYTABLE);
+    }
+  }
 
   let spinning = false;
   let raf = 0;
@@ -217,17 +262,6 @@ const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
     });
   }
 
-  function newIdempotencyKey(): string {
-    try {
-      if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-        return crypto.randomUUID();
-      }
-    } catch {
-      // fallback ниже
-    }
-    return `gamba-${Date.now()}-${Math.floor(Math.random() * 1e9)}`;
-  }
-
   /** Докрутка колеса до сегмента присланного сервером исхода. */
   function animateToOutcome(outcome: GambaOutcome): void {
     const candidates = SEGMENTS.map((s, i) => (s.outcome === outcome ? i : -1)).filter(
@@ -278,6 +312,8 @@ const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
         playOutcome(modal.dataset.lose);
       }
       if (result) result.textContent = RESULT_TEXT[outcome];
+      // Исход показан — ключ попытки истекает, следующий спин будет новым.
+      attemptKey = null;
     };
     raf = requestAnimationFrame(frame);
   }
@@ -288,6 +324,8 @@ const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
     modal.classList.remove('hidden');
     modal.classList.add('flex');
     draw(0);
+    // Плакат всегда свежий из БД (фолбэк — зашитая таблица выше).
+    void refreshPaytable();
     // Дружелюбный гейт заранее: при балансе меньше ставки — подсказка
     // про Ежедневный вход, а не ошибка после клика.
     void (async () => {
@@ -346,8 +384,13 @@ const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
     if (result) result.textContent = 'Стучимся к серверу за исходом…';
     let spinOutcome: GambaOutcome;
     let spinBalance: number | null = null;
+    // Ключ держится на попытку: генерируется на спин, повтор той же попытки
+    // (ретрай/офлайн-повтор в spinGambaWithRetry, следующий клик после ошибки
+    // без исхода) шлёт ТОТ ЖЕ ключ. Истекает только после показанного исхода
+    // (см. конец animateToOutcome) — при ошибке ключ жив, дублей нет.
+    attemptKey ??= newGambaAttemptKey();
     try {
-      const done = await spinGamba(newIdempotencyKey());
+      const done = await spinGambaWithRetry(attemptKey, { retries: 1 });
       spinOutcome = done.outcome;
       spinBalance = done.balance;
     } catch (err) {

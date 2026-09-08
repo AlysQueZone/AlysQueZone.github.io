@@ -13,7 +13,8 @@
 
 import { getSupabase } from './supabase.ts';
 
-/** Календарь наград по позиции дня 1..7 (циклический) — зеркало серверного CASE. */
+/** Календарь наград по позиции дня 1..7 (циклический) — display-mirror, source of truth — DB (CASE в claim_daily). */
+// display-mirror, source of truth — DB
 export const DAILY_CALENDAR = [100, 100, 150, 150, 200, 250, 500] as const;
 
 /** Ключ отложенного входа: открыть модалку после возврата из логина. */

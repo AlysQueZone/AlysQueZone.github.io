@@ -92,7 +92,9 @@ const clapSound = s3Sound('clap.mp3');
   /** Живая подписка на лот открытой модалки (пауза + цена, снимается при закрытии). */
   let lotUnsub: (() => void) | null = null;
 
+  // display-mirror, source of truth — DB (c_cooldown/c_max_per_window/c_window в enforce_purchase_rules).
   const PAUSE_SEC = 30;
+  // display-mirror, source of truth — DB (см. выше).
   const LIMIT_LABEL = 'Лимит: 10 покупок за 10 минут';
 
   function buyLabel(price: number): string {
@@ -324,19 +326,30 @@ const clapSound = s3Sound('clap.mp3');
       const row = await fetchLotPrice(lotId);
       if (!row || !pending || pending.id !== lotId || limitHit || pauseLeft > 0) return;
       if (row.owner_login) pending.owner = row.owner_login;
-      if (!Number.isFinite(row.nextPrice) || row.nextPrice <= 0) return;
-      if (row.nextPrice === pending.price) {
+      const next = row.nextPrice;
+      // N неизвестна (вью отсутствует) — честный «…» вместо staged как N;
+      // итог всё равно посчитает сервер.
+      if (typeof next !== 'number' || !Number.isFinite(next) || next <= 0) {
+        if (modalText) {
+          modalText.textContent = `Потратить … Пивкойнов? Владелец: ${pending.owner}`;
+        }
+        if (yesBtn instanceof HTMLButtonElement && !yesBtn.disabled) {
+          yesBtn.textContent = 'Забрать за … 🍺';
+        }
+        return;
+      }
+      if (next === pending.price) {
         if (modalText && row.owner_login) {
           modalText.textContent = `Потратить ${pending.price} Пивкойнов? Владелец: ${pending.owner}`;
         }
         return;
       }
-      pending.price = row.nextPrice;
+      pending.price = next;
       if (modalText) {
-        modalText.textContent = `Потратить ${row.nextPrice} Пивкойнов? Владелец: ${pending.owner}`;
+        modalText.textContent = `Потратить ${next} Пивкойнов? Владелец: ${pending.owner}`;
       }
       if (yesBtn instanceof HTMLButtonElement && !yesBtn.disabled) {
-        yesBtn.textContent = buyLabel(row.nextPrice);
+        yesBtn.textContent = buyLabel(next);
       }
     } catch {
       // проекция — best effort, правда придёт с сервера

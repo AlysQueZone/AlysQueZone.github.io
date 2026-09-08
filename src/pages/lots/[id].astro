@@ -133,11 +133,15 @@ const catalog = (await fetchCatalogLots()).map((l) => ({ id: l.id, title: l.titl
       const shared = states.get(lotId);
       if (shared && Number.isFinite(shared.price)) {
         const live = prices.get(lotId);
-        // Живая N из прайс-фида БД (тикет 11) — её и уйдёт серверу.
+        // Живая N из прайс-фида БД (тикет 11) — её и уйдёт серверу;
+        // null (вью нет) — «…», не текущая цена как N.
         const next =
-          live && Number.isFinite(live.nextPrice) && live.nextPrice > 0
+          live &&
+          typeof live.nextPrice === 'number' &&
+          Number.isFinite(live.nextPrice) &&
+          live.nextPrice > 0
             ? live.nextPrice
-            : shared.price;
+            : null;
         if (ownerEl) ownerEl.textContent = shared.owner_login ?? ownerEl.textContent;
         if (priceEl) priceEl.textContent = `${shared.price} 🍺`;
         const mine = uid !== null && shared.owner_uid !== null && shared.owner_uid === uid;
@@ -149,11 +153,11 @@ const catalog = (await fetchCatalogLots()).map((l) => ({ id: l.id, title: l.titl
             buyBtn.dataset.lotOwner = shared.owner_login;
           }
           if (buyBtn.dataset.lotPrice !== undefined) {
-            buyBtn.dataset.lotPrice = String(next);
+            buyBtn.dataset.lotPrice = String(next ?? shared.price);
           }
           // Свой лот купить нельзя: кнопка гаснет.
           buyBtn.disabled = mine;
-          buyBtn.textContent = mine ? 'Твой привет' : `Забрать за ${next} 🍺`;
+          buyBtn.textContent = mine ? 'Твой привет' : next !== null ? `Забрать за ${next} 🍺` : 'Забрать за … 🍺';
           buyBtn.classList.toggle('opacity-50', mine);
         }
       }

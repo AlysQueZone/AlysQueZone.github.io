@@ -84,13 +84,14 @@ function resolveVideo(slug: string): string | null {
 const liveNext = new Map<string, number>();
 
 /** Кнопка перекупа в стиле сайта (как «Купить» на карточках: bg-stream).
- *  N — из подписки на БД; пока прайс не приехал — факт уплаченной цены
- *  (сервер при записи всё равно подтвердит настоящую). */
+ *  N — из подписки на БД; пока прайс не приехал или вью отсутствует — честный
+ *  «…» вместо факта уплаченной цены как N (сервер при записи всё равно
+ *  подтвердит настоящую). */
 function makeRebuyButton(ev: OutbidEvent): HTMLButtonElement {
-  const next = liveNext.get(ev.slug) ?? ev.price;
+  const next = liveNext.get(ev.slug);
   const btn = document.createElement('button');
   btn.type = 'button';
-  btn.textContent = `Забрать за ${next} 🍺`;
+  btn.textContent = next !== undefined ? `Забрать за ${next} 🍺` : 'Забрать за … 🍺';
   btn.style.marginTop = '8px';
   btn.style.cursor = 'pointer';
   btn.style.border = 'none';
@@ -102,7 +103,8 @@ function makeRebuyButton(ev: OutbidEvent): HTMLButtonElement {
   btn.style.fontSize = '14px';
   btn.dataset.buyLot = ev.slug;
   btn.dataset.lotTitle = ev.title;
-  btn.dataset.lotPrice = String(next);
+  // Staged — живая N, иначе текущая уплаченная (сервер пересчитает настоящую).
+  btn.dataset.lotPrice = String(next ?? ev.price);
   btn.dataset.lotOwner = ev.by;
   // Живая кнопка: refreshPrices() правит текст и staged-цену по подписке.
   btn.dataset.rebuyLive = '1';
@@ -284,7 +286,12 @@ export function initOutbidNotice(): void {
     try {
       const map = await fetchLotPrices();
       liveNext.clear();
-      for (const [slug, p] of map) liveNext.set(slug, p.nextPrice);
+      for (const [slug, p] of map) {
+        // null (вью отсутствует) — в карту не кладём: показ даст «…», не враньё на шаг.
+        if (typeof p.nextPrice === 'number' && Number.isFinite(p.nextPrice) && p.nextPrice > 0) {
+          liveNext.set(slug, p.nextPrice);
+        }
+      }
       refreshRebuyButtons();
       if (bellPanel && bellPanel.style.display !== 'none') renderPanel();
     } catch {

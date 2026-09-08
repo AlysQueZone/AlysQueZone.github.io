@@ -13,18 +13,22 @@
  * клиент перечитывает вью. Отдельного ретрая нет — обновление бесшовное.
  *
  * Деградация: вью отсутствует (миграция ещё не применена) — фолбэк на таблицу
- * `lots` с `nextPrice = price` (клиентской формулы нет и не будет); сервер
+ * `lots` с `nextPrice = null` (клиентской формулы нет и не будет): показ рисует
+ * прочерк/«…» вместо текущей цены как N — показ не врёт на шаг; сервер
  * при записи всё равно подтвердит настоящую цену.
  * Секретов здесь нет: только publishable-ключ через getSupabase().
  */
 
 import { getSupabase, subscribeSharedLots } from './supabase.ts';
 
-/** Живая цена лота: текущая + следующая (та, что уйдёт серверу). */
+/**
+ * Живая цена лота: текущая + следующая (та, что уйдёт серверу).
+ * nextPrice null — N неизвестна (вью отсутствует): показывать «…», не price.
+ */
 export interface LotPrice {
   slug: string;
   price: number;
-  nextPrice: number;
+  nextPrice: number | null;
   owner_login: string | null;
   owner_uid: string | null;
 }
@@ -41,7 +45,7 @@ function toLotPrice(row: PriceRow): LotPrice | null {
   return {
     slug,
     price,
-    nextPrice: Number.isFinite(nextPrice) && nextPrice > 0 ? nextPrice : price,
+    nextPrice: Number.isFinite(nextPrice) && nextPrice > 0 ? nextPrice : null,
     owner_login: typeof row['owner_login'] === 'string' ? (row['owner_login'] as string) : null,
     owner_uid: typeof row['owner_uid'] === 'string' ? (row['owner_uid'] as string) : null,
   };
@@ -78,7 +82,7 @@ export async function fetchLotPrices(): Promise<Map<string, LotPrice>> {
       map.set(slug, {
         slug,
         price,
-        nextPrice: price,
+        nextPrice: null,
         owner_login: typeof row['owner_login'] === 'string' ? (row['owner_login'] as string) : null,
         owner_uid: typeof row['owner_uid'] === 'string' ? (row['owner_uid'] as string) : null,
       });
@@ -118,7 +122,7 @@ export async function fetchLotPrice(slug: string): Promise<LotPrice | null> {
     return {
       slug: row['slug'] as string,
       price,
-      nextPrice: price,
+      nextPrice: null,
       owner_login: typeof row['owner_login'] === 'string' ? (row['owner_login'] as string) : null,
       owner_uid: typeof row['owner_uid'] === 'string' ? (row['owner_uid'] as string) : null,
     };
@@ -127,10 +131,10 @@ export async function fetchLotPrice(slug: string): Promise<LotPrice | null> {
   }
 }
 
-/** Свежая N одного лота (перед записью). null — перечитать не вышло, пишем по staged. */
+/** Свежая N одного лота (перед записью). null — N неизвестна (вью нет) или перечитать не вышло, пишем по staged. */
 export async function fetchNextPrice(slug: string): Promise<number | null> {
   const row = await fetchLotPrice(slug);
-  if (!row || !Number.isFinite(row.nextPrice) || row.nextPrice <= 0) return null;
+  if (!row || typeof row.nextPrice !== 'number' || !Number.isFinite(row.nextPrice) || row.nextPrice <= 0) return null;
   return row.nextPrice;
 }
 
