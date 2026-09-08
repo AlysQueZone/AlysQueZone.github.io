@@ -14,6 +14,12 @@
 - В README.md должна быть простая инструкция(без лишних подробностей) для меня, что это и как этим пользоваться.
 - Перед публикацией (deploy) всегда сначала локально: `npm run build` + открыть и покликать (preview/double-click), проверять только потом деплоить.
 
+## agent-browser
+
+- Преддеплой-проверка — через проектный `agent-browser` (`dependencies`, бинарь `./node_modules/.bin/agent-browser` или `npx agent-browser`); Chrome уже скачан (`install` сделан 2026-09-08, перепроверка — `doctor --offline --quick`).
+- Цикл: поднять `npm run preview`, затем `export AGENT_BROWSER_SESSION="<задача>"` → `open http://localhost:4321/` → `snapshot -i` → `click/fill @eN` по рефам → после каждого изменения страницы заново `snapshot -i` (рефы протухают). В конце `close` + остановить preview.
+- Полный справочник команд — в самом CLI (`--help`, `skills get`), сюда его не копировать.
+
 ## Twitch-источники
 
 - Канал: <https://www.twitch.tv/alysque> (ID `224473232`, ник `aLySQuE`). Цвет чата `#FF00BC`, аватар/баннер — `static-cdn.jtvnw.net` (хотлинк можно, бинарники не коммитить).

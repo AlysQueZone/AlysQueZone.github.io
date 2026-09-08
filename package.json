@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.115.0",
+    "agent-browser": "^0.37.1",
     "astro": "^7.2.9"
   },
   "devDependencies": {
