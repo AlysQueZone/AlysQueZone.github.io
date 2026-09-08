@@ -13,6 +13,7 @@
 
 - [Математика казино для гамбы](scratch/pivkoiny-backend/issues/01-casino-math.md): готовая слот-схема, ставка 100, RTP 90% (0/100/500), daily-календарь без сброса streak, сброс цен отклонён (факты — в ветке `research/casino-math`).
 - [Аудит клиентской экономики](scratch/pivkoiny-backend/issues/02-client-economy-audit.md): баланс в localStorage, сервер авторитетен только по цене покупки; переезжает всё денежное (баланс, гейт, списание/начисление, RNG, таблица выплат, next-цена), клиент оставляет показ и анимации.
+- [Форма supabase](scratch/pivkoiny-backend/issues/03-supabase-shape.md): ledger append-only — истина + серверный кэш баланса; спин — RPC, покупка — расширить текущие триггеры; RLS на каждую таблицу; цена/баланс — select + Realtime; миграции profiles → ledger → spins → daily → purchase-money → price-feed (набросок — в ветке `research/supabase-shape`).
 
 ## Not yet specified
 
