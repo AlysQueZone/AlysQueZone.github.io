@@ -55,11 +55,10 @@ const clapSound = s3Sound('clap.mp3');
 ></div>
 
 <script>
-  import {
-    getBalance,
-    canAfford,
-    spend,
-  } from '../lib/wallet.ts';
+  // Локальный spend — только фолбэк без настроенного хранилища (подтверждать
+  // нечему, сервера нет); серверный путь денег локально не трогает (тикет 08).
+  // wallet.ts умрёт в тикете 11 вместе с этим фолбэком.
+  import { spend } from '../lib/wallet.ts';
   import { boom } from '../lib/confetti.ts';
   import {
     getSupabase,
@@ -119,17 +118,19 @@ const clapSound = s3Sound('clap.mp3');
     }
   }
 
-  /** Успех: Пивкойны + confetti + видео лота в уведомлении (без video_url — clap с S3). «Мои приветы» обновит витрина из shared по событию. */
+  /** Успех: деньги списал сервер (дебет/кредит + леджер в AFTER-триггере),
+   *  шапка подтянет новый баланс из БД по realtime-подписке.
+   *  Итог — фактически уплаченная серверная цена + confetti + видео лота
+   *  в уведомлении (без video_url — clap с S3). «Мои приветы» обновит
+   *  витрина из shared по событию. */
   function celebrate(entry: { id: string; title: string; price: number; owner: string; video?: string }): void {
-    spend(entry.price);
     closeModal();
-    renderBalances();
     boom();
     if (entry.video) {
-      showNotice(`ЗАБРАЛ! Привет твой: ${entry.title}`, true, entry.video);
+      showNotice(`ЗАБРАЛ! Привет твой: ${entry.title} — ушло ${entry.price} Пивкойнов`, true, entry.video);
     } else {
       playClapFallback();
-      showNotice(`ЗАБРАЛ! Привет твой: ${entry.title}`, true);
+      showNotice(`ЗАБРАЛ! Привет твой: ${entry.title} — ушло ${entry.price} Пивкойнов`, true);
     }
     window.dispatchEvent(new CustomEvent('alysque:bought', { detail: { id: entry.id, price: entry.price } }));
   }
@@ -306,13 +307,6 @@ const clapSound = s3Sound('clap.mp3');
     }
   }
 
-  function renderBalances(): void {
-    const balance = String(getBalance());
-    document.querySelectorAll('[data-wallet-balance]').forEach((el) => {
-      el.textContent = balance;
-    });
-  }
-
   function openModal(): void {
     if (!modal || !pending || !modalText || !modalTitle) return;
     modalTitle.textContent = pending.title;
@@ -374,13 +368,11 @@ const clapSound = s3Sound('clap.mp3');
   yesBtn?.addEventListener('click', async () => {
     if (!pending) return;
     const { id, title, price, owner, video } = pending;
-    if (!canAfford(price)) {
-      closeModal();
-      showNotice('Не хватает Пивкойнов, пойжем жоско на стрим', false);
-      return;
-    }
+    // Гейт «хватит/не хватит» — серверный (тикет 08): локальный кошелёк
+    // цену сервера не знает, BEFORE ответит `insufficient funds`, покажем честно.
     // Без настроенного хранилища — старое локальное поведение (подтверждать нечему).
     if (!isSupabaseConfigured()) {
+      spend(price);
       celebrate({ id, title, price, owner, video });
       return;
     }
@@ -416,6 +408,11 @@ const clapSound = s3Sound('clap.mp3');
         return;
       }
       restoreBuyButton();
+      if (info.kind === 'insufficient-funds') {
+        closeModal();
+        showNotice('Не хватает Пивкойнов — пойжем жоско в гамбу или забери Ежедневный вход, а этот привет подождёт.', false);
+        return;
+      }
       if (info.kind === 'unauthenticated') {
         stashPendingBuy(id);
         showNotice('СТРИМ ВКЛЮЧИЛСЯ, А ТЫ? Сессия кончилась — войди через Twitch, потом вернём к лоту.', false);
@@ -449,8 +446,6 @@ const clapSound = s3Sound('clap.mp3');
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeModal();
   });
-
-  renderBalances();
 
   // Возврат из логина (тикет 09): Чатерс залогинен — переоткрыть модалку того же Лота.
   void (async () => {

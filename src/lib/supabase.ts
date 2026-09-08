@@ -271,8 +271,9 @@ export function subscribeSharedLots(onChange: () => void, slug?: string): () => 
 //
 // Контракт с БД (см. supabase/migrations/*_shared_lots.sql): клиент делает один
 // INSERT в purchases только с lot_id + buyer_uid. Цену (ceil +10%), identity
-// (twitch_id/login из JWT), паузу 30с per-(user,lot) и кап 10 покупок/10мин
-// считает BEFORE-триггер — клиентские значения цены/identity игнорируются.
+// (twitch_id/login из JWT), паузу 30с per-(user,lot), кап 10 покупок/10мин
+// и гейт денег (`insufficient funds` — тикет 08) считает BEFORE-триггер —
+// клиентские значения цены/identity игнорируются.
 // Успех — только после confirm сервера (ответ без error).
 // ---------------------------------------------------------------------------
 
@@ -286,6 +287,7 @@ export type BuyErrorKind =
   | 'cooldown'
   | 'rate-limit'
   | 'own-lot'
+  | 'insufficient-funds'
   | 'unauthenticated'
   | 'missing-lot'
   | 'price-cap'
@@ -354,6 +356,11 @@ export function mapBuyError(err: unknown): BuyErrorInfo {
   }
   if (low.includes('price cap')) {
     return { kind: 'price-cap', raw };
+  }
+  // Деньги покупки — серверный гейт (тикет 08, BEFORE-триггер):
+  // счёта нет или баланса не хватило на серверную цену.
+  if (low.includes('insufficient funds') || low.includes('insufficient_funds')) {
+    return { kind: 'insufficient-funds', raw };
   }
   if (
     low.includes('failed to fetch') ||
