@@ -16,6 +16,7 @@
 - [Форма supabase](scratch/pivkoiny-backend/issues/03-supabase-shape.md): ledger append-only — истина + серверный кэш баланса; спин — RPC, покупка — расширить текущие триггеры; RLS на каждую таблицу; цена/баланс — select + Realtime; миграции profiles → ledger → spins → daily → purchase-money → price-feed (набросок — в ветке `research/supabase-shape`).
 - [Источники и стоки экономики](scratch/pivkoiny-backend/issues/04-economy-sources-sinks.md): старт 1000, Ежедневный вход по календарю 100–500 без сброса streak, sink — только edge 10%, комиссии нет, сброс цен похоронен.
 - [Модель ставок гамбы](scratch/pivkoiny-backend/issues/05-gamba-stake-model.md): ставка 100, таблица A (0/100/500, RTP 90%), без лимитов (только антибот rate-limit), прозрачный дисплей, дружелюбный гейт при балансе < 100.
+- [Цена перекупа из БД](scratch/pivkoiny-backend/issues/06-perekup-price-from-db.md): авторитет — только БД (клиент формулу не считает), модалка live-обновляет цену, итог — price_paid сервера, «забрать за N» из подписки везде.
 
 ## Not yet specified
 
