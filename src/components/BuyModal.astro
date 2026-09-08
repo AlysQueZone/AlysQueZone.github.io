@@ -414,6 +414,9 @@ const clapSound = s3Sound('clap.mp3');
         return;
       }
       switch (info.kind) {
+        case 'own-lot':
+          showNotice('Этот привет уже твой — перекупать нечего.', false);
+          break;
         case 'missing-lot':
           showNotice('Лот ещё не переехал в общее хранилище — покупка не записана, Пивкойны целы.', false);
           break;

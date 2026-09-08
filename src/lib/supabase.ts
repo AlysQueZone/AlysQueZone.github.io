@@ -285,6 +285,7 @@ export interface SharedPurchase {
 export type BuyErrorKind =
   | 'cooldown'
   | 'rate-limit'
+  | 'own-lot'
   | 'unauthenticated'
   | 'missing-lot'
   | 'price-cap'
@@ -336,6 +337,9 @@ export function mapBuyError(err: unknown): BuyErrorInfo {
   }
   if (low.includes('rate limit') || low.includes('max ') || low.includes('too many')) {
     return { kind: 'rate-limit', raw };
+  }
+  if (low.includes('already yours')) {
+    return { kind: 'own-lot', raw };
   }
   if (
     low.includes('not authenticated') ||
