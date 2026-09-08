@@ -1,104 +1,31 @@
 ---
-  // Ежедневный вход (тикет 10, pivkoiny-backend): точка входа рядом с балансом
-  // в шапке + модалка с недельным календарём. Награду начисляет сервер одним
-  // вызовом claim_daily (см. src/lib/daily.ts), клиент лишь показывает.
-  // Гость без сессии вход забрать не может — уводится в логин через Twitch
-  // с возвратом к месту (паттерн BuyModal/GambaModal: ?daily=1 + sessionStorage).
-  // Клиентского начисления нет; локальный кошелёк удалён (тикет 11).
-  //
-  // Использование: положить <DailyLogin /> в шапку рядом с балансом.
-  import { S3_MEDIA_BASE } from '../lib/media.ts';
-  const clapSound = `${S3_MEDIA_BASE}/sounds/clap.mp3`;
+// Ежедневный вход (тикет 13, pivkoiny-backend): автовыдача без кнопок.
+// При первом заходе залогиненного Чатерса в новый UTC-день клиент сам
+// вызывает claim_daily (см. src/lib/daily.ts) — один раз в день: сначала
+// сверка со статусом/датой последнего клейма, лишних вызовов нет. Факт
+// выдачи показывает всплывающее уведомление «Ежедневный вход: +N, день M»
+// без кнопок вообще: автозакрытие через few секунд + закрытие по клику вне.
+// Гость без сессии ничего не получает и не видит. Серверный claim_daily
+// не меняется.
+//
+// Использование: положить <DailyLogin /> в шапку (видимого места не занимает).
 ---
 
-<button
-  type="button"
-  data-daily-button
-  class="cursor-pointer rounded-full border border-melon/50 px-5 py-2 text-sm font-extrabold text-melon uppercase hover:bg-melon/10"
->
-  ежедневный вход
-</button>
-
-<div
-  id="daily-modal"
-  data-clap-sound={clapSound}
-  class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4"
-  role="dialog"
-  aria-modal="true"
-  aria-labelledby="daily-title"
->
-  <div class="w-full max-w-sm rounded-2xl border border-stream bg-panel p-5 text-center">
-    <h3 id="daily-title" class="text-lg font-black uppercase">Ежедневный вход</h3>
-    <p class="mt-1 font-mono text-xs text-mist">Первый клик дня — пивкойны в котёл · пропуск streak не сбрасывает</p>
-    <ul
-      id="daily-calendar"
-      class="mx-auto mt-3 grid max-w-70 grid-cols-7 gap-1 font-mono text-xs text-mist"
-      aria-label="Календарь наград"
-    >
-    </ul>
-    <p id="daily-result" class="mt-3 min-h-6 font-mono text-sm text-milk" role="status"></p>
-    <div class="mt-3 flex justify-center gap-2">
-      <button
-        id="daily-claim"
-        type="button"
-        class="cursor-pointer rounded-xl bg-stream px-6 py-2 font-extrabold text-white uppercase hover:bg-ctahover disabled:opacity-50"
-      >
-        Забрать пивкойны
-      </button>
-      <button
-        id="daily-login"
-        type="button"
-        class="hidden cursor-pointer rounded-xl bg-[#9146ff] px-6 py-2 font-extrabold text-white uppercase hover:brightness-110"
-      >
-        Войти через Twitch
-      </button>
-      <button
-        id="daily-close"
-        type="button"
-        class="cursor-pointer rounded-xl border border-white/20 bg-transparent px-4 py-2 text-mist hover:bg-white/10"
-      >
-        Не, пойду на стрим
-      </button>
-    </div>
-  </div>
-</div>
+<div id="daily-toast-root" aria-live="polite"></div>
 
 <script>
-  import { getSupabase, isSupabaseConfigured, signInWithTwitch } from '../lib/supabase.ts';
+  import { getSupabase, isSupabaseConfigured } from '../lib/supabase.ts';
   import {
-    amountForDay,
     claimDaily,
     dayNumForStreak,
     fetchDailyStatus,
-    mapDailyError,
-    returnUrlForDaily,
-    stashPendingDaily,
-    takePendingDaily,
+    markAutoDailyDay,
+    readAutoDailyDay,
+    todayUtcDate,
   } from '../lib/daily.ts';
 
-  const GUEST_TEXT = 'Вход только для своих — войди через Twitch, и пойжем вместе 🍺';
-  const OFFLINE_TEXT = 'Офлайн: вход не записан, Пивкойны целы. Вернись с сетью.';
-  const ERROR_TEXT = 'Не записалось — Пивкойны целы, попробуй ещё.';
-  const UNCONFIGURED_TEXT = 'Вход пока спит — человек ещё не вбил ключи.';
-
-  const modal = document.getElementById('daily-modal');
-  const calendar = document.getElementById('daily-calendar');
-  const result = document.getElementById('daily-result');
-  const claimBtn = document.getElementById('daily-claim');
-  const loginBtn = document.getElementById('daily-login');
-  const closeBtn = document.getElementById('daily-close');
-
-  let busy = false;
-
-  function setBusy(value: boolean): void {
-    busy = value;
-    if (claimBtn instanceof HTMLButtonElement) claimBtn.disabled = value;
-  }
-
-  function showClaim(show: boolean): void {
-    claimBtn?.classList.toggle('hidden', !show);
-    loginBtn?.classList.toggle('hidden', show);
-  }
+  /** few секунд на прочтение факта выдачи. */
+  const TOAST_TTL_MS = 6000;
 
   function paintBalance(balance: number): void {
     document.querySelectorAll('[data-wallet-balance]').forEach((el) => {
@@ -106,187 +33,88 @@
     });
   }
 
-  function playClap(): void {
-    try {
-      const src = modal?.dataset.clapSound;
-      if (!src) return;
-      const audio = new Audio(src);
-      audio.volume = 0.8;
-      const p = audio.play();
-      if (p && typeof p.catch === 'function') p.catch(() => {});
-    } catch {
-      // graceful-fallback: без звука, вход всё равно засчитан
-    }
-  }
-
-  /** Календарь 7 дней; highlightDay 1..7 — текущий/забранный день streak. */
-  function renderCalendar(highlightDay: number | null): void {
-    if (!calendar) return;
-    calendar.innerHTML = '';
-    for (let day = 1; day <= 7; day += 1) {
-      const li = document.createElement('li');
-      const hot = highlightDay === day;
-      li.className = hot
-        ? 'rounded-lg border border-stream bg-stream/15 px-1 py-1 text-milk'
-        : 'rounded-lg border border-white/10 px-1 py-1';
-      const reward = amountForDay(day);
-      li.textContent = `день ${day} · +${reward}`;
-      if (day === 7) li.title = 'Седьмой день streak — 500, дальше цикл сначала';
-      calendar.appendChild(li);
-    }
-  }
-
-  function claimedText(amount: number, streak: number): string {
-    const day = dayNumForStreak(streak);
-    return `ПОЙЖЕМ! +${amount} Пивкойнов — день ${day}, streak ${streak}. Приходи завтра 🍺`;
-  }
-
-  async function refresh(): Promise<void> {
-    renderCalendar(null);
-    showClaim(true);
-    setBusy(false);
-    if (!isSupabaseConfigured()) {
-      if (result) result.textContent = UNCONFIGURED_TEXT;
-      if (claimBtn instanceof HTMLButtonElement) claimBtn.disabled = true;
-      return;
-    }
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      if (result) result.textContent = OFFLINE_TEXT;
-      return;
-    }
-    const sb = getSupabase();
-    const { data } = (await sb?.auth.getSession()) ?? { data: { session: null } };
-    if (!data.session) {
-      renderCalendar(null);
-      if (result) result.textContent = GUEST_TEXT;
-      showClaim(false);
-      return;
-    }
-    showClaim(true);
-    if (result) result.textContent = 'Смотрим, какой день streak твой…';
-    const status = await fetchDailyStatus();
-    if (!status) {
-      if (result) result.textContent = ERROR_TEXT;
-      return;
-    }
-    if (status.claimedToday && status.todayStreak !== null && status.todayAmount !== null) {
-      renderCalendar(dayNumForStreak(status.todayStreak));
-      if (result) {
-        result.textContent =
-          `Уже забрано сегодня: +${status.todayAmount} (день ${dayNumForStreak(status.todayStreak)}, ` +
-          `streak ${status.todayStreak}) — приходи завтра, streak цел 🙂`;
+  /** Всплывающее уведомление о факте выдачи: текст + день streak, кнопок нет. */
+  function showToast(text: string): void {
+    const root = document.getElementById('daily-toast-root');
+    if (!root) return;
+    root.innerHTML = '';
+    const box = document.createElement('div');
+    box.dataset.dailyToast = '1';
+    box.setAttribute('role', 'status');
+    box.className =
+      'fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-2xl border border-stream ' +
+      'bg-panel px-5 py-3 text-center font-mono text-sm text-milk shadow-xl';
+    box.textContent = text;
+    root.appendChild(box);
+    const timer = window.setTimeout(() => box.remove(), TOAST_TTL_MS);
+    const detach = (): void => {
+      window.clearTimeout(timer);
+      document.removeEventListener('click', onOutside, true);
+      document.removeEventListener('keydown', onKey);
+      box.remove();
+    };
+    // Клик вне уведомления тоже закрывает (клик по самому уведомлению — нет).
+    const onOutside = (e: MouseEvent): void => {
+      const target = e.target as HTMLElement | null;
+      if (target && !box.contains(target)) detach();
+    };
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') detach();
+    };
+    // Отложка на тик: текущий клик (если он и запустил флоу) не должен
+    // тут же закрыть уведомление.
+    window.setTimeout(() => {
+      if (box.isConnected) {
+        document.addEventListener('click', onOutside, true);
+        document.addEventListener('keydown', onKey);
       }
-      if (claimBtn instanceof HTMLButtonElement) claimBtn.disabled = true;
-      return;
-    }
-    const nextDay = dayNumForStreak(status.nextStreak);
-    renderCalendar(nextDay);
-    if (result) {
-      result.textContent =
-        `Твой день ${nextDay} (streak ${status.nextStreak}): жми — и +${amountForDay(nextDay)} Пивкойнов в котёл 🍺`;
-    }
+    }, 0);
   }
 
-  function open(): void {
-    if (!modal) return;
-    if (result) result.textContent = '';
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-    void refresh();
-  }
+  let busy = false;
 
-  function close(): void {
-    if (!modal) return;
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
-    setBusy(false);
-  }
-
-  async function claim(): Promise<void> {
-    if (busy || !modal) return;
-    if (!isSupabaseConfigured()) {
-      if (result) result.textContent = UNCONFIGURED_TEXT;
-      return;
-    }
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      if (result) result.textContent = OFFLINE_TEXT;
-      return;
-    }
-    const sb = getSupabase();
-    const { data } = (await sb?.auth.getSession()) ?? { data: { session: null } };
-    if (!data.session) {
-      if (result) result.textContent = GUEST_TEXT;
-      showClaim(false);
-      stashPendingDaily();
-      await signInWithTwitch(returnUrlForDaily());
-      return;
-    }
-    setBusy(true);
-    if (result) result.textContent = 'Стучимся к серверу за наградой…';
-    try {
-      const done = await claimDaily();
-      if (done.balance !== null) paintBalance(done.balance);
-      renderCalendar(dayNumForStreak(done.streak));
-      if (result) {
-        result.textContent = done.already
-          ? `Уже забрано сегодня: +${done.amount} (день ${dayNumForStreak(done.streak)}, ` +
-            `streak ${done.streak}) — дубля нет, приходи завтра 🙂`
-          : claimedText(done.amount, done.streak);
-      }
-      if (!done.already) playClap();
-      if (claimBtn instanceof HTMLButtonElement) claimBtn.disabled = true;
-      setBusy(false);
-    } catch (err) {
-      setBusy(false);
-      const info = mapDailyError(err);
-      if (!result) return;
-      if (info.kind === 'unauthenticated') {
-        result.textContent = GUEST_TEXT;
-        showClaim(false);
-        stashPendingDaily();
-        await signInWithTwitch(returnUrlForDaily());
-        return;
-      }
-      if (info.kind === 'offline') {
-        result.textContent = OFFLINE_TEXT;
-        return;
-      }
-      result.textContent = ERROR_TEXT;
-    }
-  }
-
-  document.addEventListener('click', (e) => {
-    const target = e.target as HTMLElement | null;
-    if (target?.closest?.('[data-daily-button]')) {
-      open();
-    }
-  });
-  claimBtn?.addEventListener('click', () => {
-    void claim();
-  });
-  loginBtn?.addEventListener('click', async () => {
-    stashPendingDaily();
-    await signInWithTwitch(returnUrlForDaily());
-  });
-  closeBtn?.addEventListener('click', close);
-  modal?.addEventListener('click', (e) => {
-    if (e.target === modal) close();
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') close();
-  });
-
-  // Возврат из логина (паттерн BuyModal): Чатерс залогинен — переоткрыть вход.
-  void (async () => {
+  /** Автоклейм: один раз в день при первом заходе залогиненного. */
+  async function maybeAutoClaim(): Promise<void> {
+    if (busy || typeof window === 'undefined') return;
     if (!isSupabaseConfigured()) return;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+    // Быстрая локальная сверка: сегодня уже отработали — вызовов в сеть нет.
+    if (readAutoDailyDay() === todayUtcDate()) return;
     const sb = getSupabase();
     if (!sb) return;
     const { data } = await sb.auth.getSession();
-    if (!data.session) return;
-    if (takePendingDaily()) {
-      window.setTimeout(() => open(), 350);
+    if (!data.session) return; // гость — ничего не получает и не видит
+    busy = true;
+    try {
+      // Сверка со статусом дня: забрано — клейм не вызываем вообще.
+      const status = await fetchDailyStatus();
+      if (!status) return; // офлайн/сбой — деньги целы, молча
+      if (status.claimedToday) {
+        markAutoDailyDay();
+        return;
+      }
+      const done = await claimDaily();
+      markAutoDailyDay();
+      if (done.balance !== null) paintBalance(done.balance);
+      // Уведомление — только о факте новой выдачи; повторный (already)
+      // ответ сервера молча гасим, чтобы не спамить дублями.
+      if (!done.already) {
+        showToast(`Ежедневный вход: +${done.amount}, день ${dayNumForStreak(done.streak)}`);
+      }
+    } catch {
+      // Честная тишина: вход не записан, Пивкойны целы.
+    } finally {
+      busy = false;
     }
-  })();
+  }
 
-  renderCalendar(null);
+  // Один раз за страницу; вход посреди сессии (без перезагрузки) ловим
+  // по смене сессии (INITIAL_SESSION отфильтрован — первичный заход выше).
+  if (!document.documentElement.dataset.dailyAutoInit) {
+    document.documentElement.dataset.dailyAutoInit = '1';
+    void maybeAutoClaim();
+    getSupabase()?.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') void maybeAutoClaim();
+    });
+  }
 </script>
