@@ -138,30 +138,39 @@ const clapSound = s3Sound('clap.mp3');
     if (!notice) return;
     notice.innerHTML = '';
     let videoEl: HTMLVideoElement | null = null;
-    // Сброс варианта: текстовый — пилюля, с видео — карточка.
+    // Сброс варианта: текстовый — пилюля снизу, с видео — большое окно по центру.
     notice.classList.remove(
       'rounded-full',
       'rounded-2xl',
       'whitespace-nowrap',
       'whitespace-normal',
       'max-w-sm',
+      'max-w-lg',
       'flex-col',
       'items-start',
       'gap-2',
       'text-base',
+      'text-lg',
+      'top-1/2',
+      '-translate-y-1/2',
     );
+    notice.classList.add('bottom-16');
     const span = document.createElement('span');
     span.textContent = text;
     notice.appendChild(span);
     if (videoUrl) {
+      // Видео-вариант: большое окно строго по центру экрана.
+      notice.classList.remove('bottom-16');
       notice.classList.add(
         'rounded-2xl',
         'whitespace-normal',
-        'max-w-sm',
+        'max-w-lg',
         'flex-col',
         'items-start',
         'gap-2',
-        'text-base',
+        'text-lg',
+        'top-1/2',
+        '-translate-y-1/2',
       );
       const video = document.createElement('video');
       video.src = videoUrl;
