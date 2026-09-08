@@ -4,15 +4,15 @@
 //
 // Использование: положить <BuyModal /> на страницу и вешать на кнопки
 // data-buy-lot="<id>" data-lot-title="<title>" data-lot-price="<n>"
-// data-lot-owner="<owner>" data-lot-video="<video_url>" data-for-sale="<true|false>".
-// При покупке играет видео лота со звуком; без video_url — clap с S3.
+// data-lot-owner="<owner>" data-lot-video="<video_url>".
+// При покупке играет видео лота со звуком (видимо, в уведомлении); без video_url — clap с S3.
 // Клик по такой кнопке сам откроет модалку — скрипт ниже делегированный.
 // После покупки кидается window CustomEvent('alysque:bought', { detail: { id } }).
 import { ALYSQUE_CLAP_DARK } from '../lib/emotes.ts';
+import { s3Sound } from '../lib/media.ts';
 
 // UI-звуки — публичный бакет media (тикет 10, §3 спеки): абсолютный S3-URL без ${base}.
-const clapSound =
-  'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/sounds/clap.mp3';
+const clapSound = s3Sound('clap.mp3');
 ---
 
 <div
@@ -119,45 +119,66 @@ const clapSound =
     }
   }
 
-  function playBuyVideo(videoUrl?: string): void {
-    if (!videoUrl) {
+  /** Успех: Пивкойны + confetti + видео лота в уведомлении (без video_url — clap с S3). «Мои приветы» обновит витрина из shared по событию. */
+  function celebrate(entry: { id: string; title: string; price: number; owner: string; video?: string }): void {
+    spend(entry.price);
+    closeModal();
+    renderBalances();
+    boom();
+    if (entry.video) {
+      showNotice(`ЗАБРАЛ! Привет твой: ${entry.title}`, true, entry.video);
+    } else {
       playClapFallback();
-      return;
+      showNotice(`ЗАБРАЛ! Привет твой: ${entry.title}`, true);
     }
-    try {
+    window.dispatchEvent(new CustomEvent('alysque:bought', { detail: { id: entry.id, price: entry.price } }));
+  }
+
+  function showNotice(text: string, ok: boolean, videoUrl?: string): void {
+    if (!notice) return;
+    notice.innerHTML = '';
+    // Сброс варианта: текстовый — пилюля, с видео — карточка.
+    notice.classList.remove(
+      'rounded-full',
+      'rounded-2xl',
+      'whitespace-nowrap',
+      'whitespace-normal',
+      'max-w-sm',
+      'flex-col',
+      'items-start',
+      'gap-2',
+      'text-base',
+    );
+    const span = document.createElement('span');
+    span.textContent = text;
+    notice.appendChild(span);
+    if (videoUrl) {
+      notice.classList.add(
+        'rounded-2xl',
+        'whitespace-normal',
+        'max-w-sm',
+        'flex-col',
+        'items-start',
+        'gap-2',
+        'text-base',
+      );
       const video = document.createElement('video');
       video.src = videoUrl;
+      video.controls = true;
       video.autoplay = true;
       video.playsInline = true;
       video.setAttribute('playsinline', '');
       video.preload = 'auto';
-      video.volume = 0.8;
-      video.muted = false;
-      video.style.position = 'fixed';
-      video.style.width = '1px';
-      video.style.height = '1px';
-      video.style.opacity = '0';
-      video.style.pointerEvents = 'none';
-      document.body.appendChild(video);
-      const cleanup = (): void => {
-        video.remove();
-      };
-      video.addEventListener('ended', cleanup);
-      window.setTimeout(cleanup, 15000);
-      const p = video.play();
-      if (p && typeof p.catch === 'function') p.catch(() => {});
-    } catch {
-      playClapFallback();
-    }
-  }
-
-  function showNotice(text: string, ok: boolean): void {
-    if (!notice) return;
-    notice.innerHTML = '';
-    const span = document.createElement('span');
-    span.textContent = text;
-    notice.appendChild(span);
-    if (ok) {
+      video.className = 'mt-1 w-64 max-w-full rounded-xl';
+      notice.appendChild(video);
+      try {
+        const p = video.play();
+        if (p && typeof p.catch === 'function') p.catch(() => playClapFallback());
+      } catch {
+        playClapFallback();
+      }
+      video.addEventListener('error', () => playClapFallback());
+    } else if (ok) {
       const img = document.createElement('img');
       img.src = CLAP_URL;
       img.alt = 'alysqueCLAP';
@@ -266,17 +287,6 @@ const clapSound =
     }
   }
 
-  /** Успех: Пивкойны + confetti/видео лота (без video_url — clap с S3). «Мои приветы» обновит витрина из shared по событию. */
-  function celebrate(entry: { id: string; title: string; price: number; owner: string; video?: string }): void {
-    spend(entry.price);
-    closeModal();
-    renderBalances();
-    boom();
-    playBuyVideo(entry.video);
-    showNotice(`ЗАБРАЛ! Привет твой: ${entry.title}`, true);
-    window.dispatchEvent(new CustomEvent('alysque:bought', { detail: { id: entry.id, price: entry.price } }));
-  }
-
   function renderBalances(): void {
     const balance = String(getBalance());
     document.querySelectorAll('[data-wallet-balance]').forEach((el) => {
@@ -317,12 +327,8 @@ const clapSound =
     const target = e.target as HTMLElement | null;
     const btn = target?.closest?.('[data-buy-lot]');
     if (!(btn instanceof HTMLElement)) return;
-    const { buyLot: id, lotTitle, lotPrice, lotOwner, lotVideo, forSale } = btn.dataset;
+    const { buyLot: id, lotTitle, lotPrice, lotOwner, lotVideo } = btn.dataset;
     if (!id) return;
-    if (forSale === 'false') {
-      showNotice('ЛУК не продаётся. Хозяин не менялся.', false);
-      return;
-    }
     // Без сессии — в логин через Twitch с возвратом к тому же Лоту (тикет 09).
     // Витрина открыта всем, модалка переоткроется после возврата.
     if (isSupabaseConfigured()) {
@@ -397,9 +403,6 @@ const clapSound =
         return;
       }
       switch (info.kind) {
-        case 'locked':
-          showNotice('ЛУК не продаётся. Хозяин не менялся.', false);
-          break;
         case 'missing-lot':
           showNotice('Лот ещё не переехал в общее хранилище — покупка не записана, Пивкойны целы.', false);
           break;

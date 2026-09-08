@@ -12,8 +12,12 @@ interface Props {
 
 const { videoUrl, title } = Astro.props;
 const webm = videoUrl ?? '';
-const mp4 = webm.replace(/\.webm(\?.*)?$/i, '.mp4$1');
-const poster = webm.replace(/\.webm(\?.*)?$/i, '.webp$1');
+// Тройка MemeAlerts: webm — канон, mp4/постер выводятся заменой хвоста.
+// Будущие свои URL без .webm (напр. .mp4 из Storage) — как есть, без битого постера.
+const isWebm = /\.webm(\?.*)?$/i.test(webm);
+const isMp4 = /\.mp4(\?.*)?$/i.test(webm);
+const mp4 = isWebm ? webm.replace(/\.webm(\?.*)?$/i, '.mp4$1') : isMp4 ? webm : '';
+const poster = isWebm ? webm.replace(/\.webm(\?.*)?$/i, '.webp$1') : '';
 const hasVideo = webm.length > 0;
 ---
 
@@ -28,7 +32,7 @@ const hasVideo = webm.length > 0;
       class="relative aspect-square w-full overflow-hidden rounded-xl bg-black"
     >
       <img
-        src={poster}
+        src={poster || undefined}
         alt={title}
         loading="lazy"
         class="h-full w-full object-cover"
@@ -70,23 +74,33 @@ const hasVideo = webm.length > 0;
     video.preload = 'metadata';
     if (poster) video.poster = poster;
     video.className = 'h-full w-full object-cover';
-    const webmSrc = document.createElement('source');
-    webmSrc.src = webm;
-    webmSrc.type = 'video/webm';
-    video.appendChild(webmSrc);
-    let lastSrc: HTMLSourceElement = webmSrc;
-    if (mp4 && mp4 !== webm) {
-      const mp4Src = document.createElement('source');
-      mp4Src.src = mp4;
-      mp4Src.type = 'video/mp4';
-      video.appendChild(mp4Src);
-      lastSrc = mp4Src;
+    // Сорсы по расширению канона: webm (+выводной mp4) либо одиночный mp4.
+    const sources: { src: string; type: string }[] = [];
+    if (isWebm(webm)) {
+      sources.push({ src: webm, type: 'video/webm' });
+      if (mp4 && mp4 !== webm) sources.push({ src: mp4, type: 'video/mp4' });
+    } else if (mp4) {
+      sources.push({ src: mp4, type: 'video/mp4' });
     }
-    // Мёртвый URL: оба сорса битые → остаётся постер.
-    lastSrc.addEventListener('error', restorePoster);
+    let failed = 0;
+    for (const s of sources) {
+      const el = document.createElement('source');
+      el.src = s.src;
+      el.type = s.type;
+      // Мёртвый URL: все сорсы битые → остаётся постер.
+      el.addEventListener('error', () => {
+        failed += 1;
+        if (failed >= sources.length) restorePoster();
+      });
+      video.appendChild(el);
+    }
     video.addEventListener('error', restorePoster);
     root.innerHTML = '';
     root.appendChild(video);
+  }
+
+  function isWebm(url: string): boolean {
+    return /\.webm(\?.*)?$/i.test(url);
   }
 
   function initLotVideos(): void {

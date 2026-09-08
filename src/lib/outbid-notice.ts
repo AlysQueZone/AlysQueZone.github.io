@@ -18,6 +18,7 @@
  */
 
 import { getSessionUid, getSupabase, fetchSharedLots } from './supabase.ts';
+import { s3Sound } from './media.ts';
 
 const MAX_NOTICES = 3;
 const NOTICE_TTL_MS = 20000;
@@ -37,7 +38,7 @@ interface OutbidEvent {
 }
 
 function soundUrl(): string {
-  return 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/sounds/outbid.mp3';
+  return s3Sound('outbid.mp3');
 }
 
 function readCatalogTitle(slug: string): string | null {

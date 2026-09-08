@@ -6,7 +6,7 @@ export type Rarity = 'common' | 'rare' | 'legendary';
  * Лот каталога (тикет 09, карта video-s3).
  *
  * Каталог живёт в БД (таблица public.lots), статики больше нет:
- * audio/poster/forSale/clipUrl/history удалены, `meme` переименовано
+ * старые аудио/постер-поля удалены, `meme` переименовано
  * в `meme_text` (читается из shared). `id` = slug из БД (маппинг
  * lot.id → эмоут в emotes.ts не трогаем).
  */

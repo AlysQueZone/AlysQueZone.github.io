@@ -10,6 +10,7 @@
  *   код только вызывает signInWithOAuth/signOut и слушает сессию.
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import type { Rarity } from './lots.ts';
 
 const SUPABASE_URL = import.meta.env.PUBLIC_SUPABASE_URL as string | undefined;
 const PUBLISHABLE_KEY = import.meta.env.PUBLIC_SUPABASE_PUBLISHABLE_KEY as string | undefined;
@@ -112,7 +113,7 @@ export function returnUrlForLot(lotId: string): string {
 export interface SharedLotState {
   slug: string;
   title: string;
-  rarity: string | null;
+  rarity: Rarity | null;
   meme_text: string | null;
   video_url: string | null;
   price: number;
@@ -152,10 +153,15 @@ export async function fetchSharedLots(): Promise<Map<string, SharedLotState>> {
   const toState = (row: Record<string, unknown>): SharedLotState | null => {
     const slug = row['slug'];
     if (typeof slug !== 'string') return null;
+    const rawRarity = row['rarity'];
+    const rarity: Rarity | null =
+      rawRarity === 'legendary' || rawRarity === 'rare' || rawRarity === 'common'
+        ? rawRarity
+        : null;
     return {
       slug,
       title: typeof row['title'] === 'string' ? (row['title'] as string) : slug,
-      rarity: typeof row['rarity'] === 'string' ? (row['rarity'] as string) : null,
+      rarity,
       meme_text: typeof row['meme_text'] === 'string' ? (row['meme_text'] as string) : null,
       video_url: typeof row['video_url'] === 'string' ? (row['video_url'] as string) : null,
       price: Number(row['price']),
@@ -265,7 +271,7 @@ export function subscribeSharedLots(onChange: () => void, slug?: string): () => 
 //
 // Контракт с БД (см. supabase/migrations/*_shared_lots.sql): клиент делает один
 // INSERT в purchases только с lot_id + buyer_uid. Цену (ceil +10%), identity
-// (twitch_id/login из JWT), блок ЛУКа, паузу 30с per-(user,lot) и кап 10 покупок/10мин
+// (twitch_id/login из JWT), паузу 30с per-(user,lot) и кап 10 покупок/10мин
 // считает BEFORE-триггер — клиентские значения цены/identity игнорируются.
 // Успех — только после confirm сервера (ответ без error).
 // ---------------------------------------------------------------------------
@@ -279,7 +285,6 @@ export interface SharedPurchase {
 export type BuyErrorKind =
   | 'cooldown'
   | 'rate-limit'
-  | 'locked'
   | 'unauthenticated'
   | 'missing-lot'
   | 'price-cap'
@@ -320,7 +325,7 @@ function parseCooldownSec(msg: string): number {
 
 /**
  * Маппинг ошибок Postgres/триггера на честные виды.
- * Матчится по коду/сообщению триггера: cooldown / rate limit / not for sale /
+ * Матчится по коду/сообщению триггера: cooldown / rate limit /
  * not authenticated (см. enforce_purchase_rules в миграциях).
  */
 export function mapBuyError(err: unknown): BuyErrorInfo {
@@ -331,9 +336,6 @@ export function mapBuyError(err: unknown): BuyErrorInfo {
   }
   if (low.includes('rate limit') || low.includes('max ') || low.includes('too many')) {
     return { kind: 'rate-limit', raw };
-  }
-  if (low.includes('not for sale') || low.includes('(luk)')) {
-    return { kind: 'locked', raw };
   }
   if (
     low.includes('not authenticated') ||

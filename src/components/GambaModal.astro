@@ -7,7 +7,8 @@
 // Начисления — только через earn() из wallet и только на выигрышах.
 //
 // Звуки — публичный бакет media (тикет 10, §3 спеки): абсолютные S3-URL без ${base}.
-const S3_SOUNDS = 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/sounds';
+import { S3_MEDIA_BASE } from '../lib/media.ts';
+const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
 ---
 
 <div

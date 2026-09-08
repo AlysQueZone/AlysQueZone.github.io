@@ -58,7 +58,6 @@ const catalog = (await fetchCatalogLots()).map((l) => ({ id: l.id, title: l.titl
         data-lot-price={lot.price}
         data-lot-owner={lot.owner ?? '—'}
         data-lot-video={lot.video_url ?? undefined}
-        data-for-sale="true"
       >
         Купить за {lot.price} Пивкойнов
       </button>

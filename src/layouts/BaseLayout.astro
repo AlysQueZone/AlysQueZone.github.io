@@ -72,38 +72,6 @@ const base = import.meta.env.BASE_URL;
         if (e.key === BALANCE_KEY) render();
       });
 
-      // Кнопка «слушать» мем-лота (тикет 17): делегированная, play/stop-тоггл.
-      let listenAudio: HTMLAudioElement | null = null;
-      let listenBtn: HTMLElement | null = null;
-      function resetListenLabel(): void {
-        if (listenBtn) listenBtn.textContent = '▶ слушать';
-        listenBtn = null;
-      }
-      document.addEventListener('click', (e) => {
-        const target = e.target as HTMLElement | null;
-        const btn = target?.closest?.('[data-lot-listen]');
-        if (!(btn instanceof HTMLElement)) return;
-        const src = btn.dataset.lotListen;
-        if (!src) return;
-        try {
-          if (listenAudio && listenBtn === btn && !listenAudio.paused) {
-            listenAudio.pause();
-            resetListenLabel();
-            return;
-          }
-          listenAudio?.pause();
-          resetListenLabel();
-          listenAudio = new Audio(src);
-          listenBtn = btn;
-          btn.textContent = '⏸ стоп';
-          listenAudio.addEventListener('ended', resetListenLabel);
-          const p = listenAudio.play();
-          if (p && typeof p.catch === 'function') p.catch(resetListenLabel);
-        } catch {
-          resetListenLabel();
-        }
-      });
-
     </script>
   </body>
 </html>
