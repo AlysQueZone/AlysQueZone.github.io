@@ -33,11 +33,11 @@
 
   /** Окно ежедневного входа: по центру, карточка стиля C, confetti при успехе.
    *  Закрытие: «Ок» / крестик / клик по затемнению / Escape. Без автотаймера,
-   *  ширина ограничена вьюпортом — целиком видно на 360px и 1440px. */
+   *  ширина ограничена вьюпортом — целиком видно на 360px и 1440px.
+   *  Оверлей кладём в body: <DailyLogin /> живёт в шапке с backdrop-blur,
+   *  а он ломает fixed-позиционирование потомков (окно прилипало к верху). */
   function showDailyWindow(text: string, withConfetti: boolean): void {
-    const root = document.getElementById('daily-notice-root');
-    if (!root) return;
-    root.innerHTML = '';
+    document.querySelectorAll('[data-daily-notice]').forEach((n) => n.remove());
     const overlay = document.createElement('div');
     overlay.dataset.dailyNotice = '1';
     overlay.setAttribute('role', 'dialog');
@@ -67,7 +67,7 @@
     ok.textContent = 'Ок';
     box.append(headRow, body, ok);
     overlay.appendChild(box);
-    root.appendChild(overlay);
+    document.body.appendChild(overlay);
     const detach = (): void => {
       document.removeEventListener('click', onOutside, true);
       document.removeEventListener('keydown', onKey);
