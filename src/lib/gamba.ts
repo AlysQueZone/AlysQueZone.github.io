@@ -94,7 +94,14 @@ export function mapGambaError(err: unknown): GambaErrorInfo {
   return { kind: 'write-error', raw };
 }
 
+/**
+ * Нормализация исхода из БД/RPC. Legacy-исход 'return' (старая таблица A)
+ * оставлен валидным в БД ради истории спинов — клиент маппит его на 'small'
+ * (ближайший плюс-минимальный исход), чтобы старые строки рисовались,
+ * а не падали ('bad spin response' / выпавшая строка плаката).
+ */
 function asOutcome(value: unknown): GambaOutcome | null {
+  if (value === 'return') return 'small'; // legacy таблицы A
   return value === 'miss' || value === 'small' || value === 'big' || value === 'jackpot' ? value : null;
 }
 

@@ -88,17 +88,26 @@ const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
     J: { label: 'x10', outcome: 'jackpot', color: '#FF00BC' },
   };
   const WHEEL_PATTERN = 'MSBJSMBSMSBMSSJMBSMSBMSSBMSJMBSMSBSMSBMSJMSBSMSBMS';
-  const SEGMENTS: WheelSegment[] = [...WHEEL_PATTERN].map(
-    (ch) => SEGMENT_SPECS[ch] as WheelSegment,
-  );
+  // Инвариант рядом с паттерном: 50 сегментов 15/20/11/4 (таблица F),
+  // алфавит строго MSBJ — числа не менять, при рассинхроне упасть громко.
+  if (WHEEL_PATTERN.length !== 50 || /[^MSBJ]/.test(WHEEL_PATTERN)) {
+    throw new Error(`bad WHEEL_PATTERN (len=${WHEEL_PATTERN.length}, alphabet=MSBJ)`);
+  }
+  const SEGMENTS: WheelSegment[] = [...WHEEL_PATTERN].map((ch) => {
+    const seg = SEGMENT_SPECS[ch];
+    if (!seg) throw new Error(`bad WHEEL_PATTERN char: ${ch}`);
+    return seg;
+  });
   const SEG = (Math.PI * 2) / SEGMENTS.length;
   const SPIN_MS = 4200;
 
-  const RESULT_TEXT: Record<GambaOutcome, string> = {
+  const RESULT_TEXT: Record<GambaOutcome | 'return', string> = {
     miss: 'МИМО! Ставка ушла в котёл, пойжем дальше 🍺',
     small: 'ПОЙЖЕМ! +50 сверху — котёл делится, крути ещё 🙂',
     big: 'ЖОСКО! +200 сверху — чат уважает 🍺',
     jackpot: 'ДЖЕКПОТ ЖОСКО! x10 — 1000 Пивкойнов, чат в шоке 🍺',
+    // legacy таблицы A (в БД валиден ради истории): ставка вернулась в ноль.
+    return: 'ВОЗВРАТ! Ставка вернулась — котёл при своих, крути ещё 🙂',
   };
   const GATE_TEXT =
     'В котле меньше сотни — ставка 100 не влезла. Забери Ежедневный вход и возвращайся пойжемать 🙂';
@@ -266,8 +275,10 @@ const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
   }
 
   /** Докрутка колеса до сегмента присланного сервером исхода. */
-  function animateToOutcome(outcome: GambaOutcome): void {
-    const candidates = SEGMENTS.map((s, i) => (s.outcome === outcome ? i : -1)).filter(
+  function animateToOutcome(outcome: GambaOutcome | 'return'): void {
+    // legacy 'return' своего сегмента не имеет — крутим до 'small'.
+    const wheelOutcome: GambaOutcome = outcome === 'return' ? 'small' : outcome;
+    const candidates = SEGMENTS.map((s, i) => (s.outcome === wheelOutcome ? i : -1)).filter(
       (i) => i >= 0,
     );
     const target = candidates[Math.floor(Math.random() * candidates.length)] ?? 0;
@@ -307,7 +318,7 @@ const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
       spinning = false;
       setBusy(false);
       if (!modal) return;
-      if (outcome === 'small' || outcome === 'big') {
+      if (outcome === 'small' || outcome === 'big' || outcome === 'return') {
         playOutcome(modal.dataset.win);
       } else if (outcome === 'jackpot') {
         playOutcome(modal.dataset.jackpot);

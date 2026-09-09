@@ -11,7 +11,7 @@
 -- оставлены валидными ради истории спинов) + замена seed-строк через
 -- DELETE+INSERT (старые строки UPDATE не правятся).
 -- RLS/гранты таблицы не меняются (публичный SELECT anon/authenticated).
--- Применить: мёрж в main применит сам; руками на прод НЕ накатывать.
+-- Применить: агент на прод не накатывал; применение — мёржем в main / человеком.
 
 -- 1. CHECK-рамки под 4 исхода (superset: старые значения валидны).
 alter table public.gamba_payouts drop constraint if exists gamba_payouts_outcome_check;
