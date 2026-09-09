@@ -14,10 +14,6 @@
 
 import { getSupabase } from './supabase.ts';
 
-/** Календарь наград по позиции дня 1..7 (циклический) — display-mirror, source of truth — DB (CASE в claim_daily). */
-// display-mirror, source of truth — DB
-export const DAILY_CALENDAR = [100, 100, 150, 150, 200, 250, 500] as const;
-
 /** Ключ локальной метки «автоклейм в этот UTC-день уже отработал». */
 export const AUTO_DAILY_KEY = 'alysque:daily-auto-day';
 

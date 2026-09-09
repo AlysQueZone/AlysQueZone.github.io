@@ -11,7 +11,7 @@
 // Использование: положить <DailyLogin /> в шапку (видимого места не занимает).
 ---
 
-<div id="daily-toast-root" aria-live="polite"></div>
+<div id="daily-notice-root" aria-live="polite"></div>
 
 <script>
   import { getSupabase, isSupabaseConfigured } from '../lib/supabase.ts';
@@ -25,7 +25,7 @@
   } from '../lib/daily.ts';
 
   /** few секунд на прочтение факта выдачи. */
-  const TOAST_TTL_MS = 6000;
+  const NOTICE_TTL_MS = 6000;
 
   function paintBalance(balance: number): void {
     document.querySelectorAll('[data-wallet-balance]').forEach((el) => {
@@ -37,19 +37,19 @@
    *  Верстка в тон buy-notice (тикет 14): крупный шрифт/отступы, снизу по
    *  центру (наверх не вылезает), ширина ограничена вьюпортом с переносом —
    *  целиком видно на 360px и 1440px без скролла. */
-  function showToast(text: string): void {
-    const root = document.getElementById('daily-toast-root');
+  function showNotice(text: string): void {
+    const root = document.getElementById('daily-notice-root');
     if (!root) return;
     root.innerHTML = '';
     const box = document.createElement('div');
-    box.dataset.dailyToast = '1';
+    box.dataset.dailyNotice = '1';
     box.setAttribute('role', 'status');
     box.className =
       'fixed bottom-16 left-1/2 z-50 w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-2xl border-2 border-stream ' +
       'bg-panel px-8 py-4 text-center font-mono text-base break-words whitespace-normal text-milk shadow-lg sm:text-xl';
     box.textContent = text;
     root.appendChild(box);
-    const timer = window.setTimeout(() => box.remove(), TOAST_TTL_MS);
+    const timer = window.setTimeout(() => box.remove(), NOTICE_TTL_MS);
     const detach = (): void => {
       window.clearTimeout(timer);
       document.removeEventListener('click', onOutside, true);
@@ -102,10 +102,21 @@
       // Уведомление — только о факте новой выдачи; повторный (already)
       // ответ сервера молча гасим, чтобы не спамить дублями.
       if (!done.already) {
-        showToast(`Ежедневный вход: +${done.amount}, день ${dayNumForStreak(done.streak)}`);
+        showNotice(`Ежедневный вход: +${done.amount}, день ${dayNumForStreak(done.streak)}`);
       }
-    } catch {
-      // Честная тишина: вход не записан, Пивкойны целы.
+    } catch (err) {
+      // Понятная серверная ошибка «no account» (счёта нет): показать тем же
+      // всплывающим уведомлением; день НЕ отмечаем — повтор при следующем
+      // заходе. Остальные ошибки — как раньше молча (деньги целы).
+      const raw =
+        err instanceof Error
+          ? err.message
+          : typeof err === 'object' && err !== null && 'message' in err
+            ? String((err as { message: unknown }).message)
+            : String(err);
+      if (raw.toLowerCase().includes('no account')) {
+        showNotice(raw);
+      }
     } finally {
       busy = false;
     }
