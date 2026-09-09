@@ -9,25 +9,25 @@
   <button
     type="button"
     data-auth-login
-    class="cursor-pointer rounded-full bg-twitch px-5 py-2 text-sm font-extrabold text-white uppercase hover:brightness-110"
+    class="btn-arcade bg-twitch px-4 py-2 text-xs text-white"
   >
-    Войти через Twitch
+    ▶ Войти через Twitch
   </button>
   <span data-auth-user-wrap class="hidden items-center gap-2">
     <span
       data-auth-user
-      class="max-w-36 truncate rounded-full border border-rind/50 bg-void px-3 py-1 font-mono text-sm text-milk"
+      class="max-w-36 truncate border-2 border-milk bg-void px-3 py-1 text-sm font-bold text-milk"
       title="Ты на бирже, чатерс"
     ></span>
     <button
       type="button"
       data-auth-logout
-      class="cursor-pointer rounded-full border border-white/20 px-4 py-2 text-sm font-bold text-mist hover:bg-white/10"
+      class="btn-arcade btn-arcade-ghost px-4 py-2 text-xs text-mist"
     >
       Выйти
     </button>
   </span>
-  <p data-auth-hint class="hidden font-mono text-xs text-melon"></p>
+  <p data-auth-hint class="hidden text-xs font-bold text-melon"></p>
 </div>
 
 <script>

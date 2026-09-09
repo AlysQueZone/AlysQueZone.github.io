@@ -25,8 +25,8 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
   aria-modal="true"
   aria-labelledby="gamba-title"
 >
-  <div class="w-full max-w-md rounded-2xl border border-stream bg-panel p-5 text-center">
-    <h3 id="gamba-title" class="text-lg font-black uppercase">Гамба на пивкойны</h3>
+  <div class="card-pixel w-full max-w-md p-5 text-center">
+    <h3 id="gamba-title" class="font-display text-xs leading-relaxed uppercase">🎰 Гамба на пивкойны</h3>
     <div class="relative mx-auto mt-3 h-72 w-72 max-w-full">
       <canvas id="gamba-wheel" width="560" height="560" class="h-72 w-72 max-w-full"></canvas>
       <div
@@ -35,12 +35,12 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
       >
       </div>
     </div>
-    <p id="gamba-result" class="mt-3 min-h-6 font-mono text-sm text-milk" role="status"></p>
-    <div class="mt-3 flex justify-center gap-2">
+    <p id="gamba-result" class="mt-3 min-h-6 text-sm font-black" role="status"></p>
+    <div class="mt-3 flex flex-wrap justify-center gap-3">
       <button
         id="gamba-spin"
         type="button"
-        class="cursor-pointer rounded-xl bg-stream px-6 py-2 font-extrabold text-white uppercase hover:bg-ctahover disabled:opacity-50"
+        class="btn-arcade btn-arcade-primary px-6 py-2 text-sm"
       >
         Крутить за 100
         <img
@@ -56,7 +56,7 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
       <button
         id="gamba-close"
         type="button"
-        class="cursor-pointer rounded-xl border border-white/20 bg-transparent px-4 py-2 text-mist hover:bg-white/10"
+        class="btn-arcade btn-arcade-ghost px-4 py-2 text-sm text-mist"
       >
         Не, пойду на стрим
       </button>
@@ -153,7 +153,7 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
     paytable.innerHTML = '';
     for (const row of rows) {
       const li = document.createElement('li');
-      li.className = 'rounded-lg border border-white/10 px-1 py-1';
+      li.className = 'border-2 border-milk/60 bg-void px-1 py-1 font-bold';
       li.textContent = `${row.label} — ${row.chance}`;
       paytable.appendChild(li);
     }
@@ -200,7 +200,9 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
       ctx.rotate(i * SEG + SEG / 2);
       ctx.textAlign = 'right';
       ctx.fillStyle = s.outcome === 'miss' ? '#422006' : '#FFFBEA';
-      ctx.font = `bold ${s.outcome === 'jackpot' ? 30 : 34}px monospace`;
+      // Пиксельные подписи сегментов (стиль C); без загруженного шрифта —
+      // честный monospace-фолбэк.
+      ctx.font = `400 ${s.outcome === 'jackpot' ? 20 : 22}px "Press Start 2P", monospace`;
       ctx.fillText(s.label, r - 26, 12);
       ctx.restore();
     }

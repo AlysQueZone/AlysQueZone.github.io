@@ -23,24 +23,24 @@ const clapSound = s3Sound('clap.mp3');
   aria-modal="true"
   aria-labelledby="buy-modal-title"
 >
-  <div class="w-full max-w-sm rounded-2xl border border-stream bg-panel p-5">
+  <div class="card-pixel w-full max-w-sm p-5">
     <div class="flex items-center gap-3">
-      <img src={ALYSQUE_CLAP_DARK} alt="alysqueCLAP" width="56" height="56" loading="lazy" class="h-14 w-14 shrink-0 object-contain" />
-      <h3 id="buy-modal-title" class="text-lg font-black uppercase">Купить привет?</h3>
+      <img src={ALYSQUE_CLAP_DARK} alt="alysqueCLAP" width="56" height="56" loading="lazy" class="h-14 w-14 shrink-0 border-2 border-milk object-contain" />
+      <h3 id="buy-modal-title" class="font-display text-[11px] leading-relaxed uppercase">Купить привет?</h3>
     </div>
-    <p id="buy-modal-text" class="mt-2 font-mono text-sm text-mist"></p>
-    <div class="mt-4 flex gap-2">
+    <p id="buy-modal-text" class="mt-2 text-sm font-bold text-mist"></p>
+    <div class="mt-4 flex flex-wrap gap-3">
       <button
         id="buy-modal-yes"
         type="button"
-        class="cursor-pointer rounded-xl bg-stream px-4 py-2 font-extrabold text-white hover:bg-ctahover"
+        class="btn-arcade btn-arcade-primary px-4 py-2 text-sm"
       >
         Да, забираю
       </button>
       <button
         id="buy-modal-no"
         type="button"
-        class="cursor-pointer rounded-xl border border-white/20 bg-transparent px-4 py-2 text-mist hover:bg-white/10"
+        class="btn-arcade btn-arcade-ghost px-4 py-2 text-sm text-mist"
       >
         Не, пойду на стрим
       </button>
@@ -50,7 +50,7 @@ const clapSound = s3Sound('clap.mp3');
 
 <div
   id="buy-notice"
-  class="fixed bottom-16 left-1/2 z-50 hidden -translate-x-1/2 rounded-full border-2 bg-panel px-8 py-4 font-mono text-xl text-milk whitespace-nowrap shadow-lg"
+  class="card-pixel fixed bottom-16 left-1/2 z-50 hidden max-w-[calc(100vw-2rem)] -translate-x-1/2 px-8 py-4 text-center text-xl font-black whitespace-nowrap"
   role="status"
 ></div>
 
@@ -142,13 +142,10 @@ const clapSound = s3Sound('clap.mp3');
     if (!notice) return;
     notice.innerHTML = '';
     let videoEl: HTMLVideoElement | null = null;
-    // Сброс варианта: текстовый — пилюля снизу, с видео — большое окно по центру.
+    // Сброс варианта: текстовый — плашка снизу, с видео — большое окно по центру.
     notice.classList.remove(
-      'rounded-full',
-      'rounded-2xl',
       'whitespace-nowrap',
       'whitespace-normal',
-      'max-w-sm',
       'max-w-lg',
       'flex-col',
       'items-start',
@@ -166,7 +163,6 @@ const clapSound = s3Sound('clap.mp3');
       // Видео-вариант: большое окно строго по центру экрана.
       notice.classList.remove('bottom-16');
       notice.classList.add(
-        'rounded-2xl',
         'whitespace-normal',
         'max-w-lg',
         'flex-col',
@@ -183,7 +179,7 @@ const clapSound = s3Sound('clap.mp3');
       video.playsInline = true;
       video.setAttribute('playsinline', '');
       video.preload = 'auto';
-      video.className = 'mt-1 w-full rounded-xl';
+      video.className = 'mt-1 w-full border-2 border-milk';
       notice.appendChild(video);
       try {
         const p = video.play();
