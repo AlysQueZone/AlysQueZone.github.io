@@ -10,6 +10,8 @@
  // Звуки — публичный бакет media (тикет 10, §3 спеки): абсолютные S3-URL без ${base}.
 import { S3_MEDIA_BASE } from '../lib/media.ts';
 const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
+/** 7TV-эмоут GAMBA канала (ID проверен 2026-09-09 через 7TV API сета). */
+const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp';
 ---
 
 <div
@@ -41,6 +43,15 @@ const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
         class="cursor-pointer rounded-xl bg-stream px-6 py-2 font-extrabold text-white uppercase hover:bg-ctahover disabled:opacity-50"
       >
         Крутить за 100
+        <img
+          src={GAMBA_URL}
+          alt="GAMBA"
+          title="GAMBA"
+          width="20"
+          height="20"
+          loading="eager"
+          class="ml-1 inline h-5 w-5 object-contain align-[-3px]"
+        />
       </button>
       <button
         id="gamba-close"
