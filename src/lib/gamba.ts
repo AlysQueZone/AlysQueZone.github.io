@@ -6,8 +6,9 @@
  * сам не считает, грантов локально не делает — лишь рисует присланное.
  * Локальный кошелёк удалён в тикете 11 — денег в клиенте нет вовсе.
  *
- * Таблица выплат (seed-конфиг в БД, `public.gamba_payouts`, ставка 100):
- * мимо 50% → 0, возврат 40% → 100, джекпот 10% → 500 (RTP 90%).
+ * Таблица выплат F — щедрый аттракцион-фаусет (тикет 16, seed-конфиг
+ * в БД, `public.gamba_payouts`, ставка 100): мимо 30% → 0, +50 40% → 150,
+ * +200 22% → 300, джекпот x10 8% → 1000 (со 100 возвращается ~206).
  * Секретов здесь нет: только publishable-ключ через getSupabase().
  */
 
@@ -17,7 +18,7 @@ import { getSupabase } from './supabase.ts';
 // display-mirror, source of truth — DB
 export const GAMBA_STAKE = 100;
 
-export type GambaOutcome = 'miss' | 'return' | 'jackpot';
+export type GambaOutcome = 'miss' | 'small' | 'big' | 'jackpot';
 
 export interface GambaPayRow {
   outcome: GambaOutcome;
@@ -31,9 +32,10 @@ export interface GambaPayRow {
  *  показа, если конфиг из БД не прочитался. */
 // display-mirror, source of truth — DB
 export const GAMBA_PAYTABLE: GambaPayRow[] = [
-  { outcome: 'miss', payout: 0, chance: '50%', label: 'мимо' },
-  { outcome: 'return', payout: 100, chance: '40%', label: 'возврат 100' },
-  { outcome: 'jackpot', payout: 500, chance: '10%', label: 'джекпот 500' },
+  { outcome: 'miss', payout: 0, chance: '30%', label: 'мимо' },
+  { outcome: 'small', payout: 150, chance: '40%', label: '+50' },
+  { outcome: 'big', payout: 300, chance: '22%', label: '+200' },
+  { outcome: 'jackpot', payout: 1000, chance: '8%', label: 'джекпот x10' },
 ];
 
 export interface GambaSpinResult {
@@ -93,7 +95,7 @@ export function mapGambaError(err: unknown): GambaErrorInfo {
 }
 
 function asOutcome(value: unknown): GambaOutcome | null {
-  return value === 'miss' || value === 'return' || value === 'jackpot' ? value : null;
+  return value === 'miss' || value === 'small' || value === 'big' || value === 'jackpot' ? value : null;
 }
 
 /**

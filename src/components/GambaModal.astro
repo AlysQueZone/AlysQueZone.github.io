@@ -28,10 +28,11 @@ const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
     <p class="mt-1 font-mono text-xs text-mist">Ставка 100 · крутит сервер, подкрутить из консоли нельзя</p>
     <!-- display-mirror, source of truth — DB (public.gamba_payouts): разметка ниже —
       лишь фолбэк показа, живой плакат дорисовывает скрипт (fetchGambaPaytable). -->
-    <ul id="gamba-paytable" class="mx-auto mt-2 grid max-w-70 grid-cols-3 gap-1 font-mono text-xs text-mist" aria-label="Таблица выплат">
-      <li class="rounded-lg border border-white/10 px-1 py-1">мимо · 50%<br /><span class="text-milk">+0</span></li>
-      <li class="rounded-lg border border-white/10 px-1 py-1">возврат · 40%<br /><span class="text-milk">+100</span></li>
-      <li class="rounded-lg border border-white/10 px-1 py-1">джекпот · 10%<br /><span class="text-milk">+500</span></li>
+    <ul id="gamba-paytable" class="mx-auto mt-2 grid max-w-70 grid-cols-4 gap-1 font-mono text-xs text-mist" aria-label="Таблица выплат">
+      <li class="rounded-lg border border-white/10 px-1 py-1">мимо · 30%<br /><span class="text-milk">+0</span></li>
+      <li class="rounded-lg border border-white/10 px-1 py-1">+50 · 40%<br /><span class="text-milk">+150</span></li>
+      <li class="rounded-lg border border-white/10 px-1 py-1">+200 · 22%<br /><span class="text-milk">+300</span></li>
+      <li class="rounded-lg border border-white/10 px-1 py-1">x10 · 8%<br /><span class="text-milk">+1000</span></li>
     </ul>
     <div class="relative mx-auto mt-3 h-70 w-70">
       <canvas id="gamba-wheel" width="560" height="560" class="h-70 w-70"></canvas>
@@ -75,27 +76,29 @@ const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
     type GambaPayRow,
   } from '../lib/gamba.ts';
 
-  // 10 сегментов под серверную таблицу A: 5×«мимо», 4×«+100», 1×«+500».
-  // Колесо лишь докручивается до сегмента присланного сервером исхода.
-  const SEGMENTS: { label: string; outcome: GambaOutcome; color: string }[] = [
-    { label: 'мимо', outcome: 'miss', color: '#FFE6AC' },
-    { label: '+100', outcome: 'return', color: '#FF9E2C' },
-    { label: 'мимо', outcome: 'miss', color: '#FFE6AC' },
-    { label: '+100', outcome: 'return', color: '#FF9E2C' },
-    { label: 'мимо', outcome: 'miss', color: '#FFE6AC' },
-    { label: '+500', outcome: 'jackpot', color: '#FF00BC' },
-    { label: 'мимо', outcome: 'miss', color: '#FFE6AC' },
-    { label: '+100', outcome: 'return', color: '#FF9E2C' },
-    { label: 'мимо', outcome: 'miss', color: '#FFE6AC' },
-    { label: '+100', outcome: 'return', color: '#FF9E2C' },
-  ];
+  // 50 сегментов под таблицу F тикета 16 (веса 30/40/22/8 → 15/20/11/4
+  // из 50): строка-паттерн с равномерным размещением (макс. 2 одинаковых
+  // подряд, проверено скриптом). Колесо лишь докручивается до сегмента
+  // присланного сервером исхода.
+  type WheelSegment = { label: string; outcome: GambaOutcome; color: string };
+  const SEGMENT_SPECS: Record<string, WheelSegment> = {
+    M: { label: 'мимо', outcome: 'miss', color: '#FFE6AC' },
+    S: { label: '+50', outcome: 'small', color: '#FF9E2C' },
+    B: { label: '+200', outcome: 'big', color: '#FF5A3C' },
+    J: { label: 'x10', outcome: 'jackpot', color: '#FF00BC' },
+  };
+  const WHEEL_PATTERN = 'MSBJSMBSMSBMSSJMBSMSBMSSBMSJMBSMSBSMSBMSJMSBSMSBMS';
+  const SEGMENTS: WheelSegment[] = [...WHEEL_PATTERN].map(
+    (ch) => SEGMENT_SPECS[ch] as WheelSegment,
+  );
   const SEG = (Math.PI * 2) / SEGMENTS.length;
   const SPIN_MS = 4200;
 
   const RESULT_TEXT: Record<GambaOutcome, string> = {
     miss: 'МИМО! Ставка ушла в котёл, пойжем дальше 🍺',
-    return: 'ПОЙЖЕМ! Возврат 100 — ставка вернулась, крути ещё 🙂',
-    jackpot: 'ДЖЕКПОТ ЖОСКО! +500 Пивкойнов — чат в шоке 🍺',
+    small: 'ПОЙЖЕМ! +50 сверху — котёл делится, крути ещё 🙂',
+    big: 'ЖОСКО! +200 сверху — чат уважает 🍺',
+    jackpot: 'ДЖЕКПОТ ЖОСКО! x10 — 1000 Пивкойнов, чат в шоке 🍺',
   };
   const GATE_TEXT =
     'В котле меньше сотни — ставка 100 не влезла. Забери Ежедневный вход и возвращайся пойжемать 🙂';
@@ -304,7 +307,7 @@ const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
       spinning = false;
       setBusy(false);
       if (!modal) return;
-      if (outcome === 'return') {
+      if (outcome === 'small' || outcome === 'big') {
         playOutcome(modal.dataset.win);
       } else if (outcome === 'jackpot') {
         playOutcome(modal.dataset.jackpot);
