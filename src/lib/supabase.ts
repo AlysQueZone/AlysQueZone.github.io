@@ -10,7 +10,6 @@
  *   код только вызывает signInWithOAuth/signOut и слушает сессию.
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { Rarity } from './lots.ts';
 
 const SUPABASE_URL = import.meta.env.PUBLIC_SUPABASE_URL as string | undefined;
 const PUBLISHABLE_KEY = import.meta.env.PUBLIC_SUPABASE_PUBLISHABLE_KEY as string | undefined;
@@ -101,7 +100,7 @@ export function returnUrlForLot(lotId: string): string {
 // ---------------------------------------------------------------------------
 // Живая витрина (тикет 09, shared-state).
 //
-// Каталог (названия, редкость, мем-тексты, video_url) живёт в БД (public.lots)
+// Каталог (названия, video_url) живёт в БД (public.lots)
 // и читается отсюда же: SSG берёт слаги из БД на билде (см. fetchCatalogLots
 // в lib/lots.ts), витрина дотягивает shared-слой поверх: владельца
 // (owner_login), цену и хвост перепродаж. Без настроенных
@@ -113,8 +112,6 @@ export function returnUrlForLot(lotId: string): string {
 export interface SharedLotState {
   slug: string;
   title: string;
-  rarity: Rarity | null;
-  meme_text: string | null;
   video_url: string | null;
   price: number;
   owner_login: string | null;
@@ -148,21 +145,13 @@ export async function fetchSharedLots(): Promise<Map<string, SharedLotState>> {
   const empty = new Map<string, SharedLotState>();
   const sb = getSupabase();
   if (!sb) return empty;
-  // Полный селект по §3 спеки; до миграции 07 новых колонок нет в БД —
-  // тогда откат на legacy-набор, новые поля отдаём null.
+  // Полный селект по §3 спеки.
   const toState = (row: Record<string, unknown>): SharedLotState | null => {
     const slug = row['slug'];
     if (typeof slug !== 'string') return null;
-    const rawRarity = row['rarity'];
-    const rarity: Rarity | null =
-      rawRarity === 'legendary' || rawRarity === 'rare' || rawRarity === 'common'
-        ? rawRarity
-        : null;
     return {
       slug,
       title: typeof row['title'] === 'string' ? (row['title'] as string) : slug,
-      rarity,
-      meme_text: typeof row['meme_text'] === 'string' ? (row['meme_text'] as string) : null,
       video_url: typeof row['video_url'] === 'string' ? (row['video_url'] as string) : null,
       price: Number(row['price']),
       owner_login: typeof row['owner_login'] === 'string' ? (row['owner_login'] as string) : null,
@@ -173,7 +162,7 @@ export async function fetchSharedLots(): Promise<Map<string, SharedLotState>> {
   try {
     const full = await sb
       .from('lots')
-      .select('slug,title,rarity,meme_text,video_url,price,owner_login,owner_uid,updated_at');
+      .select('slug,title,video_url,price,owner_login,owner_uid,updated_at');
     let rows: unknown = full.error ? null : full.data;
     if (!Array.isArray(rows)) {
       const legacy = await sb.from('lots').select('slug,title,price,owner_login,owner_uid,updated_at');

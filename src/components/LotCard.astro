@@ -7,7 +7,6 @@
 // scratch/video-s3/prototype/inline-video.html).
 // Кнопка покупки несёт data-lot-video (тикет 10): BuyModal играет его при покупке.
 import type { Lot } from '../lib/lots.ts';
-import { lotEmote } from '../lib/emotes.ts';
 import LotVideo from './LotVideo.astro';
 
 interface Props {
@@ -16,31 +15,15 @@ interface Props {
 
 const { lot } = Astro.props;
 const base = import.meta.env.BASE_URL;
-const emote = lotEmote(lot.id);
-
-const badgeClass =
-  lot.rarity === 'legendary'
-    ? 'bg-legend text-cream'
-    : lot.rarity === 'rare'
-      ? 'bg-terra text-cream'
-      : 'bg-bar text-milk';
-
-const rarityLabel =
-  lot.rarity === 'legendary' ? 'ЛЕГЕНДА' : lot.rarity === 'rare' ? 'РЕДКИЙ' : 'ОБЫЧНЫЙ';
 ---
 
 <article data-lot-card={lot.id} class="card-pixel flex flex-col gap-2 p-4 transition hover:-translate-y-0.5">
-  <span class={`badge-pixel w-fit ${badgeClass}`}>
-    {rarityLabel}
-  </span>
   <h3 class="text-base font-extrabold">
     <a href={`${base}lots/${lot.id}/`} class="hover:text-ember">{lot.title}</a>
   </h3>
   <LotVideo videoUrl={lot.video_url} title={lot.title} />
-  {emote && !lot.video_url && <img src={emote.src} alt={emote.name} title={emote.name} loading="lazy" width="56" height="56" class="h-14 w-14 object-contain" />}
   <p class="text-sm text-mist/70">владелец: <span data-shared-owner>{lot.owner ?? '—'}</span> <span data-mine-badge class="hidden font-bold text-rind">· ТВОЙ</span></p>
   <p data-shared-price class="text-xl font-black text-pivko">{lot.price} 🍺</p>
-  {lot.meme_text && !lot.video_url && <p class="text-sm text-mist/80">{lot.meme_text}</p>}
   <div class="mt-auto pt-2">
     <button
       type="button"

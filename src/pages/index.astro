@@ -84,16 +84,6 @@ const topLots = (await fetchCatalogLots()).slice(0, 4);
       {
         topLots.map((lot) => (
           <article class="card-pixel flex min-w-0 flex-col p-5 transition hover:-translate-y-0.5">
-            <span
-              class:list={[
-                'badge-pixel w-fit',
-                lot.rarity === 'rare' && 'bg-terra text-cream',
-                lot.rarity === 'legendary' && 'bg-legend text-cream',
-                lot.rarity === 'common' && 'bg-bar text-milk',
-              ]}
-            >
-              {lot.rarity}
-            </span>
             <h3 class="mt-3 font-extrabold break-words">{lot.title}</h3>
             <p class="mt-1 truncate text-sm text-mist/60">владелец: {lot.owner ?? '—'}</p>
             <p class="mt-3 text-xl font-black text-pivko">{lot.price} 🍺</p>
