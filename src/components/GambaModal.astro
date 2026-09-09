@@ -20,6 +20,10 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
   data-win={`${S3_SOUNDS}/gamba-win1k.mp3`}
   data-lose={`${S3_SOUNDS}/m4-scum.mp3`}
   data-jackpot={`${S3_SOUNDS}/gamba-win100k.mp3`}
+  data-spin-pool={`${S3_SOUNDS}/gamba-spin-sova.mp3,${S3_SOUNDS}/gamba-spin-maknagens.mp3,${S3_SOUNDS}/gamba-spin-toptop.mp3`}
+  data-win-pool={`${S3_SOUNDS}/gamba-win1k.mp3,${S3_SOUNDS}/gamba-win-ideal.mp3,${S3_SOUNDS}/gamba-win-oooo.mp3,${S3_SOUNDS}/gamba-win-taktak.mp3,${S3_SOUNDS}/gamba-win-pivo.mp3`}
+  data-jackpot-pool={`${S3_SOUNDS}/gamba-win100k.mp3,${S3_SOUNDS}/gamba-super-vanna.mp3,${S3_SOUNDS}/gamba-super-snow.mp3`}
+  data-lose-pool={`${S3_SOUNDS}/m4-scum.mp3,${S3_SOUNDS}/gamba-lose-higan.mp3`}
   class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4"
   role="dialog"
   aria-modal="true"
@@ -232,6 +236,38 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
     }
   }
 
+  /** Рандом-пулы звуков гамбы (Q1–Q2): равномерный выбор внутри категории. */
+  function pool(key: string, fallbackKey?: string): string[] {
+    if (!modal) return [];
+    const raw = modal.dataset[key] ?? '';
+    const list = raw
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (list.length > 0) return list;
+    const fb = fallbackKey ? modal.dataset[fallbackKey] : undefined;
+    return fb ? [fb] : [];
+  }
+
+  function pick<T>(list: T[]): T | undefined {
+    if (list.length === 0) return undefined;
+    return list[Math.floor(Math.random() * list.length)];
+  }
+
+  function preloadPools(): void {
+    try {
+      for (const key of ['spinPool', 'winPool', 'jackpotPool', 'losePool']) {
+        for (const src of pool(key)) {
+          const a = new Audio(src);
+          a.preload = 'auto';
+          a.volume = 0.01;
+        }
+      }
+    } catch {
+      // предзагрузка — best effort
+    }
+  }
+
   function playBg(src: string | undefined): void {
     stopAll();
     if (!src) return;
@@ -239,6 +275,22 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
       bgAudio = new Audio(src);
       bgAudio.loop = true;
       bgAudio.volume = 0.6;
+      const p = bgAudio.play();
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+    } catch {
+      bgAudio = null;
+    }
+  }
+
+  /** Случайная фраза кручения — one-shot поверх щелчков, без лупа gamba-bg. */
+  function playSpin(): void {
+    stopAll();
+    const src = pick(pool('spinPool', 'bg'));
+    if (!src) return;
+    try {
+      bgAudio = new Audio(src);
+      bgAudio.loop = false;
+      bgAudio.volume = 0.8;
       const p = bgAudio.play();
       if (p && typeof p.catch === 'function') p.catch(() => {});
     } catch {
@@ -276,6 +328,11 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
     } catch {
       outcomeAudio = null;
     }
+  }
+
+  /** Случайный исходник из пула категории (старые + новые равноправны). */
+  function playOutcomePool(poolKey: string, fallbackKey: string): void {
+    playOutcome(pick(pool(poolKey, fallbackKey)));
   }
 
   function setBusy(busy: boolean): void {
@@ -335,7 +392,7 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
     spinning = true;
     setBusy(true);
     if (result) result.textContent = 'Крутится…';
-    if (modal) playBg(modal.dataset.bg);
+    playSpin();
     const t0 = performance.now();
     let lastTick = 0;
 
@@ -361,11 +418,11 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
       setBusy(false);
       if (!modal) return;
       if (outcome === 'small' || outcome === 'big' || outcome === 'return') {
-        playOutcome(modal.dataset.win);
+        playOutcomePool('winPool', 'win');
       } else if (outcome === 'jackpot') {
-        playOutcome(modal.dataset.jackpot);
+        playOutcomePool('jackpotPool', 'jackpot');
       } else {
-        playOutcome(modal.dataset.lose);
+        playOutcomePool('losePool', 'lose');
       }
       if (result) showOutcome(outcome);
       // Исход показан — ключ попытки истекает, следующий спин будет новым.
@@ -380,6 +437,7 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
     modal.classList.remove('hidden');
     modal.classList.add('flex');
     draw(0);
+    preloadPools();
     // Плакат всегда свежий из БД (фолбэк — зашитая таблица выше).
     void refreshPaytable();
     // Дружелюбный гейт заранее: при балансе меньше ставки — подсказка
