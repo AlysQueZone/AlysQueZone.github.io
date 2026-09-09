@@ -25,15 +25,6 @@ const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
 >
   <div class="w-full max-w-md rounded-2xl border border-stream bg-panel p-5 text-center">
     <h3 id="gamba-title" class="text-lg font-black uppercase">Гамба на пивкойны</h3>
-    <p class="mt-1 font-mono text-xs text-mist">Ставка — 100 Пивкойнов</p>
-    <!-- display-mirror, source of truth — DB (public.gamba_payouts): разметка ниже —
-      лишь фолбэк показа, живой плакат дорисовывает скрипт (fetchGambaPaytable). -->
-    <ul id="gamba-paytable" class="mx-auto mt-2 grid max-w-70 grid-cols-2 gap-1 font-mono text-xs text-mist" aria-label="Таблица выплат">
-      <li class="rounded-lg border border-white/10 px-1 py-1">мимо — 30%</li>
-      <li class="rounded-lg border border-white/10 px-1 py-1">+50 — 40%</li>
-      <li class="rounded-lg border border-white/10 px-1 py-1">+200 — 22%</li>
-      <li class="rounded-lg border border-white/10 px-1 py-1">джекпот x10 — 8%</li>
-    </ul>
     <div class="relative mx-auto mt-3 h-72 w-72 max-w-full">
       <canvas id="gamba-wheel" width="560" height="560" class="h-72 w-72 max-w-full"></canvas>
       <div
@@ -109,9 +100,12 @@ const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
   const SEG = (Math.PI * 2) / SEGMENTS.length;
   const SPIN_MS = 4200;
 
+  /** 7TV-эмоут aga канала (ID проверен 2026-09-09 через 7TV API сета). */
+  const AGA_URL = 'https://cdn.7tv.app/emote/01HMBMJPV0000D32KQCYBK4S1D/2x.webp';
+
   const RESULT_TEXT: Record<GambaOutcome | 'return', string> = {
-    miss: 'МИМО! −100 Пивкойнов — пойжем дальше 🍺',
-    small: 'ПОЙЖЕМ! +50 Пивкойнов 🙂',
+    miss: 'МИМО! −100 Пивкойнов 🍺',
+    small: '+50 Пивкойнов',
     big: 'ЖОСКО! +200 Пивкойнов — чат уважает 🍺',
     jackpot: 'ДЖЕКПОТ! +1000 Пивкойнов — чат в шоке 🍺',
     // legacy таблицы A (в БД валиден ради истории): ставка вернулась в ноль.
@@ -271,6 +265,26 @@ const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
     if (spinBtn instanceof HTMLButtonElement) spinBtn.disabled = busy;
   }
 
+  /** Исход в строку результата: small — с 7TV-эмоутом aga вместо смайлика. */
+  function showOutcome(outcome: GambaOutcome | 'return'): void {
+    if (!result) return;
+    result.innerHTML = '';
+    const span = document.createElement('span');
+    span.textContent = RESULT_TEXT[outcome];
+    result.appendChild(span);
+    if (outcome === 'small') {
+      const img = document.createElement('img');
+      img.src = AGA_URL;
+      img.alt = 'aga';
+      img.title = 'aga';
+      img.width = 20;
+      img.height = 20;
+      img.loading = 'eager';
+      img.className = 'ml-1 inline h-5 w-5 object-contain align-[-3px]';
+      result.appendChild(img);
+    }
+  }
+
   function paintBalance(balance: number): void {
     document.querySelectorAll('[data-wallet-balance]').forEach((el) => {
       el.textContent = String(balance);
@@ -295,7 +309,7 @@ const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
 
     spinning = true;
     setBusy(true);
-    if (result) result.textContent = 'Крутится, пойжем жоско…';
+    if (result) result.textContent = 'Крутится…';
     if (modal) playBg(modal.dataset.bg);
     const t0 = performance.now();
     let lastTick = 0;
@@ -328,7 +342,7 @@ const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
       } else {
         playOutcome(modal.dataset.lose);
       }
-      if (result) result.textContent = RESULT_TEXT[outcome];
+      if (result) showOutcome(outcome);
       // Исход показан — ключ попытки истекает, следующий спин будет новым.
       attemptKey = null;
     };
