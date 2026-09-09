@@ -23,19 +23,19 @@ const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
   aria-modal="true"
   aria-labelledby="gamba-title"
 >
-  <div class="w-full max-w-sm rounded-2xl border border-stream bg-panel p-5 text-center">
+  <div class="w-full max-w-md rounded-2xl border border-stream bg-panel p-5 text-center">
     <h3 id="gamba-title" class="text-lg font-black uppercase">Гамба на пивкойны</h3>
-    <p class="mt-1 font-mono text-xs text-mist">Ставка 100 · крутит сервер, подкрутить из консоли нельзя</p>
+    <p class="mt-1 font-mono text-xs text-mist">Ставка — 100 Пивкойнов</p>
     <!-- display-mirror, source of truth — DB (public.gamba_payouts): разметка ниже —
       лишь фолбэк показа, живой плакат дорисовывает скрипт (fetchGambaPaytable). -->
-    <ul id="gamba-paytable" class="mx-auto mt-2 grid max-w-70 grid-cols-4 gap-1 font-mono text-xs text-mist" aria-label="Таблица выплат">
-      <li class="rounded-lg border border-white/10 px-1 py-1">мимо · 30%<br /><span class="text-milk">+0</span></li>
-      <li class="rounded-lg border border-white/10 px-1 py-1">+50 · 40%<br /><span class="text-milk">+150</span></li>
-      <li class="rounded-lg border border-white/10 px-1 py-1">+200 · 22%<br /><span class="text-milk">+300</span></li>
-      <li class="rounded-lg border border-white/10 px-1 py-1">x10 · 8%<br /><span class="text-milk">+1000</span></li>
+    <ul id="gamba-paytable" class="mx-auto mt-2 grid max-w-70 grid-cols-2 gap-1 font-mono text-xs text-mist" aria-label="Таблица выплат">
+      <li class="rounded-lg border border-white/10 px-1 py-1">мимо — 30%</li>
+      <li class="rounded-lg border border-white/10 px-1 py-1">+50 — 40%</li>
+      <li class="rounded-lg border border-white/10 px-1 py-1">+200 — 22%</li>
+      <li class="rounded-lg border border-white/10 px-1 py-1">джекпот x10 — 8%</li>
     </ul>
-    <div class="relative mx-auto mt-3 h-70 w-70">
-      <canvas id="gamba-wheel" width="560" height="560" class="h-70 w-70"></canvas>
+    <div class="relative mx-auto mt-3 h-72 w-72 max-w-full">
+      <canvas id="gamba-wheel" width="560" height="560" class="h-72 w-72 max-w-full"></canvas>
       <div
         aria-hidden="true"
         class="absolute top-0 left-1/2 -translate-x-1/2 border-x-12 border-t-20 border-x-transparent border-t-melon"
@@ -76,10 +76,10 @@ const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
     type GambaPayRow,
   } from '../lib/gamba.ts';
 
-  // 50 сегментов под таблицу F тикета 16 (веса 30/40/22/8 → 15/20/11/4
-  // из 50): строка-паттерн с равномерным размещением (макс. 2 одинаковых
-  // подряд, проверено скриптом). Колесо лишь докручивается до сегмента
-  // присланного сервером исхода.
+  // 10 крупных сегментов — визуальная аппроксимация таблицы F тикета 16
+  // (3 мимо / 4 малых / 2 средних / 1 джекпот); точные веса 30/40/22/8
+  // живут в БД и плакате, исход решает сервер — колесо лишь докручивается
+  // до сегмента присланного типа.
   type WheelSegment = { label: string; outcome: GambaOutcome; color: string };
   const SEGMENT_SPECS: Record<string, WheelSegment> = {
     M: { label: 'мимо', outcome: 'miss', color: '#FFE6AC' },
@@ -87,11 +87,19 @@ const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
     B: { label: '+200', outcome: 'big', color: '#FF5A3C' },
     J: { label: 'x10', outcome: 'jackpot', color: '#FF00BC' },
   };
-  const WHEEL_PATTERN = 'MSBJSMBSMSBMSSJMBSMSBMSSBMSJMBSMSBSMSBMSJMSBSMSBMS';
-  // Инвариант рядом с паттерном: 50 сегментов 15/20/11/4 (таблица F),
-  // алфавит строго MSBJ — числа не менять, при рассинхроне упасть громко.
-  if (WHEEL_PATTERN.length !== 50 || /[^MSBJ]/.test(WHEEL_PATTERN)) {
+  const WHEEL_PATTERN = 'MSBSMSJSBM';
+  // Инвариант рядом с паттерном: 10 сегментов 3/4/2/1 (M/S/B/J) —
+  // визуальная аппроксимация таблицы F, алфавит строго MSBJ — числа
+  // не менять, при рассинхроне упасть громко.
+  if (WHEEL_PATTERN.length !== 10 || /[^MSBJ]/.test(WHEEL_PATTERN)) {
     throw new Error(`bad WHEEL_PATTERN (len=${WHEEL_PATTERN.length}, alphabet=MSBJ)`);
+  }
+  const _counts = [...WHEEL_PATTERN].reduce<Record<string, number>>((acc, ch) => {
+    acc[ch] = (acc[ch] ?? 0) + 1;
+    return acc;
+  }, {});
+  if (_counts['M'] !== 3 || _counts['S'] !== 4 || _counts['B'] !== 2 || _counts['J'] !== 1) {
+    throw new Error(`bad WHEEL_PATTERN counts (M/S/B/J=${_counts['M']}/${_counts['S']}/${_counts['B']}/${_counts['J']})`);
   }
   const SEGMENTS: WheelSegment[] = [...WHEEL_PATTERN].map((ch) => {
     const seg = SEGMENT_SPECS[ch];
@@ -102,12 +110,12 @@ const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
   const SPIN_MS = 4200;
 
   const RESULT_TEXT: Record<GambaOutcome | 'return', string> = {
-    miss: 'МИМО! Ставка ушла в котёл, пойжем дальше 🍺',
-    small: 'ПОЙЖЕМ! +50 сверху — котёл делится, крути ещё 🙂',
-    big: 'ЖОСКО! +200 сверху — чат уважает 🍺',
-    jackpot: 'ДЖЕКПОТ ЖОСКО! x10 — 1000 Пивкойнов, чат в шоке 🍺',
+    miss: 'МИМО! −100 Пивкойнов — пойжем дальше 🍺',
+    small: 'ПОЙЖЕМ! +50 Пивкойнов 🙂',
+    big: 'ЖОСКО! +200 Пивкойнов — чат уважает 🍺',
+    jackpot: 'ДЖЕКПОТ! +1000 Пивкойнов — чат в шоке 🍺',
     // legacy таблицы A (в БД валиден ради истории): ставка вернулась в ноль.
-    return: 'ВОЗВРАТ! Ставка вернулась — котёл при своих, крути ещё 🙂',
+    return: 'ВОЗВРАТ! При своих — крути ещё 🙂',
   };
   const GATE_TEXT =
     'В котле меньше сотни — ставка 100 не влезла. Забери Ежедневный вход и возвращайся пойжемать 🙂';
@@ -137,12 +145,7 @@ const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
     for (const row of rows) {
       const li = document.createElement('li');
       li.className = 'rounded-lg border border-white/10 px-1 py-1';
-      li.appendChild(document.createTextNode(`${row.label} · ${row.chance}`));
-      li.appendChild(document.createElement('br'));
-      const span = document.createElement('span');
-      span.className = 'text-milk';
-      span.textContent = `+${row.payout}`;
-      li.appendChild(span);
+      li.textContent = `${row.label} — ${row.chance}`;
       paytable.appendChild(li);
     }
   }
