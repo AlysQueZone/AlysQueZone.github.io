@@ -91,14 +91,10 @@ function makeRebuyButton(ev: OutbidEvent): HTMLButtonElement {
   const next = liveNext.get(ev.slug);
   const btn = document.createElement('button');
   btn.type = 'button';
-  btn.textContent = next !== undefined ? `Забрать за ${next} 🍺` : 'Забрать за … 🍺';
+  btn.textContent = next !== undefined ? `▶ Забрать за ${next} 🍺` : '▶ Забрать за … 🍺';
+  // Аркадная кнопка стиля C (классы из global.css) + отступ от текста.
+  btn.className = 'btn-arcade btn-arcade-primary';
   btn.style.marginTop = '8px';
-  btn.style.cursor = 'pointer';
-  btn.style.border = 'none';
-  btn.style.borderRadius = '12px';
-  btn.style.background = '#c2187b';
-  btn.style.color = '#fff';
-  btn.style.fontWeight = '800';
   btn.style.padding = '8px 16px';
   btn.style.fontSize = '14px';
   btn.dataset.buyLot = ev.slug;
@@ -169,9 +165,11 @@ export function initOutbidNotice(): void {
     if (!bellPanel) return;
     bellPanel.innerHTML = '';
     const head = document.createElement('div');
-    head.style.fontWeight = '800';
+    head.className = 'font-display';
+    head.style.fontSize = '10px';
+    head.style.textTransform = 'uppercase';
     head.style.marginBottom = '8px';
-    head.textContent = 'Перекупы твоих лотов';
+    head.textContent = '▶ Перекупы твоих лотов';
     bellPanel.appendChild(head);
     if (history.length === 0) {
       const empty = document.createElement('div');
@@ -183,9 +181,10 @@ export function initOutbidNotice(): void {
     }
     for (const ev of history) {
       const item = document.createElement('div');
-      item.style.borderTop = '1px solid rgba(0,0,0,0.1)';
+      item.style.borderTop = '3px solid #422006';
       item.style.padding = '8px 0';
       item.style.fontSize = '13px';
+      item.style.fontWeight = '700';
       const line = document.createElement('div');
       line.textContent = `${ev.by} забрал «${ev.title}» за ${ev.price} 🍺`;
       item.append(line, makeRebuyButton(ev));
@@ -204,12 +203,9 @@ export function initOutbidNotice(): void {
     btn.id = BELL_ID;
     btn.type = 'button';
     btn.title = 'Перекупы твоих лотов';
+    // Колокол стиля C: аркадная кнопка-призрак + счётчик-пиксель.
+    btn.className = 'btn-arcade btn-arcade-ghost';
     btn.style.position = 'relative';
-    btn.style.cursor = 'pointer';
-    btn.style.borderRadius = '999px';
-    btn.style.border = '1px solid rgba(138,109,0,0.5)';
-    btn.style.background = '#fff6bf';
-    btn.style.color = '#422006';
     btn.style.fontSize = '16px';
     btn.style.padding = '4px 12px';
     btn.textContent = '🔔';
@@ -217,17 +213,20 @@ export function initOutbidNotice(): void {
     count.id = BELL_COUNT_ID;
     count.style.display = 'none';
     count.style.position = 'absolute';
-    count.style.top = '-6px';
-    count.style.right = '-6px';
+    count.style.top = '-10px';
+    count.style.right = '-10px';
     count.style.background = '#c2187b';
     count.style.color = '#fff';
-    count.style.borderRadius = '999px';
+    count.style.border = '2px solid #422006';
     count.style.fontSize = '11px';
-    count.style.fontWeight = '800';
+    count.style.fontWeight = '900';
     count.style.padding = '0 6px';
     btn.appendChild(count);
     const panel = document.createElement('div');
     panel.id = BELL_PANEL_ID;
+    // Панель — карточка стиля C (фон/рамка/тень из .card-pixel),
+    // позиционирование прежнее.
+    panel.className = 'card-pixel';
     panel.style.display = 'none';
     panel.style.position = 'fixed';
     panel.style.top = '64px';
@@ -237,12 +236,7 @@ export function initOutbidNotice(): void {
     panel.style.maxWidth = 'calc(100vw - 24px)';
     panel.style.maxHeight = '60vh';
     panel.style.overflowY = 'auto';
-    panel.style.border = '2px solid rgba(21,128,61,0.4)';
-    panel.style.borderRadius = '12px';
-    panel.style.background = '#ffe6ac';
-    panel.style.color = '#111';
     panel.style.padding = '12px 14px';
-    panel.style.boxShadow = '0 4px 16px rgba(0,0,0,0.2)';
     document.body.appendChild(panel);
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -276,7 +270,7 @@ export function initOutbidNotice(): void {
       if (!slug) return;
       const next = liveNext.get(slug);
       if (next === undefined) return;
-      node.textContent = `Забрать за ${next} 🍺`;
+      node.textContent = `▶ Забрать за ${next} 🍺`;
       node.dataset.lotPrice = String(next);
     });
   }
@@ -319,16 +313,18 @@ export function initOutbidNotice(): void {
   function showNotice(ev: OutbidEvent): void {
     const box = document.createElement('div');
     box.dataset.outbidSlug = ev.slug;
-    box.style.border = '2px solid rgba(21,128,61,0.4)';
-    box.style.borderRadius = '12px';
-    box.style.background = '#ffe6ac';
-    box.style.color = '#422006';
+    // Окошко — карточка стиля C (фон/рамка/тень из .card-pixel),
+    // раскладка прежняя.
+    box.className = 'card-pixel';
     box.style.padding = '10px 12px';
-    box.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.2)';
+    box.style.fontSize = '14px';
     const head = document.createElement('b');
+    head.className = 'font-display';
     head.style.display = 'block';
+    head.style.fontSize = '10px';
+    head.style.textTransform = 'uppercase';
     head.style.marginBottom = '4px';
-    head.textContent = 'Твой лот перекупили!';
+    head.textContent = '▶ Твой лот перекупили!';
     const text = document.createElement('span');
     // Факт уплаченной цены сервера; живая N — на кнопке возврата ниже.
     text.textContent = `${ev.by} забрал «${ev.title}» за ${ev.price} 🍺`;
