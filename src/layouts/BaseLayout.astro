@@ -80,6 +80,47 @@ const base = import.meta.env.BASE_URL;
     </main>
     <!-- Гамба-рулетка (тикет 32): кнопка в шапке открывает модалку-колесо. -->
     <GambaModal />
+    <!-- Инфо-плашка: звук + VPN, снизу на всех страницах, только крестик, память в localStorage. -->
+    <div
+      id="info-plaska"
+      class="fixed inset-x-0 bottom-0 z-50 hidden border-t-4 border-milk bg-bar"
+      role="note"
+    >
+      <div class="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
+        <p class="text-sm font-bold text-milk">
+          🔊 Включи звук<br class="sm:hidden" />
+          <span class="sm:ml-3">🛡️ Без VPN часть штук может не грузиться</span>
+        </p>
+        <button
+          type="button"
+          id="info-plaska-close"
+          aria-label="Закрыть подсказку"
+          class="btn-arcade btn-arcade-ghost shrink-0 px-3 py-1 text-sm"
+        >
+          ✕
+        </button>
+      </div>
+    </div>
+    <script>
+      const PLASKA_KEY = 'alysque:info-plaska-dismissed';
+      const plaska = document.getElementById('info-plaska');
+      const plaskaClose = document.getElementById('info-plaska-close');
+      try {
+        if (plaska && !localStorage.getItem(PLASKA_KEY)) {
+          plaska.classList.remove('hidden');
+        }
+      } catch {
+        plaska?.classList.remove('hidden');
+      }
+      plaskaClose?.addEventListener('click', () => {
+        plaska?.classList.add('hidden');
+        try {
+          localStorage.setItem(PLASKA_KEY, '1');
+        } catch {
+          // приватный режим — просто скрыли до перезагрузки
+        }
+      });
+    </script>
     <script>
       import { getSupabase, getSessionUid } from '../lib/supabase.ts';
       import { fetchMyBalance, subscribeMyBalance } from '../lib/balance.ts';

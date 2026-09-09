@@ -3,8 +3,8 @@
 // При первом заходе залогиненного Чатерса в новый UTC-день клиент сам
 // вызывает claim_daily (см. src/lib/daily.ts) — один раз в день: сначала
 // сверка со статусом/датой последнего клейма, лишних вызовов нет. Факт
-// выдачи показывает всплывающее уведомление «Ежедневный вход: +N, день M»
-// без кнопок вообще: автозакрытие через few секунд + закрытие по клику вне.
+// выдачи показывает окно ежедневного входа «+N, день M (из 7)» с confetti:
+// кнопка «Ок» + крестик + клик вне + Escape, без автотаймера.
 // Гость без сессии ничего не получает и не видит. Серверный claim_daily
 // не меняется.
 //
@@ -23,9 +23,7 @@
     readAutoDailyDay,
     todayUtcDate,
   } from '../lib/daily.ts';
-
-  /** few секунд на прочтение факта выдачи. */
-  const NOTICE_TTL_MS = 6000;
+  import { boom } from '../lib/confetti.ts';
 
   function paintBalance(balance: number): void {
     document.querySelectorAll('[data-wallet-balance]').forEach((el) => {
@@ -33,45 +31,66 @@
     });
   }
 
-  /** Всплывающее уведомление о факте выдачи: текст + день streak, кнопок нет.
-   *  Верстка в тон buy-notice (тикет 14): крупный шрифт/отступы, снизу по
-   *  центру (наверх не вылезает), ширина ограничена вьюпортом с переносом —
-   *  целиком видно на 360px и 1440px без скролла. */
-  function showNotice(text: string): void {
+  /** Окно ежедневного входа: по центру, карточка стиля C, confetti при успехе.
+   *  Закрытие: «Ок» / крестик / клик по затемнению / Escape. Без автотаймера,
+   *  ширина ограничена вьюпортом — целиком видно на 360px и 1440px. */
+  function showDailyWindow(text: string, withConfetti: boolean): void {
     const root = document.getElementById('daily-notice-root');
     if (!root) return;
     root.innerHTML = '';
+    const overlay = document.createElement('div');
+    overlay.dataset.dailyNotice = '1';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-label', 'Ежедневный вход');
+    overlay.className =
+      'fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4';
     const box = document.createElement('div');
-    box.dataset.dailyNotice = '1';
-    box.setAttribute('role', 'status');
-    box.className =
-      'card-pixel fixed bottom-16 left-1/2 z-50 w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 ' +
-      'px-8 py-4 text-center text-base font-black break-words whitespace-normal sm:text-xl';
-    box.textContent = text;
-    root.appendChild(box);
-    const timer = window.setTimeout(() => box.remove(), NOTICE_TTL_MS);
+    box.className = 'card-pixel w-full max-w-sm p-5 text-center';
+    const headRow = document.createElement('div');
+    headRow.className = 'flex items-start justify-between gap-3';
+    const title = document.createElement('h3');
+    title.className = 'font-display text-[11px] leading-relaxed uppercase';
+    title.textContent = 'Ежедневный вход';
+    const cross = document.createElement('button');
+    cross.type = 'button';
+    cross.setAttribute('aria-label', 'Закрыть');
+    cross.className = 'btn-arcade btn-arcade-ghost shrink-0 px-3 py-1 text-sm';
+    cross.textContent = '✕';
+    headRow.append(title, cross);
+    const body = document.createElement('p');
+    body.className = 'mt-3 text-lg font-black break-words whitespace-normal';
+    body.textContent = text;
+    const ok = document.createElement('button');
+    ok.type = 'button';
+    ok.className = 'btn-arcade btn-arcade-primary mt-4 px-8 py-2 text-sm';
+    ok.textContent = 'Ок';
+    box.append(headRow, body, ok);
+    overlay.appendChild(box);
+    root.appendChild(overlay);
     const detach = (): void => {
-      window.clearTimeout(timer);
       document.removeEventListener('click', onOutside, true);
       document.removeEventListener('keydown', onKey);
-      box.remove();
+      overlay.remove();
     };
-    // Клик вне уведомления тоже закрывает (клик по самому уведомлению — нет).
     const onOutside = (e: MouseEvent): void => {
-      const target = e.target as HTMLElement | null;
-      if (target && !box.contains(target)) detach();
+      if (e.target === overlay) detach();
     };
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') detach();
     };
+    cross.addEventListener('click', detach);
+    ok.addEventListener('click', detach);
     // Отложка на тик: текущий клик (если он и запустил флоу) не должен
-    // тут же закрыть уведомление.
+    // тут же закрыть окно через onOutside.
     window.setTimeout(() => {
-      if (box.isConnected) {
+      if (overlay.isConnected) {
         document.addEventListener('click', onOutside, true);
         document.addEventListener('keydown', onKey);
       }
     }, 0);
+    if (withConfetti) boom();
+    ok.focus();
   }
 
   let busy = false;
@@ -99,14 +118,14 @@
       const done = await claimDaily();
       markAutoDailyDay();
       if (done.balance !== null) paintBalance(done.balance);
-      // Уведомление — только о факте новой выдачи; повторный (already)
+      // Окно — только о факте новой выдачи; повторный (already)
       // ответ сервера молча гасим, чтобы не спамить дублями.
       if (!done.already) {
-        showNotice(`Ежедневный вход: +${done.amount}, день ${dayNumForStreak(done.streak)}`);
+        showDailyWindow(`+${done.amount}, день ${dayNumForStreak(done.streak)} (из 7)`, true);
       }
     } catch (err) {
       // Понятная серверная ошибка «no account» (счёта нет): показать тем же
-      // всплывающим уведомлением; день НЕ отмечаем — повтор при следующем
+      // окном без confetti; день НЕ отмечаем — повтор при следующем
       // заходе. Остальные ошибки — как раньше молча (деньги целы).
       const raw =
         err instanceof Error
@@ -115,7 +134,7 @@
             ? String((err as { message: unknown }).message)
             : String(err);
       if (raw.toLowerCase().includes('no account')) {
-        showNotice(raw);
+        showDailyWindow(raw, false);
       }
     } finally {
       busy = false;
