@@ -102,6 +102,8 @@ const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
 
   /** 7TV-эмоут aga канала (ID проверен 2026-09-09 через 7TV API сета). */
   const AGA_URL = 'https://cdn.7tv.app/emote/01HMBMJPV0000D32KQCYBK4S1D/2x.webp';
+  /** 7TV-эмоут SCAMBA канала (ID из src/lib/emotes.ts). */
+  const SCAMBA_URL = 'https://cdn.7tv.app/emote/01GWACFXSG0002CCPRV6KPX2XA/2x.webp';
 
   const RESULT_TEXT: Record<GambaOutcome | 'return', string> = {
     miss: 'МИМО! −100 Пивкойнов 🍺',
@@ -265,18 +267,24 @@ const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
     if (spinBtn instanceof HTMLButtonElement) spinBtn.disabled = busy;
   }
 
-  /** Исход в строку результата: small — с 7TV-эмоутом aga вместо смайлика. */
+  /** Исход в строку результата: small — 7TV aga, miss — 7TV SCAMBA. */
   function showOutcome(outcome: GambaOutcome | 'return'): void {
     if (!result) return;
     result.innerHTML = '';
     const span = document.createElement('span');
     span.textContent = RESULT_TEXT[outcome];
     result.appendChild(span);
-    if (outcome === 'small') {
+    const emote =
+      outcome === 'small'
+        ? { src: AGA_URL, name: 'aga' }
+        : outcome === 'miss'
+          ? { src: SCAMBA_URL, name: 'SCAMBA' }
+          : null;
+    if (emote) {
       const img = document.createElement('img');
-      img.src = AGA_URL;
-      img.alt = 'aga';
-      img.title = 'aga';
+      img.src = emote.src;
+      img.alt = emote.name;
+      img.title = emote.name;
       img.width = 20;
       img.height = 20;
       img.loading = 'eager';
