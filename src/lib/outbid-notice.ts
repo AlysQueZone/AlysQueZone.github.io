@@ -193,6 +193,7 @@ export function initOutbidNotice(): void {
   }
 
   function ensureBell(): void {
+    if (uid === null) return;
     if (document.getElementById(BELL_ID)) return;
     const actions =
       document.getElementById('topbar-right') ??
@@ -260,6 +261,27 @@ export function initOutbidNotice(): void {
     bellPanel = panel;
     void bellBtn;
     renderBell();
+  }
+
+  /** Колокол — только залогиненным: гостю кнопку и панель не показываем вообще. */
+  function removeBell(): void {
+    document.getElementById(BELL_ID)?.remove();
+    document.getElementById(BELL_PANEL_ID)?.remove();
+    bellBtn = null;
+    bellCount = null;
+    bellPanel = null;
+  }
+
+  function syncBellVisibility(): void {
+    if (uid === null) {
+      // Чужую историю перекупов после выхода не светим следующему за экраном.
+      history.length = 0;
+      missed.length = 0;
+      unread = 0;
+      removeBell();
+      return;
+    }
+    ensureBell();
   }
 
   /** Живые кнопки возврата: текст и staged-цена из прайс-фида БД. */
@@ -441,7 +463,7 @@ export function initOutbidNotice(): void {
 
   void (async () => {
     await refreshMine();
-    ensureBell();
+    syncBellVisibility();
     ensureSubscribed();
     // Живая N кнопок возврата: перечитываем прайс-фид по каждому тику лотов.
     void refreshPrices();
@@ -449,7 +471,10 @@ export function initOutbidNotice(): void {
       void refreshPrices();
     });
     getSupabase()?.auth.onAuthStateChange(() => {
-      void refreshMine().then(() => ensureSubscribed());
+      void refreshMine().then(() => {
+        syncBellVisibility();
+        ensureSubscribed();
+      });
     });
     // Купил обратно — записи про этот лот не актуальны: убрать из истории
     // и закрыть висящие окошки.
