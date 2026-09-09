@@ -115,6 +115,8 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
   const AGA_URL = 'https://cdn.7tv.app/emote/01HMBMJPV0000D32KQCYBK4S1D/2x.webp';
   /** 7TV-эмоут SCAMBA канала (ID из src/lib/emotes.ts). */
   const SCAMBA_URL = 'https://cdn.7tv.app/emote/01GWACFXSG0002CCPRV6KPX2XA/2x.webp';
+  /** 7TV-эмоут suda канала (ID проверен 2026-09-09 через 7TV API сета). */
+  const SUDA_URL = 'https://cdn.7tv.app/emote/01JRQF9CBSHN8MBST3TX1W6DY7/2x.webp';
 
   const RESULT_TEXT: Record<GambaOutcome | 'return', string> = {
     miss: 'МИМО! −100 Пивкойнов 🍺',
@@ -278,7 +280,7 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
     if (spinBtn instanceof HTMLButtonElement) spinBtn.disabled = busy;
   }
 
-  /** Исход в строку результата: small — 7TV aga, miss — 7TV SCAMBA. */
+  /** Исход в строку результата: small — 7TV aga, miss — 7TV SCAMBA, jackpot — 7TV suda. */
   function showOutcome(outcome: GambaOutcome | 'return'): void {
     if (!result) return;
     result.innerHTML = '';
@@ -290,7 +292,9 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
         ? { src: AGA_URL, name: 'aga' }
         : outcome === 'miss'
           ? { src: SCAMBA_URL, name: 'SCAMBA' }
-          : null;
+          : outcome === 'jackpot'
+            ? { src: SUDA_URL, name: 'suda' }
+            : null;
     if (emote) {
       const img = document.createElement('img');
       img.src = emote.src;
