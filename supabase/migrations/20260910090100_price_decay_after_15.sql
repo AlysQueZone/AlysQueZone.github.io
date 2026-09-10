@@ -86,7 +86,11 @@ revoke execute on function public.enforce_purchase_rules() from public, anon, au
 
 -- Вью — зеркало серверной формулы с капом (см. 20260908270000): до 15 покупок
 -- +10%, дальше +1. purchase_count в селекте — для прозрачности порога.
-create or replace view public.lots_with_next_price as
+-- ВАЖНО: только через DROP+CREATE: CREATE OR REPLACE не умеет вставлять
+-- колонку в середину (падает 42P16 «cannot change name of view column» —
+-- словили на проде 2026-09-10, очередь миграций встала).
+drop view if exists public.lots_with_next_price;
+create view public.lots_with_next_price as
 select
   l.slug,
   l.title,
