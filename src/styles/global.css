@@ -160,8 +160,9 @@
     animation: arcade-blink 1.1s steps(1, end) infinite;
   }
 
-  /* Бегущая строка-казино под шапкой. Дорожка дублируется в разметке
-     дважды — зацикливание бесшовное. */
+  /* Бегущая строка-лог под шапкой. Дорожка дублируется в разметке
+     дважды — зацикливание бесшовное. Темп спокойный: лог читается,
+     а не мелькает (45с на круг). */
   .marquee {
     overflow: hidden;
     white-space: nowrap;
@@ -169,7 +170,7 @@
 
   .marquee-track {
     display: inline-block;
-    animation: marquee-scroll 22s linear infinite;
+    animation: marquee-scroll 45s linear infinite;
   }
 
   @keyframes marquee-scroll {
