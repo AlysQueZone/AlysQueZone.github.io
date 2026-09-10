@@ -3,9 +3,18 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import { fetchCatalogLots } from '../lib/lots.ts';
 
 const base = import.meta.env.BASE_URL;
-// Топ приветов — первые 4 лота каталога из БД на билде (тикет 09),
-// без PUBLIC_SUPABASE_* билд падает явно. Не хардкод.
-const topLots = (await fetchCatalogLots()).slice(0, 4);
+// Случайные приветы — 4 лота наугад из каталога БД на каждой сборке (ребаланс:
+// витрина не приедается, «топа» больше нет — дорогие лоты не караулят вход).
+// Без PUBLIC_SUPABASE_* билд падает явно. Не хардкод.
+function pickRandom<T>(rows: T[], n: number): T[] {
+  const pool = [...rows];
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j] as T, pool[i] as T];
+  }
+  return pool.slice(0, n);
+}
+const randomLots = pickRandom(await fetchCatalogLots(), 4);
 ---
 
 <BaseLayout title="AlysQueZone — БИРЖА ПРИВЕТОВ">
@@ -61,7 +70,7 @@ const topLots = (await fetchCatalogLots()).slice(0, 4);
       <li class="card-pixel p-5">
         <p class="font-display text-[10px] text-stream">01</p>
         <p class="mt-2 font-black uppercase">Выбираешь привет</p>
-        <p class="mt-1 text-sm text-mist/70">Топ лотов ниже — бери, пока чат не разобрал.</p>
+        <p class="mt-1 text-sm text-mist/70">Случайные лоты ниже — бери, пока чат не разобрал.</p>
       </li>
       <li class="card-pixel p-5">
         <p class="font-display text-[10px] text-ember">02</p>
@@ -76,17 +85,17 @@ const topLots = (await fetchCatalogLots()).slice(0, 4);
     </ol>
   </section>
 
-  <!-- ТОП ПРИВЕТОВ -->
+  <!-- СЛУЧАЙНЫЕ ПРИВЕТЫ -->
   <section class="mt-10">
     <div class="flex items-end justify-between gap-4">
-      <h2 class="font-display text-xs uppercase sm:text-sm">Топ приветов</h2>
+      <h2 class="font-display text-xs uppercase sm:text-sm">Случайные приветы</h2>
       <a href={`${base}lots/`} class="shrink-0 text-sm font-bold text-stream hover:underline">
         Все лоты →
       </a>
     </div>
     <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {
-        topLots.map((lot) => (
+        randomLots.map((lot) => (
           <article class="card-pixel flex min-w-0 flex-col p-5 transition hover:-translate-y-0.5">
             <h3 class="mt-3 font-extrabold break-words">{lot.title}</h3>
             <p class="mt-1 truncate text-sm text-mist/60">владелец: {lot.owner ?? '—'}</p>

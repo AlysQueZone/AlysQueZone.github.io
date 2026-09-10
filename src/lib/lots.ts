@@ -75,5 +75,8 @@ export async function fetchCatalogLots(): Promise<Lot[]> {
     const lot = toLot(row);
     return lot ? [lot] : [];
   });
-  return lots.sort((a, b) => b.price - a.price);
+  // Витрина по умолчанию — от дешёвых к дорогим (ребаланс: новичок первым
+  // делом видит доступные лоты). Живой ресорт поверх Realtime не делаем —
+  // порядок первого экрана задаёт SSG.
+  return lots.sort((a, b) => a.price - b.price);
 }

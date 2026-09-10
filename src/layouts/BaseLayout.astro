@@ -68,10 +68,12 @@ const base = import.meta.env.BASE_URL;
           <AuthButton />
         </div>
       </div>
-      <!-- Бегущая строка-казино (стиль C): бесшовный луп, дорожка продублирована. -->
+      <!-- Бегущая строка-лог (ребаланс): живой хвост ~10 последних сделок
+        из purchases через realtime-подписку; без БД/истории — честная
+        строка живых правил (те же цифры, что в модалке «Правила биржи»). -->
       <div class="marquee border-t-2 border-milk/20 bg-milk py-1" aria-hidden="true">
         <p class="marquee-track font-display text-[9px] text-cream uppercase">
-          <span class="mx-4">Жоско &#43; мощно &#9733; гамба на пивкойны &#9733; каждый перекуп &#43;10% &#9733; ежедневный вход до 500 &#9733; привет стримера — это ценность &#9733; чат в шоке &#9733;&nbsp;</span><span class="mx-4">Жоско &#43; мощно &#9733; гамба на пивкойны &#9733; каждый перекуп &#43;10% &#9733; ежедневный вход до 500 &#9733; привет стримера — это ценность &#9733; чат в шоке &#9733;&nbsp;</span>
+          <span data-deal-log-a class="mx-4">Комиссия биржи 7% &#9733; перекуп &#43;10% &#215;15, дальше &#43;1 &#9733; гамба до x10 &#9733; вход 200/200/250 &#9733;&nbsp;</span><span data-deal-log-b class="mx-4">Комиссия биржи 7% &#9733; перекуп &#43;10% &#215;15, дальше &#43;1 &#9733; гамба до x10 &#9733; вход 200/200/250 &#9733;&nbsp;</span>
         </p>
       </div>
     </header>
@@ -122,10 +124,63 @@ const base = import.meta.env.BASE_URL;
       });
     </script>
     <script>
-      import { getSupabase, getSessionUid } from '../lib/supabase.ts';
+      import { getSupabase, getSessionUid, isSupabaseConfigured } from '../lib/supabase.ts';
       import { fetchMyBalance, subscribeMyBalance } from '../lib/balance.ts';
       import { initOutbidNotice } from '../lib/outbid-notice.ts';
       initOutbidNotice();
+      // Бегущая строка-лог (ребаланс, тикет 06): последние ~10 сделок из
+      // purchases (публичный SELECT) через realtime-подписку на INSERT.
+      // Без БД/истории — остаётся запечённая строка живых правил выше.
+      async function refreshDealLog(): Promise<void> {
+        const a = document.querySelector('[data-deal-log-a]');
+        const b = document.querySelector('[data-deal-log-b]');
+        if (!(a instanceof HTMLElement) || !(b instanceof HTMLElement)) return;
+        if (!isSupabaseConfigured()) return;
+        try {
+          const sb = getSupabase();
+          if (!sb) return;
+          const { data, error } = await sb
+            .from('purchases')
+            .select('price_paid,buyer_login,created_at,lots(slug,title)')
+            .order('created_at', { ascending: false })
+            .order('id', { ascending: false })
+            .limit(10);
+          if (error || !Array.isArray(data) || data.length === 0) return;
+          const line = (data as unknown as Record<string, unknown>[])
+            .flatMap((row) => {
+              const price = Number(row['price_paid']);
+              const by = row['buyer_login'];
+              const lot = row['lots'] as unknown as Record<string, unknown> | null;
+              const title = lot && typeof lot['title'] === 'string' ? lot['title'] : null;
+              if (!Number.isFinite(price) || typeof by !== 'string' || !title) return [];
+              return [`${by} забрал «${title}» за ${price} 🍺`];
+            })
+            .join(' ★ ');
+          if (!line) return;
+          a.textContent = `${line} ★ `;
+          b.textContent = `${line} ★ `;
+        } catch {
+          // лог — best effort, запечённые правила остаются
+        }
+      }
+      if (isSupabaseConfigured()) {
+        void refreshDealLog();
+        try {
+          getSupabase()
+            ?.channel('alysque:deal-log')
+            .on(
+              'postgres_changes',
+              { event: 'INSERT', schema: 'public', table: 'purchases' },
+              () => void refreshDealLog(),
+            )
+            .subscribe();
+        } catch {
+          // Realtime недоступен — виден последний подтянутый хвост
+        }
+        document.addEventListener('visibilitychange', () => {
+          if (!document.hidden) void refreshDealLog();
+        });
+      }
       // Баланс в шапке (тикет 11, contract): только из БД (таблица profiles,
       // live-подписка). Гостю чип не показываем вообще; залогиненному без
       // строки (счёт ещё не создан триггером / офлайн) — прочерк, деньги целы.
