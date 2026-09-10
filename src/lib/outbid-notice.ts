@@ -20,8 +20,7 @@
  */
 
 import { getSessionUid, getSupabase, fetchSharedLots, subscribeSharedLots } from './supabase.ts';
-import { fetchLotPrices } from './prices.ts';
-import { commissionFor } from './prices.ts';
+import { fetchLotPrices, commissionFor } from './prices.ts';
 import { s3Sound } from './media.ts';
 
 const MAX_NOTICES = 3;
