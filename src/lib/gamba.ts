@@ -6,10 +6,11 @@
  * сам не считает, грантов локально не делает — лишь рисует присланное.
  * Локальный кошелёк удалён в тикете 11 — денег в клиенте нет вовсе.
  *
- * Таблица выплат G — нейтральный фаусет (ребаланс, seed-конфиг
- * в БД, `public.gamba_payouts`, ставка 100): мимо 52% → 0, возврат 30% → 100,
- * крупно 15% → 250 (+150), джекпот x10 3% → 1000 (EV ~97.5, было ~206).
- * Legacy-исход 'small' (+50 эпохи F) в БД валиден ради истории спинов.
+ * Таблица выплат H — нейтральный фаусет (ребаланс, тикет 07, seed-конфиг
+ * в БД, `public.gamba_payouts`, ставка 100): мимо 52% → 0, возврат 10% → 100
+ * (при своих), мелочь 30% → 150 (+50), крупно 5% → 250 (+150),
+ * джекпот x10 3% → 1000 (EV ~97.5 как у G, было ~206 у F;
+ * доля «в плюсе» 18% → 38%).
  * Секретов здесь нет: только publishable-ключ через getSupabase().
  */
 
@@ -34,8 +35,9 @@ export interface GambaPayRow {
 // display-mirror, source of truth — DB
 export const GAMBA_PAYTABLE: GambaPayRow[] = [
   { outcome: 'miss', payout: 0, chance: '52%', label: 'мимо' },
-  { outcome: 'return', payout: 100, chance: '30%', label: 'возврат 100' },
-  { outcome: 'big', payout: 250, chance: '15%', label: '+150' },
+  { outcome: 'return', payout: 100, chance: '10%', label: 'возврат 100' },
+  { outcome: 'small', payout: 150, chance: '30%', label: '+50' },
+  { outcome: 'big', payout: 250, chance: '5%', label: '+150' },
   { outcome: 'jackpot', payout: 1000, chance: '3%', label: 'джекпот x10' },
 ];
 
@@ -96,9 +98,8 @@ export function mapGambaError(err: unknown): GambaErrorInfo {
 }
 
 /**
- * Нормализация исхода из БД/RPC. Legacy-исход 'small' (+50 эпохи F)
- * оставлен валидным в БД ради истории спинов — старые строки рисуются
- * тем же текстом, новых 'small' сервер больше не выдаёт (таблица G).
+ * Нормализация исхода из БД/RPC. Исход 'small' (мелкий выигрыш +50) —
+ * штатный исход таблицы H; история эпохи F рисуется тем же текстом.
  */
 function asOutcome(value: unknown): GambaOutcome | null {
   return value === 'miss' ||

@@ -82,30 +82,31 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
     type GambaPayRow,
   } from '../lib/gamba.ts';
 
-  // 20 крупных сегментов — визуальная аппроксимация таблицы G ребаланса
-  // (10 мимо / 6 возвратов / 3 крупных / 1 джекпот ≈ веса 52/30/15/3);
+  // 20 крупных сегментов — визуальная аппроксимация таблицы H (тикет 07)
+  // (10 мимо / 2 возврата / 6 мелких / 1 крупный / 1 джекпот ≈ веса 52/10/30/5/3);
   // точные веса живут в БД и плакате, исход решает сервер — колесо лишь
   // докручивается до сегмента присланного типа.
   type WheelSegment = { label: string; outcome: GambaOutcome; color: string };
   const SEGMENT_SPECS: Record<string, WheelSegment> = {
     M: { label: 'мимо', outcome: 'miss', color: '#FFE6AC' },
     R: { label: 'возврат', outcome: 'return', color: '#FF9E2C' },
+    S: { label: '+50', outcome: 'small', color: '#FFB800' },
     B: { label: '+150', outcome: 'big', color: '#FF5A3C' },
     J: { label: 'x10', outcome: 'jackpot', color: '#FF00BC' },
   };
-  const WHEEL_PATTERN = 'MRBMMRMRBMMRBMRMMRMJ';
-  // Инвариант рядом с паттерном: 20 сегментов 10/6/3/1 (M/R/B/J) —
-  // визуальная аппроксимация таблицы G, алфавит строго MRBJ — числа
+  const WHEEL_PATTERN = 'MSSMMRMSMSMSRMMSMBMJ';
+  // Инвариант рядом с паттерном: 20 сегментов 10/2/6/1/1 (M/R/S/B/J) —
+  // визуальная аппроксимация таблицы H, алфавит строго MRBSJ — числа
   // не менять, при рассинхроне упасть громко.
-  if (WHEEL_PATTERN.length !== 20 || /[^MRBJ]/.test(WHEEL_PATTERN)) {
-    throw new Error(`bad WHEEL_PATTERN (len=${WHEEL_PATTERN.length}, alphabet=MRBJ)`);
+  if (WHEEL_PATTERN.length !== 20 || /[^MRBSJ]/.test(WHEEL_PATTERN)) {
+    throw new Error(`bad WHEEL_PATTERN (len=${WHEEL_PATTERN.length}, alphabet=MRBSJ)`);
   }
   const _counts = [...WHEEL_PATTERN].reduce<Record<string, number>>((acc, ch) => {
     acc[ch] = (acc[ch] ?? 0) + 1;
     return acc;
   }, {});
-  if (_counts['M'] !== 10 || _counts['R'] !== 6 || _counts['B'] !== 3 || _counts['J'] !== 1) {
-    throw new Error(`bad WHEEL_PATTERN counts (M/R/B/J=${_counts['M']}/${_counts['R']}/${_counts['B']}/${_counts['J']})`);
+  if (_counts['M'] !== 10 || _counts['R'] !== 2 || _counts['S'] !== 6 || _counts['B'] !== 1 || _counts['J'] !== 1) {
+    throw new Error(`bad WHEEL_PATTERN counts (M/R/S/B/J=${_counts['M']}/${_counts['R']}/${_counts['S']}/${_counts['B']}/${_counts['J']})`);
   }
   const SEGMENTS: WheelSegment[] = [...WHEEL_PATTERN].map((ch) => {
     const seg = SEGMENT_SPECS[ch];
@@ -125,9 +126,8 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
   const RESULT_TEXT: Record<GambaOutcome, string> = {
     miss: 'МИМО! −100 Пивкойнов 🍺',
     return: 'ВОЗВРАТ! При своих — крути ещё 🙂',
-    // legacy 'small' (+50 эпохи F): новых таких спинов сервер не выдаёт,
-    // текст оставлен ради истории.
-    small: '+50 Пивкойнов',
+    // 'small' — штатный исход таблицы H (мелкий выигрыш +50), свой сегмент есть.
+    small: '+50 Пивкойнов 🙂',
     big: 'ЖОСКО! +150 Пивкойнов — чат уважает 🍺',
     jackpot: 'ДЖЕКПОТ! +1000 Пивкойнов — чат в шоке 🍺',
   };
@@ -376,9 +376,8 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
 
   /** Докрутка колеса до сегмента присланного сервером исхода. */
   function animateToOutcome(outcome: GambaOutcome): void {
-    // legacy 'small' (+50 эпохи F) своего сегмента больше не имеет —
-    // крутим до ближайшего 'return'.
-    const wheelOutcome: GambaOutcome = outcome === 'small' ? 'return' : outcome;
+    // У каждого исхода таблицы H свой сегмент — маппинга не нужно.
+    const wheelOutcome: GambaOutcome = outcome;
     const candidates = SEGMENTS.map((s, i) => (s.outcome === wheelOutcome ? i : -1)).filter(
       (i) => i >= 0,
     );
