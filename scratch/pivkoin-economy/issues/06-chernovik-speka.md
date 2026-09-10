@@ -1,5 +1,6 @@
 Status: resolved
 Type: prototype
+Labels: ready-for-agent
 
 ## Question
 
