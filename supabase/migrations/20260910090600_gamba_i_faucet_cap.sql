@@ -2,7 +2,7 @@
 -- Диагноз: H честна (EV 97.5), но выигрыши не накапливаются — bleed −2.5/спин
 -- съедает даже джекпот за минуты; мелочь +50 не регистрируется как победа.
 -- Гриллинг 2026-09-10 (Q8–Q15, вариант K-A): пол выплаты 100 (мимо нет),
--- x10 жив, EV 128, дневной лимит 5 спинов/сутки.
+-- x10 жив, EV 128, дневной лимит 10 спинов/сутки.
 -- Таблица I: возврат 75% → 100 (при своих, net 0), мелочь 17% → 150 (+50),
 -- крупно 7% → 250 (+150), джекпот 1% → 1000 (x10 жив, но редок: при кэпе 5
 -- занос в среднем раз в ~20 активных дней — лотерейный билет, зафиксировано).
@@ -30,7 +30,7 @@ insert into public.gamba_payouts (outcome, payout, weight, label) values
   ('big', 250, 7, '+150'),
   ('jackpot', 1000, 1, 'джекпот x10');
 
--- 3. Дневной лимит 5 спинов/сутки (игровой прибор; остальное — как было).
+-- 3. Дневной лимит 10 спинов/сутки (игровой прибор; остальное — как было).
 create or replace function public.spin_gamba(p_idempotency_key uuid)
 returns table (spin_outcome text, spin_payout bigint, spin_balance bigint)
 language plpgsql
@@ -45,7 +45,7 @@ declare
   v_roll double precision;
   r record;
   c_stake bigint := 100;
-  c_daily_limit int := 5;
+  c_daily_limit int := 10;
 begin
   if v_uid is null then raise exception 'not authenticated'; end if;
   if p_idempotency_key is null then raise exception 'idempotency key required'; end if;
@@ -62,11 +62,11 @@ begin
     return;
   end if;
 
-  -- Игровой прибор (тикет 08): не больше 5 спинов в UTC-сутки. Повторные
+  -- Игровой прибор (тикет 08): не больше 10 спинов в UTC-сутки. Повторные
   -- попытки тем же ключом выше уже вернулись и лимит не тратят.
   if (select count(*) from public.gamba_spins
       where user_id = v_uid and created_at >= date_trunc('day', now())) >= c_daily_limit then
-    raise exception 'daily limit: счастливых спинов на сегодня больше нет (5 в день) — возвращайся завтра';
+    raise exception 'daily limit: счастливых спинов на сегодня больше нет (10 в день) — возвращайся завтра';
   end if;
 
   -- Технический антибот rate-limit (игровую нагрузку теперь держит кэп выше):

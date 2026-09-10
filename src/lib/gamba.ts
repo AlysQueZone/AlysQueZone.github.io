@@ -7,7 +7,7 @@
  * Локальный кошелёк удалён в тикете 11 — денег в клиенте нет вовсе.
  *
  * Таблица выплат I — кран под прибором (ребаланс, тикет 08, seed-конфиг
- * в БД, `public.gamba_payouts`, ставка 100, кэп 5 спинов/сутки): минимум —
+ * в БД, `public.gamba_payouts`, ставка 100, кэп 10 спинов/сутки): минимум —
  * возврат 75% → 100 (при своих, net 0; мимо нет вовсе), мелочь 17% → 150
  * (+50), крупно 7% → 250 (+150), джекпот x10 1% → 1000 (EV ~128, было ~97.5
  * у H; доля «в плюсе» 25%). Печать worst-case ~59k ≈ стокам.
@@ -22,7 +22,7 @@ export const GAMBA_STAKE = 100;
 
 /** Дневной лимит спинов — display-mirror, source of truth — DB (c_daily_limit в spin_gamba). */
 // display-mirror, source of truth — DB
-export const GAMBA_DAILY_LIMIT = 5;
+export const GAMBA_DAILY_LIMIT = 10;
 
 export type GambaOutcome = 'miss' | 'return' | 'small' | 'big' | 'jackpot';
 
