@@ -6,7 +6,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] Первые три клейма streak выдают 200/200/250, четвёртый и дальше — как раньше
 - [ ] Окно входа и строка правил (когда появится) называют те же суммы
