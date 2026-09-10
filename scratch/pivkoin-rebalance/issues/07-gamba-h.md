@@ -6,7 +6,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** in_progress
+**Status:** done (released 2026-09-10: migration 090500 applied, site deployed; superseded by 08)
 
 - [ ] Миграция `gamba_h_payouts`: веса 52/10/30/5/3, EV по весам = 97.5, x10 на месте
 - [ ] Колесо/фолбэк/комменты в клиенте соответствуют H (свой сегмент `small`, без маппинга small→return)

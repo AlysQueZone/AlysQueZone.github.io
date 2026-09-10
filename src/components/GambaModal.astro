@@ -9,6 +9,7 @@
  //
  // Звуки — публичный бакет media (тикет 10, §3 спеки): абсолютные S3-URL без ${base}.
 import { S3_MEDIA_BASE } from '../lib/media.ts';
+import { GAMBA_DAILY_LIMIT } from '../lib/gamba.ts';
 const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
 /** 7TV-эмоут GAMBA канала (ID проверен 2026-09-09 через 7TV API сета). */
 const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp';
@@ -65,6 +66,9 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
         Не, пойду на стрим
       </button>
     </div>
+    <p class="mt-2 text-xs font-bold text-mist/60">
+      {GAMBA_DAILY_LIMIT} счастливых спинов в день · минимум — при своих 🙂
+    </p>
   </div>
 </div>
 
@@ -82,33 +86,34 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
     type GambaPayRow,
   } from '../lib/gamba.ts';
 
-  // 18 крупных сегментов — визуальная аппроксимация таблицы H (тикет 07)
-  // (9 мимо / 2 возврата / 5 мелких / 1 крупный / 1 джекпот ≈ веса 52/10/30/5/3);
+  // 20 сегментов — визуальная аппроксимация таблицы I (тикет 08)
+  // (15 возвратов / 3 мелких / 1 крупный / 1 джекпот ≈ веса 75/17/7/1 —
+  // джекпот визуально завышен 5% vs 1%: сегмент меньше не сделать, честные
+  // шансы только в плакате/правилах);
   // точные веса живут в БД и плакате, исход решает сервер — колесо лишь
-  // докручивается до сегмента присланного типа.
-  // Цвета по нарастанию выигрыша: мимо — светлый, возврат — жёлтый,
-  // +50 — оранжевый, +150 — красный, x10 — маджента.
+  // докручивается до сегмента присланного типа. Мимо нет вовсе (тикет 08).
+  // Цвета по нарастанию выигрыша: возврат — жёлтый, +50 — оранжевый,
+  // +150 — красный, x10 — маджента.
   type WheelSegment = { label: string; outcome: GambaOutcome; color: string };
   const SEGMENT_SPECS: Record<string, WheelSegment> = {
-    M: { label: 'мимо', outcome: 'miss', color: '#FFE6AC' },
     R: { label: 'возврат', outcome: 'return', color: '#FFD93C' },
     S: { label: '+50', outcome: 'small', color: '#FF9E2C' },
     B: { label: '+150', outcome: 'big', color: '#FF5A3C' },
     J: { label: 'x10', outcome: 'jackpot', color: '#FF00BC' },
   };
-  const WHEEL_PATTERN = 'MSMMRMSMSMSRMMSMBJ';
-  // Инвариант рядом с паттерном: 18 сегментов 9/2/5/1/1 (M/R/S/B/J) —
-  // визуальная аппроксимация таблицы H, алфавит строго MRBSJ — числа
+  const WHEEL_PATTERN = 'RSRRBRSRRRRSRRRRJRRR';
+  // Инвариант рядом с паттерном: 20 сегментов 15/3/1/1 (R/S/B/J) —
+  // визуальная аппроксимация таблицы I, алфавит строго RBSJ — числа
   // не менять, при рассинхроне упасть громко.
-  if (WHEEL_PATTERN.length !== 18 || /[^MRBSJ]/.test(WHEEL_PATTERN)) {
-    throw new Error(`bad WHEEL_PATTERN (len=${WHEEL_PATTERN.length}, alphabet=MRBSJ)`);
+  if (WHEEL_PATTERN.length !== 20 || /[^RBSJ]/.test(WHEEL_PATTERN)) {
+    throw new Error(`bad WHEEL_PATTERN (len=${WHEEL_PATTERN.length}, alphabet=RBSJ)`);
   }
   const _counts = [...WHEEL_PATTERN].reduce<Record<string, number>>((acc, ch) => {
     acc[ch] = (acc[ch] ?? 0) + 1;
     return acc;
   }, {});
-  if (_counts['M'] !== 9 || _counts['R'] !== 2 || _counts['S'] !== 5 || _counts['B'] !== 1 || _counts['J'] !== 1) {
-    throw new Error(`bad WHEEL_PATTERN counts (M/R/S/B/J=${_counts['M']}/${_counts['R']}/${_counts['S']}/${_counts['B']}/${_counts['J']})`);
+  if (_counts['R'] !== 15 || _counts['S'] !== 3 || _counts['B'] !== 1 || _counts['J'] !== 1) {
+    throw new Error(`bad WHEEL_PATTERN counts (R/S/B/J=${_counts['R']}/${_counts['S']}/${_counts['B']}/${_counts['J']})`);
   }
   const SEGMENTS: WheelSegment[] = [...WHEEL_PATTERN].map((ch) => {
     const seg = SEGMENT_SPECS[ch];
@@ -126,6 +131,8 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
   const SUDA_URL = 'https://cdn.7tv.app/emote/01JRQF9CBSHN8MBST3TX1W6DY7/2x.webp';
 
   const RESULT_TEXT: Record<GambaOutcome, string> = {
+    // legacy 'miss' (эпохи F–H): новых таких спинов сервер не выдаёт (таблица I
+    // без мимо), ключ оставлен ради типа и истории.
     miss: 'МИМО! −100 Пивкойнов 🍺',
     return: 'ВОЗВРАТ! При своих — крути ещё 🙂',
     // 'small' — штатный исход таблицы H (мелкий выигрыш +50), свой сегмент есть.
@@ -137,6 +144,7 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
     'В котле меньше сотни — ставка 100 не влезла. Забери Ежедневный вход и возвращайся пойжемать 🙂';
   const GUEST_TEXT = 'Гамба только для своих — войди через Twitch, и пойжем вместе 🍺';
   const RATE_TEXT = 'Не жми так жоско — дай колесу отдышаться пару секунд 🙂';
+  const LIMIT_TEXT = 'Счастливые спины на сегодня кончились (5 в день) — возвращайся завтра 🙂';
   const OFFLINE_TEXT = 'Офлайн: спин не записан, Пивкойны целы. Вернись с сетью.';
   const ERROR_TEXT = 'Не крутанулось — Пивкойны целы, попробуй ещё.';
 
@@ -206,8 +214,8 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
       ctx.save();
       ctx.rotate(i * SEG + SEG / 2);
       ctx.textAlign = 'right';
-      // Тёмный текст — на светлых сегментах (мимо, жёлтый возврат), белый — дальше по нарастанию.
-      ctx.fillStyle = s.outcome === 'miss' || s.outcome === 'return' ? '#422006' : '#FFFBEA';
+      // Тёмный текст — на жёлтом возврате, белый — дальше по нарастанию.
+      ctx.fillStyle = s.outcome === 'return' ? '#422006' : '#FFFBEA';
       // Пиксельные подписи сегментов (стиль C); без загруженного шрифта —
       // честный monospace-фолбэк.
       ctx.font = `400 ${s.outcome === 'jackpot' ? 20 : 22}px "Press Start 2P", monospace`;
@@ -421,7 +429,12 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
       spinning = false;
       setBusy(false);
       if (!modal) return;
-      if (outcome === 'small' || outcome === 'big' || outcome === 'return') {
+      // Церемония по исходам (тикет 08): возврат — нейтральная фраза
+      // кручения (не win — при своих не победа), мелочь/крупно — win-пул,
+      // джекпот — jackpot-пул. legacy miss — lose-пул, новых не бывает.
+      if (outcome === 'return') {
+        playOutcomePool('spinPool', 'bg');
+      } else if (outcome === 'small' || outcome === 'big') {
         playOutcomePool('winPool', 'win');
       } else if (outcome === 'jackpot') {
         playOutcomePool('jackpotPool', 'jackpot');
@@ -526,6 +539,10 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
       }
       if (info.kind === 'rate-limit') {
         result.textContent = RATE_TEXT;
+        return;
+      }
+      if (info.kind === 'daily-limit') {
+        result.textContent = LIMIT_TEXT;
         return;
       }
       if (info.kind === 'offline') {

@@ -6,11 +6,11 @@
  * сам не считает, грантов локально не делает — лишь рисует присланное.
  * Локальный кошелёк удалён в тикете 11 — денег в клиенте нет вовсе.
  *
- * Таблица выплат H — нейтральный фаусет (ребаланс, тикет 07, seed-конфиг
- * в БД, `public.gamba_payouts`, ставка 100): мимо 52% → 0, возврат 10% → 100
- * (при своих), мелочь 30% → 150 (+50), крупно 5% → 250 (+150),
- * джекпот x10 3% → 1000 (EV ~97.5 как у G, было ~206 у F;
- * доля «в плюсе» 18% → 38%).
+ * Таблица выплат I — кран под прибором (ребаланс, тикет 08, seed-конфиг
+ * в БД, `public.gamba_payouts`, ставка 100, кэп 5 спинов/сутки): минимум —
+ * возврат 75% → 100 (при своих, net 0; мимо нет вовсе), мелочь 17% → 150
+ * (+50), крупно 7% → 250 (+150), джекпот x10 1% → 1000 (EV ~128, было ~97.5
+ * у H; доля «в плюсе» 25%). Печать worst-case ~59k ≈ стокам.
  * Секретов здесь нет: только publishable-ключ через getSupabase().
  */
 
@@ -19,6 +19,10 @@ import { getSupabase } from './supabase.ts';
 /** Фиксированная ставка Гамбы — display-mirror, source of truth — DB (c_stake в spin_gamba). */
 // display-mirror, source of truth — DB
 export const GAMBA_STAKE = 100;
+
+/** Дневной лимит спинов — display-mirror, source of truth — DB (c_daily_limit в spin_gamba). */
+// display-mirror, source of truth — DB
+export const GAMBA_DAILY_LIMIT = 5;
 
 export type GambaOutcome = 'miss' | 'return' | 'small' | 'big' | 'jackpot';
 
@@ -34,11 +38,10 @@ export interface GambaPayRow {
  *  показа, если конфиг из БД не прочитался. */
 // display-mirror, source of truth — DB
 export const GAMBA_PAYTABLE: GambaPayRow[] = [
-  { outcome: 'miss', payout: 0, chance: '52%', label: 'мимо' },
-  { outcome: 'return', payout: 100, chance: '10%', label: 'возврат 100' },
-  { outcome: 'small', payout: 150, chance: '30%', label: '+50' },
-  { outcome: 'big', payout: 250, chance: '5%', label: '+150' },
-  { outcome: 'jackpot', payout: 1000, chance: '3%', label: 'джекпот x10' },
+  { outcome: 'return', payout: 100, chance: '75%', label: 'возврат 100' },
+  { outcome: 'small', payout: 150, chance: '17%', label: '+50' },
+  { outcome: 'big', payout: 250, chance: '7%', label: '+150' },
+  { outcome: 'jackpot', payout: 1000, chance: '1%', label: 'джекпот x10' },
 ];
 
 export interface GambaSpinResult {
@@ -51,6 +54,7 @@ export type GambaErrorKind =
   | 'unauthenticated'
   | 'insufficient-funds'
   | 'rate-limit'
+  | 'daily-limit'
   | 'offline'
   | 'write-error';
 
@@ -83,6 +87,9 @@ export function mapGambaError(err: unknown): GambaErrorInfo {
   }
   if (low.includes('rate limit') || low.includes('too many') || low.includes('slow down')) {
     return { kind: 'rate-limit', raw };
+  }
+  if (low.includes('daily limit')) {
+    return { kind: 'daily-limit', raw };
   }
   if (
     low.includes('failed to fetch') ||

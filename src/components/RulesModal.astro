@@ -8,7 +8,7 @@
 // Использование: положить <RulesModal /> на страницу с hero и повесить
 // data-rules-button на кнопку открытия — скрипт ниже делегированный.
 // Закрытие: «Понятно» / крестик / клик по затемнению / Escape.
-import { GAMBA_PAYTABLE } from '../lib/gamba.ts';
+import { GAMBA_DAILY_LIMIT, GAMBA_PAYTABLE } from '../lib/gamba.ts';
 ---
 
 <div
@@ -48,7 +48,7 @@ import { GAMBA_PAYTABLE } from '../lib/gamba.ts';
         </p>
       </li>
       <li>
-        <p class="font-display text-[10px] uppercase text-pivko">Гамба · ставка 100</p>
+        <p class="font-display text-[10px] uppercase text-pivko">Гамба · ставка 100 · {GAMBA_DAILY_LIMIT} спинов в день</p>
         <ul data-rules-gamba class="mt-1 flex flex-col gap-1 text-mist/80">
           {
             GAMBA_PAYTABLE.map((row) => (
