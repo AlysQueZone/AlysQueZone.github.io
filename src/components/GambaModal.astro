@@ -82,30 +82,30 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
     type GambaPayRow,
   } from '../lib/gamba.ts';
 
-  // 10 крупных сегментов — визуальная аппроксимация таблицы F тикета 16
-  // (3 мимо / 4 малых / 2 средних / 1 джекпот); точные веса 30/40/22/8
-  // живут в БД и плакате, исход решает сервер — колесо лишь докручивается
-  // до сегмента присланного типа.
+  // 20 крупных сегментов — визуальная аппроксимация таблицы G ребаланса
+  // (10 мимо / 6 возвратов / 3 крупных / 1 джекпот ≈ веса 52/30/15/3);
+  // точные веса живут в БД и плакате, исход решает сервер — колесо лишь
+  // докручивается до сегмента присланного типа.
   type WheelSegment = { label: string; outcome: GambaOutcome; color: string };
   const SEGMENT_SPECS: Record<string, WheelSegment> = {
     M: { label: 'мимо', outcome: 'miss', color: '#FFE6AC' },
-    S: { label: '+50', outcome: 'small', color: '#FF9E2C' },
-    B: { label: '+200', outcome: 'big', color: '#FF5A3C' },
+    R: { label: 'возврат', outcome: 'return', color: '#FF9E2C' },
+    B: { label: '+150', outcome: 'big', color: '#FF5A3C' },
     J: { label: 'x10', outcome: 'jackpot', color: '#FF00BC' },
   };
-  const WHEEL_PATTERN = 'MSBSMSJSBM';
-  // Инвариант рядом с паттерном: 10 сегментов 3/4/2/1 (M/S/B/J) —
-  // визуальная аппроксимация таблицы F, алфавит строго MSBJ — числа
+  const WHEEL_PATTERN = 'MRBMMRMRBMMRBMRMMRMJ';
+  // Инвариант рядом с паттерном: 20 сегментов 10/6/3/1 (M/R/B/J) —
+  // визуальная аппроксимация таблицы G, алфавит строго MRBJ — числа
   // не менять, при рассинхроне упасть громко.
-  if (WHEEL_PATTERN.length !== 10 || /[^MSBJ]/.test(WHEEL_PATTERN)) {
-    throw new Error(`bad WHEEL_PATTERN (len=${WHEEL_PATTERN.length}, alphabet=MSBJ)`);
+  if (WHEEL_PATTERN.length !== 20 || /[^MRBJ]/.test(WHEEL_PATTERN)) {
+    throw new Error(`bad WHEEL_PATTERN (len=${WHEEL_PATTERN.length}, alphabet=MRBJ)`);
   }
   const _counts = [...WHEEL_PATTERN].reduce<Record<string, number>>((acc, ch) => {
     acc[ch] = (acc[ch] ?? 0) + 1;
     return acc;
   }, {});
-  if (_counts['M'] !== 3 || _counts['S'] !== 4 || _counts['B'] !== 2 || _counts['J'] !== 1) {
-    throw new Error(`bad WHEEL_PATTERN counts (M/S/B/J=${_counts['M']}/${_counts['S']}/${_counts['B']}/${_counts['J']})`);
+  if (_counts['M'] !== 10 || _counts['R'] !== 6 || _counts['B'] !== 3 || _counts['J'] !== 1) {
+    throw new Error(`bad WHEEL_PATTERN counts (M/R/B/J=${_counts['M']}/${_counts['R']}/${_counts['B']}/${_counts['J']})`);
   }
   const SEGMENTS: WheelSegment[] = [...WHEEL_PATTERN].map((ch) => {
     const seg = SEGMENT_SPECS[ch];
@@ -122,13 +122,14 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
   /** 7TV-эмоут suda канала (ID проверен 2026-09-09 через 7TV API сета). */
   const SUDA_URL = 'https://cdn.7tv.app/emote/01JRQF9CBSHN8MBST3TX1W6DY7/2x.webp';
 
-  const RESULT_TEXT: Record<GambaOutcome | 'return', string> = {
+  const RESULT_TEXT: Record<GambaOutcome, string> = {
     miss: 'МИМО! −100 Пивкойнов 🍺',
-    small: '+50 Пивкойнов',
-    big: 'ЖОСКО! +200 Пивкойнов — чат уважает 🍺',
-    jackpot: 'ДЖЕКПОТ! +1000 Пивкойнов — чат в шоке 🍺',
-    // legacy таблицы A (в БД валиден ради истории): ставка вернулась в ноль.
     return: 'ВОЗВРАТ! При своих — крути ещё 🙂',
+    // legacy 'small' (+50 эпохи F): новых таких спинов сервер не выдаёт,
+    // текст оставлен ради истории.
+    small: '+50 Пивкойнов',
+    big: 'ЖОСКО! +150 Пивкойнов — чат уважает 🍺',
+    jackpot: 'ДЖЕКПОТ! +1000 Пивкойнов — чат в шоке 🍺',
   };
   const GATE_TEXT =
     'В котле меньше сотни — ставка 100 не влезла. Забери Ежедневный вход и возвращайся пойжемать 🙂';
@@ -339,15 +340,15 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
     if (spinBtn instanceof HTMLButtonElement) spinBtn.disabled = busy;
   }
 
-  /** Исход в строку результата: small — 7TV aga, miss — 7TV SCAMBA, jackpot — 7TV suda. */
-  function showOutcome(outcome: GambaOutcome | 'return'): void {
+  /** Исход в строку результата: return/small — 7TV aga, miss — 7TV SCAMBA, jackpot — 7TV suda. */
+  function showOutcome(outcome: GambaOutcome): void {
     if (!result) return;
     result.innerHTML = '';
     const span = document.createElement('span');
     span.textContent = RESULT_TEXT[outcome];
     result.appendChild(span);
     const emote =
-      outcome === 'small'
+      outcome === 'return' || outcome === 'small'
         ? { src: AGA_URL, name: 'aga' }
         : outcome === 'miss'
           ? { src: SCAMBA_URL, name: 'SCAMBA' }
@@ -374,9 +375,10 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
   }
 
   /** Докрутка колеса до сегмента присланного сервером исхода. */
-  function animateToOutcome(outcome: GambaOutcome | 'return'): void {
-    // legacy 'return' своего сегмента не имеет — крутим до 'small'.
-    const wheelOutcome: GambaOutcome = outcome === 'return' ? 'small' : outcome;
+  function animateToOutcome(outcome: GambaOutcome): void {
+    // legacy 'small' (+50 эпохи F) своего сегмента больше не имеет —
+    // крутим до ближайшего 'return'.
+    const wheelOutcome: GambaOutcome = outcome === 'small' ? 'return' : outcome;
     const candidates = SEGMENTS.map((s, i) => (s.outcome === wheelOutcome ? i : -1)).filter(
       (i) => i >= 0,
     );

@@ -6,9 +6,10 @@
  * сам не считает, грантов локально не делает — лишь рисует присланное.
  * Локальный кошелёк удалён в тикете 11 — денег в клиенте нет вовсе.
  *
- * Таблица выплат F — щедрый аттракцион-фаусет (тикет 16, seed-конфиг
- * в БД, `public.gamba_payouts`, ставка 100): мимо 30% → 0, +50 40% → 150,
- * +200 22% → 300, джекпот x10 8% → 1000 (со 100 возвращается ~206).
+ * Таблица выплат G — нейтральный фаусет (ребаланс, seed-конфиг
+ * в БД, `public.gamba_payouts`, ставка 100): мимо 52% → 0, возврат 30% → 100,
+ * крупно 15% → 250 (+150), джекпот x10 3% → 1000 (EV ~97.5, было ~206).
+ * Legacy-исход 'small' (+50 эпохи F) в БД валиден ради истории спинов.
  * Секретов здесь нет: только publishable-ключ через getSupabase().
  */
 
@@ -18,7 +19,7 @@ import { getSupabase } from './supabase.ts';
 // display-mirror, source of truth — DB
 export const GAMBA_STAKE = 100;
 
-export type GambaOutcome = 'miss' | 'small' | 'big' | 'jackpot';
+export type GambaOutcome = 'miss' | 'return' | 'small' | 'big' | 'jackpot';
 
 export interface GambaPayRow {
   outcome: GambaOutcome;
@@ -32,10 +33,10 @@ export interface GambaPayRow {
  *  показа, если конфиг из БД не прочитался. */
 // display-mirror, source of truth — DB
 export const GAMBA_PAYTABLE: GambaPayRow[] = [
-  { outcome: 'miss', payout: 0, chance: '30%', label: 'мимо' },
-  { outcome: 'small', payout: 150, chance: '40%', label: '+50' },
-  { outcome: 'big', payout: 300, chance: '22%', label: '+200' },
-  { outcome: 'jackpot', payout: 1000, chance: '8%', label: 'джекпот x10' },
+  { outcome: 'miss', payout: 0, chance: '52%', label: 'мимо' },
+  { outcome: 'return', payout: 100, chance: '30%', label: 'возврат 100' },
+  { outcome: 'big', payout: 250, chance: '15%', label: '+150' },
+  { outcome: 'jackpot', payout: 1000, chance: '3%', label: 'джекпот x10' },
 ];
 
 export interface GambaSpinResult {
@@ -95,14 +96,18 @@ export function mapGambaError(err: unknown): GambaErrorInfo {
 }
 
 /**
- * Нормализация исхода из БД/RPC. Legacy-исход 'return' (старая таблица A)
- * оставлен валидным в БД ради истории спинов — клиент маппит его на 'small'
- * (ближайший плюс-минимальный исход), чтобы старые строки рисовались,
- * а не падали ('bad spin response' / выпавшая строка плаката).
+ * Нормализация исхода из БД/RPC. Legacy-исход 'small' (+50 эпохи F)
+ * оставлен валидным в БД ради истории спинов — старые строки рисуются
+ * тем же текстом, новых 'small' сервер больше не выдаёт (таблица G).
  */
 function asOutcome(value: unknown): GambaOutcome | null {
-  if (value === 'return') return 'small'; // legacy таблицы A
-  return value === 'miss' || value === 'small' || value === 'big' || value === 'jackpot' ? value : null;
+  return value === 'miss' ||
+    value === 'return' ||
+    value === 'small' ||
+    value === 'big' ||
+    value === 'jackpot'
+    ? (value as GambaOutcome)
+    : null;
 }
 
 /**

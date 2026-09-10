@@ -6,7 +6,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] Выпадают все четыре исхода, включая новый номинал крупной выплаты
 - [ ] EV по весам ≈ 97.5, джекпот x10 на месте
