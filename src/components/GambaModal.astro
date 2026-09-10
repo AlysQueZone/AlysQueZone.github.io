@@ -389,10 +389,16 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
   function animateToOutcome(outcome: GambaOutcome): void {
     // У каждого исхода таблицы H свой сегмент — маппинга не нужно.
     const wheelOutcome: GambaOutcome = outcome;
+    // Исхода может не быть на колесе (рассыхание конфига БД и клиента
+    // при раскатке, legacy miss): тогда крутим на случайный сегмент —
+    // это лишь церемония, правду говорит только строка результата.
     const candidates = SEGMENTS.map((s, i) => (s.outcome === wheelOutcome ? i : -1)).filter(
       (i) => i >= 0,
     );
-    const target = candidates[Math.floor(Math.random() * candidates.length)] ?? 0;
+    const target =
+      candidates.length > 0
+        ? (candidates[Math.floor(Math.random() * candidates.length)] ?? 0)
+        : Math.floor(Math.random() * SEGMENTS.length);
     // Центр целевого сегмента под стрелку сверху (-PI/2).
     const targetAngle = -Math.PI / 2 - (target * SEG + SEG / 2);
     const start = 0;
