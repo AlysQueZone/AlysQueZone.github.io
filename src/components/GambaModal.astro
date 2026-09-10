@@ -86,10 +86,11 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
     type GambaPayRow,
   } from '../lib/gamba.ts';
 
-  // 20 сегментов — визуальная аппроксимация таблицы I (тикет 08)
-  // (15 возвратов / 3 мелких / 1 крупный / 1 джекпот ≈ веса 75/17/7/1 —
-  // джекпот визуально завышен 5% vs 1%: сегмент меньше не сделать, честные
-  // шансы только в плакате/правилах);
+  // 12 сегментов — визуальная аппроксимация таблицы I (тикет 08)
+  // (9 возвратов / 1 мелкий / 1 крупный / 1 джекпот ≈ веса 75/17/7/1 —
+  // возврат ровно 75% как в паспорте; мелочь занижена, джекпот визуально
+  // завышен 8% vs 1%: сегмент меньше не сделать, честные шансы только
+  // в плакате/правилах);
   // точные веса живут в БД и плакате, исход решает сервер — колесо лишь
   // докручивается до сегмента присланного типа. Мимо нет вовсе (тикет 08).
   // Цвета по нарастанию выигрыша: возврат — жёлтый, +50 — оранжевый,
@@ -101,18 +102,18 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
     B: { label: '+150', outcome: 'big', color: '#FF5A3C' },
     J: { label: 'x10', outcome: 'jackpot', color: '#FF00BC' },
   };
-  const WHEEL_PATTERN = 'RSRRBRSRRRRSRRRRJRRR';
-  // Инвариант рядом с паттерном: 20 сегментов 15/3/1/1 (R/S/B/J) —
+  const WHEEL_PATTERN = 'RSRRBRRJRRRR';
+  // Инвариант рядом с паттерном: 12 сегментов 9/1/1/1 (R/S/B/J) —
   // визуальная аппроксимация таблицы I, алфавит строго RBSJ — числа
   // не менять, при рассинхроне упасть громко.
-  if (WHEEL_PATTERN.length !== 20 || /[^RBSJ]/.test(WHEEL_PATTERN)) {
+  if (WHEEL_PATTERN.length !== 12 || /[^RBSJ]/.test(WHEEL_PATTERN)) {
     throw new Error(`bad WHEEL_PATTERN (len=${WHEEL_PATTERN.length}, alphabet=RBSJ)`);
   }
   const _counts = [...WHEEL_PATTERN].reduce<Record<string, number>>((acc, ch) => {
     acc[ch] = (acc[ch] ?? 0) + 1;
     return acc;
   }, {});
-  if (_counts['R'] !== 15 || _counts['S'] !== 3 || _counts['B'] !== 1 || _counts['J'] !== 1) {
+  if (_counts['R'] !== 9 || _counts['S'] !== 1 || _counts['B'] !== 1 || _counts['J'] !== 1) {
     throw new Error(`bad WHEEL_PATTERN counts (R/S/B/J=${_counts['R']}/${_counts['S']}/${_counts['B']}/${_counts['J']})`);
   }
   const SEGMENTS: WheelSegment[] = [...WHEEL_PATTERN].map((ch) => {
