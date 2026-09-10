@@ -3,6 +3,8 @@
  *
  * - триггер — Realtime-смена Владельца лота, где я был прошлым Владельцем
  *   («мои» = текущий Владелец, owner_uid == uid сессии);
+ * - текст раскрывает комиссию биржи (ребаланс, тикет 05): «получено N
+ *   (комиссия M)» — сервер зачислил цену минус 7%;
  * - уведомление справа-снизу + звук с S3
  *   (`.../media/sounds/outbid.mp3` через `new Audio`)
  *   (звук только после первого взаимодействия — автоплей-политика);
@@ -19,6 +21,7 @@
 
 import { getSessionUid, getSupabase, fetchSharedLots, subscribeSharedLots } from './supabase.ts';
 import { fetchLotPrices } from './prices.ts';
+import { commissionFor } from './prices.ts';
 import { s3Sound } from './media.ts';
 
 const MAX_NOTICES = 3;
@@ -36,6 +39,17 @@ interface OutbidEvent {
   by: string;
   price: number;
   at: number;
+}
+
+/**
+ * Строка продавца с раскрытой комиссией (ребаланс, тикет 05): сервер зачислил
+ * цену минус 7% (display-mirror формулы тикета 01 из prices.ts), показываем
+ * «получено N − комиссия», а не голую цену сделки.
+ */
+function sellerLine(ev: OutbidEvent): string {
+  const fee = commissionFor(ev.price);
+  const net = ev.price - fee;
+  return `${ev.by} забрал «${ev.title}» за ${ev.price} 🍺 — получено ${net} (комиссия ${fee})`;
 }
 
 function soundUrl(): string {
@@ -186,7 +200,7 @@ export function initOutbidNotice(): void {
       item.style.fontSize = '13px';
       item.style.fontWeight = '700';
       const line = document.createElement('div');
-      line.textContent = `${ev.by} забрал «${ev.title}» за ${ev.price} 🍺`;
+      line.textContent = sellerLine(ev);
       item.append(line, makeRebuyButton(ev));
       bellPanel.appendChild(item);
     }
@@ -348,8 +362,9 @@ export function initOutbidNotice(): void {
     head.style.marginBottom = '4px';
     head.textContent = '▶ Твой лот перекупили!';
     const text = document.createElement('span');
-    // Факт уплаченной цены сервера; живая N — на кнопке возврата ниже.
-    text.textContent = `${ev.by} забрал «${ev.title}» за ${ev.price} 🍺`;
+    // Факт уплаченной цены сервера + раскрытая комиссия продавца (тикет 05);
+    // живая N — на кнопке возврата ниже.
+    text.textContent = sellerLine(ev);
     const btn = makeRebuyButton(ev);
     btn.addEventListener('click', () => {
       window.setTimeout(() => box.remove(), 0);

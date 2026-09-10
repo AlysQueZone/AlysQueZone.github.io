@@ -139,6 +139,19 @@ export async function fetchNextPrice(slug: string): Promise<number | null> {
 }
 
 /**
+ * Комиссия биржи — display-mirror серверной формулы тикета 01
+ * (greatest(ceil(price_paid * 7%), 1), платит продавец из выручки):
+ * только для показа «получено N − комиссия» в уведомлениях и правилах,
+ * деньги считает только БД.
+ */
+export const COMMISSION_RATE = 0.07;
+
+export function commissionFor(pricePaid: number): number {
+  if (!Number.isFinite(pricePaid) || pricePaid <= 0) return 0;
+  return Math.max(1, Math.ceil(pricePaid * COMMISSION_RATE));
+}
+
+/**
  * Живая подписка на цены: тик таблицы `lots` → перечитать вью.
  * Без настроенного хранилища — noop-отписка. Возвращает функцию отписки.
  */
