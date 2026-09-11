@@ -1,45 +1,21 @@
 # AlysQueZone
 
-Шуточная биржа приветов чата Twitch-канала alysque. Что это и как запустить — в README.md.
+Шуточная биржа приветов Twitch-канала alysque. Запуск — README.md.
 
-## Правила
-
-- Дописывай сюда кратко новые Twitch-источники и решения реализации.
-- Коммить сам, когда изменение готово.
+- Коммить сам, когда изменение готово; новые решения — краткой строкой сюда.
 - README — простая инструкция для человека, без подробностей.
-- Преддеплой-гейт: `npm run build` + покликать сборку в `preview`. Гейт красный — деплоя нет.
-- Простые команды(вроде запуска проекта), которые могут пригодится человеку добавляй в `justfile`.
+- Гейт красный — деплоя нет: `npm run build` + клик сборки в `preview`.
+- Бэкенд — в Supabase, схему — только миграциями.
+- Математика биржи — из одних рук: меняешь механику — обнови витрину и `CONTEXT.md`.
 
-## Преддеплой-проверка (`preview` + `agent-browser`)
+## Указатели
 
-Бинарь `./node_modules/.bin/agent-browser`. Цикл: поднять `npm run preview`, затем `export AGENT_BROWSER_SESSION="<задача>"` → `open http://localhost:4321/` → `snapshot -i` → `click/fill @eN` (после каждого изменения страницы заново `snapshot -i`, рефы протухают). В конце `close` + остановить preview. Справочник — в самом CLI (`--help`, `skills get`).
-Скиллы (`core`, `dogfood`, …) в репо не копировать: они лежат в пакете и отдаются командой `skills get <имя>` всегда под версию CLI. Для глубокой проверки (поиск багов/UX) грузить `skills get dogfood` по месту.
-
-## Релиз (две ступени)
-
-1. Бэкенд: мерж в `main` — Supabase сам применяет новые миграции. Проверка: подождать ~60с, затем MCP `list_migrations` — все новые версии в списке (сразу после пуша проверять бессмысленно — очередь ещё не отработала). Ошибка — читаем текст, чиним файл неприменённой миграции и пушим снова (очередь встаёт целиком).
-2. Сайт: `npm run deploy` (сборка + пуш `dist` в ветку `gh-pages` — GitHub Pages раздаёт именно её, не `main`). Проверка: свежие маркеры на живом сайте.
-
-## Supabase
-
-- Backend-логика — на supabase, не в клиентском коде; skill `supabase` — на схему/RLS/миграции/отладку.
-- MCP `supabase` (`opencode.json`) — на все операции: схема, миграции, данные, логи, edge functions.
-- Deploy to production ВКЛ: мерж в `main` сам применяет миграции. Схему менять только миграциями; правки из дашборда забирать через `db pull`.
-- Вью со сменой состава/порядка колонок — только через `DROP VIEW + CREATE`: `CREATE OR REPLACE` падает 42P16 и блокирует очередь (кейс 2026-09-10).
-
-## Решения
-
-- Качество кода: Prettier 3 (+ prettier-plugin-astro, tailwind-плагин последним) + ESLint 10 flat (`recommended`, без type-aware), `eslint-config-prettier` последним; enforcement — только pre-commit хук (`husky + lint-staged`), без CI; команды `just lint` / `just format`.
-- Импорты фронта: `@/`-алиас для межпапочных, относительные внутри папки, без `.ts`-расширений; SSR-first (островов `client:*` нет); frontmatter — типы/пропсы/данные, разметка без логики.
-- SQL-гайд: русская шапка-комментарий обязательна; RLS deny-by-default (`revoke all` + точечные политики); нейминг plural/`_idx`/`<table>_<действие>_<скоуп>`.
-
-- Звуки гамбы — рандом-пулы из констант `GAMBA_*_SOUNDS` в `src/lib/gamba.ts` (спин 5: sova/maknagens/toptop/gamba-bg/taktak / выигрыш 4 / супер 3 / проигрыш 2); возврат церемониально равен проигрышу и звучит lose-пулом (худший исход таблицы I, мимо нет); Тактактакуе — фраза кручения, файл исторически `gamba-win-taktak.mp3`; `gamba-bg` — one-shot вариант спина, не луп; источник фраз — MemeAlerts webm → `ffmpeg -vn libmp3lame`.
-- Математика биржи в UI — из одних рук: бегущая строка-лог, hero-бейджи, модалка «Правила биржи» показывают живые правила (комиссия биржи, рост цены, гамба, вход). Меняешь механику — обнови все три места и `CONTEXT.md`, иначе витрина врёт (кейс: бейдж «+10%» пережил введение комиссии).
-
-## Указатели (грузить по ветке)
-
-- Эмоуты/чат VOD/мемы/пасты/стата канала → `docs/agents/twitch-sources.md`.
-- Новый привет/лот (конверт `ffmpeg`, заливка в `media`, `INSERT INTO lots`) → `docs/agents/media-pipeline.md`.
-- Issues-трекинг (файлы в `scratch/`) → `docs/agents/issue-tracker.md`.
+- Preview-клик / релиз (`gh-pages`, миграции в `main`) → `docs/agents/shipping.md`.
+- Supabase-схема / RLS / миграции / отладка → `docs/agents/supabase.md`.
+- Стиль / импорты / SSR / SQL-гайд / `just` → `docs/agents/code-style.md`.
+- Гамба-звуки / комиссия / рост цены → `docs/agents/economy.md`.
+- Эмоуты / чат VOD / мемы / пасты / стата → `docs/agents/twitch-sources.md`.
+- Новый лот / `ffmpeg` / `media` / `INSERT INTO lots` → `docs/agents/media-pipeline.md`.
+- Issues-трекинг (`scratch/`) → `docs/agents/issue-tracker.md`.
 - Триаж-лейблы (`needs-triage` … `wontfix`) → `docs/agents/triage-labels.md`.
-- Термины/глоссарий/ADR-конфликт → `docs/agents/domain.md` (`CONTEXT.md` + `docs/adr/`).
+- Термины / глоссарий / ADR-конфликт → `docs/agents/domain.md` (`CONTEXT.md` + `docs/adr/`).
