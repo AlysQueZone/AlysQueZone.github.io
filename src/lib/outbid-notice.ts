@@ -14,12 +14,15 @@
  *   (до 3 свежих), остальное — в истории колокольчика;
  * - колокольчик в шапке: счётчик непрочитанных + панель истории за сессию
  *   (макс 10, у каждой записи кнопка перекупа). Только залогиненным.
+ *   Оффлайн-догон: при старте/фокусе/смене сессии история донаполняется
+ *   из purchases (сделки, где я был продавцом), поэтому перекуп с закрытой
+ *   вкладкой тоже виден; выкупленные обратно лоты из истории исключаются.
  *
  * Свой Realtime-канал на таблицу лотов (плюс общий тик через subscribeLots
  * из lib/lots.ts для живых цен кнопок возврата).
  */
 
-import { getSessionUid, getSupabase } from './supabase';
+import { getSessionUid, getSupabase, fetchOutbidCatchup } from './supabase';
 import { fetchLotCatalog, subscribeLots, onBought } from './lots';
 import { sellerLine, type OutbidEvent } from './outbid-event';
 import { playOutbidSound } from './outbid-sound';
@@ -233,6 +236,38 @@ export function initOutbidNotice(): void {
     renderBell();
   }
 
+  function eventKey(ev: OutbidEvent): string {
+    return `${ev.slug}|${ev.price}|${ev.by}`;
+  }
+
+  /** Оффлайн-догон: сделки, где меня перекупили без открытого канала
+   *  (закрыта вкладка). Best effort, дедуп по событию, свежие — первыми. */
+  async function catchUpOffline(): Promise<void> {
+    if (uid === null) return;
+    try {
+      const found = await fetchOutbidCatchup(uid, MAX_HISTORY);
+      if (found.length === 0) return;
+      const known = new Set(history.map(eventKey));
+      for (const m of missed) known.add(eventKey(m));
+      let added = 0;
+      for (const ev of found) {
+        if (known.has(eventKey(ev))) continue;
+        history.push(ev);
+        known.add(eventKey(ev));
+        added += 1;
+      }
+      history.sort((a, b) => b.at - a.at);
+      while (history.length > MAX_HISTORY) history.pop();
+      if (added > 0) {
+        unread += added;
+        renderBell();
+        if (bellPanel && bellPanel.style.display !== 'none') renderPanel();
+      }
+    } catch {
+      // догон — best effort, лайв-канал работает и без него
+    }
+  }
+
   function onOutbid(ev: OutbidEvent): void {
     pushHistory(ev);
     playOutbidSound(interacted);
@@ -250,7 +285,14 @@ export function initOutbidNotice(): void {
       for (const ev of fresh) showNotice(corner, ev, liveNext);
       void refreshMine();
       void refreshPrices();
+      void catchUpOffline();
     }
+  });
+  window.addEventListener('focus', () => {
+    void refreshMine().then(() => {
+      void catchUpOffline();
+    });
+    void refreshPrices();
   });
 
   async function refreshMine(): Promise<void> {
@@ -337,6 +379,7 @@ export function initOutbidNotice(): void {
     ensureSubscribed();
     // Живая N кнопок возврата: перечитываем каталог по каждому тику лотов.
     void refreshPrices();
+    void catchUpOffline();
     subscribeLots(() => {
       void refreshPrices();
     });
@@ -344,6 +387,7 @@ export function initOutbidNotice(): void {
       void refreshMine().then(() => {
         syncBellVisibility();
         ensureSubscribed();
+        void catchUpOffline();
       });
     });
     // Купил обратно — записи про этот лот не актуальны: убрать из истории

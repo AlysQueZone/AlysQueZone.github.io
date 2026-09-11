@@ -179,6 +179,105 @@ export async function fetchSharedHistory(
 }
 
 /**
+ * Оффлайн-догон колокольчика (без новой таблицы).
+ * Находит сделки, где я был продавцом: цепочка покупок лота, в которой
+ * предыдущий покупатель — я, а следующий — уже не я. Текущие мои лоты
+ * (lots.owner_uid == uid) исключаются — их уже выкупил обратно.
+ * Первая продажа от сидового владельца без prior-покупки не покрывается:
+ * продавец там вне цепочки purchases. Возвращает до `limit` свежих событий.
+ */
+export interface OutbidCatchupEntry {
+  slug: string;
+  title: string;
+  by: string;
+  price: number;
+  at: number;
+  video: string | null;
+}
+
+export async function fetchOutbidCatchup(uid: string, limit = 10): Promise<OutbidCatchupEntry[]> {
+  const sb = getSupabase();
+  if (!sb || !uid) return [];
+  try {
+    const { data: mine, error: mineError } = await sb
+      .from('purchases')
+      .select('lot_id')
+      .eq('buyer_uid', uid)
+      .order('id', { ascending: false })
+      .limit(200);
+    if (mineError || !Array.isArray(mine) || mine.length === 0) return [];
+    const lotIds = [
+      ...new Set(
+        (mine as unknown as Record<string, unknown>[])
+          .map((row) => Number(row['lot_id']))
+          .filter((id) => Number.isFinite(id) && id > 0)
+      ),
+    ];
+    if (lotIds.length === 0) return [];
+    const { data, error } = await sb
+      .from('purchases')
+      .select(
+        'lot_id,buyer_uid,buyer_login,price_paid,created_at,lots(slug,title,video_url,owner_uid)'
+      )
+      .in('lot_id', lotIds)
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
+      .limit(500);
+    if (error || !Array.isArray(data)) return [];
+    const byLot = new Map<number, Record<string, unknown>[]>();
+    for (const row of data as unknown as Record<string, unknown>[]) {
+      const lotId = Number(row['lot_id']);
+      if (!Number.isFinite(lotId)) continue;
+      const list = byLot.get(lotId) ?? [];
+      list.push(row);
+      byLot.set(lotId, list);
+    }
+    const events: OutbidCatchupEntry[] = [];
+    for (const rows of byLot.values()) {
+      let prevBuyer: string | null = null;
+      for (const row of rows) {
+        const curBuyer = typeof row['buyer_uid'] === 'string' ? (row['buyer_uid'] as string) : '';
+        const lot = row['lots'] as unknown as Record<string, unknown> | null;
+        const slug = lot && typeof lot['slug'] === 'string' ? (lot['slug'] as string) : null;
+        if (prevBuyer === uid && curBuyer !== uid && slug) {
+          const price = Number(row['price_paid']);
+          const created =
+            typeof row['created_at'] === 'string' ? Date.parse(row['created_at']) : NaN;
+          const ownerUid =
+            lot && typeof lot['owner_uid'] === 'string' ? (lot['owner_uid'] as string) : null;
+          // Лот уже выкуплен обратно — не тащим в историю.
+          if (ownerUid !== uid && Number.isFinite(price) && price > 0) {
+            events.push({
+              slug,
+              title:
+                lot && typeof lot['title'] === 'string' && (lot['title'] as string).length > 0
+                  ? (lot['title'] as string)
+                  : slug,
+              by:
+                typeof row['buyer_login'] === 'string' && (row['buyer_login'] as string).length > 0
+                  ? (row['buyer_login'] as string)
+                  : 'Чатерс',
+              price,
+              at: Number.isFinite(created) ? created : Date.now(),
+              video:
+                lot &&
+                typeof lot['video_url'] === 'string' &&
+                (lot['video_url'] as string).length > 0
+                  ? (lot['video_url'] as string)
+                  : null,
+            });
+          }
+        }
+        prevBuyer = curBuyer || prevBuyer;
+      }
+    }
+    return events.sort((a, b) => b.at - a.at).slice(0, Math.max(1, limit));
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Живая подписка на смену Лотов (postgres_changes по таблице lots).
  * Без настроенного хранилища — noop-отписка. Возвращает функцию отписки.
  */
