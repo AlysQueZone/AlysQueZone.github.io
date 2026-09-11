@@ -17,6 +17,8 @@
  *   Оффлайн-догон: при старте/фокусе/смене сессии история донаполняется
  *   из purchases (сделки, где я был продавцом), поэтому перекуп с закрытой
  *   вкладкой тоже виден; выкупленные обратно лоты из истории исключаются.
+ *   Метка просмотра — в localStorage per-uid: открытая панель гасит бейдж
+ *   и переживает перезагрузку (непрочитанное между девайсами не синкается).
  *
  * Свой Realtime-канал на таблицу лотов (плюс общий тик через subscribeLots
  * из lib/lots.ts для живых цен кнопок возврата).
@@ -52,6 +54,35 @@ export function initOutbidNotice(): void {
   const history: OutbidEvent[] = [];
   const missed: OutbidEvent[] = [];
   let unread = 0;
+
+  /** Прочитанное — в localStorage per-uid: переживает перезагрузку.
+   *  Без сервера это лучший вариант для варианта А (без таблицы);
+   *  между девайсами непрочитанное не синкается — осознанный лимит. */
+  function seenStorageKey(): string | null {
+    return uid === null ? null : `alysque:outbid-seen:${uid}`;
+  }
+
+  function loadSeenAt(): number {
+    try {
+      const key = seenStorageKey();
+      if (!key) return 0;
+      const raw = window.localStorage.getItem(key);
+      const ts = raw === null ? 0 : Number(raw);
+      return Number.isFinite(ts) && ts > 0 ? ts : 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  function markSeen(): void {
+    try {
+      const key = seenStorageKey();
+      if (!key) return;
+      window.localStorage.setItem(key, String(Date.now()));
+    } catch {
+      // приватный режим — бейдж просто проживёт до перезагрузки
+    }
+  }
 
   let bellBtn: HTMLElement | null = null;
   let bellCount: HTMLElement | null = null;
@@ -161,6 +192,7 @@ export function initOutbidNotice(): void {
       renderPanel();
       panel.style.display = 'block';
       unread = 0;
+      markSeen();
       renderBell();
     });
     document.addEventListener('click', (e) => {
@@ -241,12 +273,14 @@ export function initOutbidNotice(): void {
   }
 
   /** Оффлайн-догон: сделки, где меня перекупили без открытого канала
-   *  (закрыта вкладка). Best effort, дедуп по событию, свежие — первыми. */
+   *  (закрыта вкладка). Best effort, дедуп по событию, свежие — первыми.
+   *  Непрочитанными считаются только события новее метки просмотра. */
   async function catchUpOffline(): Promise<void> {
     if (uid === null) return;
     try {
       const found = await fetchOutbidCatchup(uid, MAX_HISTORY);
       if (found.length === 0) return;
+      const seenAt = loadSeenAt();
       const known = new Set(history.map(eventKey));
       for (const m of missed) known.add(eventKey(m));
       let added = 0;
@@ -254,7 +288,7 @@ export function initOutbidNotice(): void {
         if (known.has(eventKey(ev))) continue;
         history.push(ev);
         known.add(eventKey(ev));
-        added += 1;
+        if (ev.at > seenAt) added += 1;
       }
       history.sort((a, b) => b.at - a.at);
       while (history.length > MAX_HISTORY) history.pop();
