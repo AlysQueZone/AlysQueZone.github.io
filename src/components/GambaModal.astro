@@ -147,6 +147,16 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
     big: 'ЖОСКО! +150 Пивкойнов — чат уважает 🍺',
     jackpot: 'ДЖЕКПОТ! +1000 Пивкойнов — чат в шоке 🍺',
   };
+  // DOM-lookup — выше всех текстов и функций: LIMIT_TEXT читает modal.dataset
+  // на верхнем уровне, позже — TDZ ReferenceError и мёртвый скрипт (кейс 2026-09-11,
+  // в прод-бандле const→var молча прятал, в dev кнопка ничего не открывала).
+  const modal = document.getElementById('gamba-modal');
+  const canvas = document.getElementById('gamba-wheel');
+  const result = document.getElementById('gamba-result');
+  const spinBtn = document.getElementById('gamba-spin');
+  const closeBtn = document.getElementById('gamba-close');
+  const paytable = document.getElementById('gamba-paytable');
+
   const GATE_TEXT =
     'В котле меньше сотни — ставка 100 не влезла. Забери Ежедневный вход и возвращайся пойжемать 🙂';
   const GUEST_TEXT = 'Гамба только для своих — войди через Twitch, и пойжем вместе 🍺';
@@ -155,13 +165,6 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
   const LIMIT_TEXT = `Счастливые спины на сегодня кончились (${limitN} в день) — возвращайся завтра 🙂`;
   const OFFLINE_TEXT = 'Офлайн: спин не записан, Пивкойны целы. Вернись с сетью.';
   const ERROR_TEXT = 'Не крутанулось — Пивкойны целы, попробуй ещё.';
-
-  const modal = document.getElementById('gamba-modal');
-  const canvas = document.getElementById('gamba-wheel');
-  const result = document.getElementById('gamba-result');
-  const spinBtn = document.getElementById('gamba-spin');
-  const closeBtn = document.getElementById('gamba-close');
-  const paytable = document.getElementById('gamba-paytable');
 
   /**
    * Ключ текущей попытки: генерируется на спин, переживает ретрай и

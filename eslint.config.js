@@ -13,6 +13,10 @@ export default [
       '@typescript-eslint/no-unused-vars': 'warn',
       'no-unused-vars': 'off',
       'no-console': 'off',
+      // TDZ-гард (кейс GambaModal 2026-09-11: use-before-const убивал
+      // скрипт в dev, а прод-бандл const→var молча прятал): tsc .astro-скрипты
+      // не проверяет, это правило — единственный committed-шов.
+      'no-use-before-define': ['error', { variables: true, functions: false, classes: true }],
     },
   },
   prettier,

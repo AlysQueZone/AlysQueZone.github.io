@@ -67,17 +67,17 @@
     box.append(headRow, body, ok);
     overlay.appendChild(box);
     document.body.appendChild(overlay);
-    const detach = (): void => {
+    function detach(): void {
       document.removeEventListener('click', onOutside, true);
       document.removeEventListener('keydown', onKey);
       overlay.remove();
-    };
-    const onOutside = (e: MouseEvent): void => {
+    }
+    function onOutside(e: MouseEvent): void {
       if (e.target === overlay) detach();
-    };
-    const onKey = (e: KeyboardEvent): void => {
+    }
+    function onKey(e: KeyboardEvent): void {
       if (e.key === 'Escape') detach();
-    };
+    }
     cross.addEventListener('click', detach);
     ok.addEventListener('click', detach);
     // Отложка на тик: текущий клик (если он и запустил флоу) не должен
