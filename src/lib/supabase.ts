@@ -222,102 +222,10 @@ export interface SharedPurchase {
   buyer_login: string;
 }
 
-export type BuyErrorKind =
-  | 'cooldown'
-  | 'rate-limit'
-  | 'own-lot'
-  | 'insufficient-funds'
-  | 'unauthenticated'
-  | 'missing-lot'
-  | 'price-cap'
-  | 'offline'
-  | 'write-error';
-
-export interface BuyErrorInfo {
-  kind: BuyErrorKind;
-  /** Для паузы — сколько секунд ждать (парсится из текста триггера). */
-  retryAfterSec?: number;
-  raw: string;
-}
-
-/** Запасная пауза, если текст триггера не распарсился (в миграции — 30с). */
-export const BUY_COOLDOWN_FALLBACK_SEC = 30;
-
-function buyErrorMessage(err: unknown): string {
-  if (err instanceof Error) return err.message;
-  if (typeof err === 'object' && err !== null && 'message' in err) {
-    return String((err as { message: unknown }).message);
-  }
-  return String(err);
-}
-
-function parseCooldownSec(msg: string): number {
-  const hms = msg.match(/(\d+):(\d{2}):(\d{2})/);
-  if (hms) {
-    const sec = Number(hms[1]) * 3600 + Number(hms[2]) * 60 + Number(hms[3]);
-    if (Number.isFinite(sec) && sec > 0 && sec <= 3600) return sec;
-  }
-  const sec = msg.match(/(\d+)\s*(?:s|sec|сек)/i);
-  if (sec) {
-    const n = Number(sec[1]);
-    if (Number.isFinite(n) && n > 0 && n <= 3600) return n;
-  }
-  return BUY_COOLDOWN_FALLBACK_SEC;
-}
-
 /**
- * Маппинг ошибок Postgres/триггера на честные виды.
- * Матчится по коду/сообщению триггера: cooldown / rate limit /
- * not authenticated (см. enforce_purchase_rules в миграциях).
- */
-export function mapBuyError(err: unknown): BuyErrorInfo {
-  const raw = buyErrorMessage(err);
-  const low = raw.toLowerCase();
-  if (low.includes('cooldown')) {
-    return { kind: 'cooldown', retryAfterSec: parseCooldownSec(raw), raw };
-  }
-  if (low.includes('rate limit') || low.includes('max ') || low.includes('too many')) {
-    return { kind: 'rate-limit', raw };
-  }
-  if (low.includes('already yours')) {
-    return { kind: 'own-lot', raw };
-  }
-  if (
-    low.includes('not authenticated') ||
-    low.includes('row-level security') ||
-    low.includes('jwt') ||
-    low.includes('no twitch identity')
-  ) {
-    return { kind: 'unauthenticated', raw };
-  }
-  if (low.includes('not found')) {
-    return { kind: 'missing-lot', raw };
-  }
-  if (low.includes('price cap')) {
-    return { kind: 'price-cap', raw };
-  }
-  // Деньги покупки — серверный гейт (тикет 08, BEFORE-триггер):
-  // счёта нет или баланса не хватило на серверную цену.
-  if (low.includes('insufficient funds') || low.includes('insufficient_funds')) {
-    return { kind: 'insufficient-funds', raw };
-  }
-  if (
-    low.includes('failed to fetch') ||
-    low.includes('networkerror') ||
-    low.includes('network error') ||
-    low.includes('load failed') ||
-    low.includes('offline') ||
-    err instanceof TypeError
-  ) {
-    return { kind: 'offline', raw };
-  }
-  return { kind: 'write-error', raw };
-}
-
-/**
- * Shared-покупка одним вызовом: resolve slug → bigint id, затем INSERT
+ * Сырой примитив shared-покупки: resolve slug → bigint id, затем INSERT
  * { lot_id, buyer_uid } и ожидание confirm. Бросает исходную ошибку —
- * маппить через mapBuyError на стороне UI.
+ * доменный итог собирает buyLot из lib/lots.ts (свежая N + маппинг ошибок).
  */
 export async function buyLotShared(slug: string): Promise<SharedPurchase> {
   const sb = getSupabase();

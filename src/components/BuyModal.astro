@@ -7,7 +7,8 @@
 // data-lot-owner="<owner>" data-lot-video="<video_url>".
 // При покупке играет видео лота со звуком (видимо, в уведомлении); без video_url — clap с S3.
 // Клик по такой кнопке сам откроет модалку — скрипт ниже делегированный.
-// После покупки кидается window CustomEvent('alysque:bought', { detail: { id } }).
+// После покупки — announceBought({ id, price }) из lib/lots.ts
+// (типизированный announce/listen; слушают витрина, страница лота, колокол).
 import { ALYSQUE_CLAP_DARK } from '@/lib/emotes';
 import { s3Sound } from '@/lib/media';
 
@@ -69,7 +70,7 @@ const clapSound = s3Sound('clap.mp3');
   // Локальный кошелёк удалён, фолбэка без настроенного хранилища нет:
   // подтверждать нечему — говорим честно.
   import { boom } from '@/lib/confetti';
-  import { fetchLotState, subscribeLots } from '@/lib/lots';
+  import { fetchLotState, subscribeLots, buyLot, announceBought } from '@/lib/lots';
   import {
     getSupabase,
     isSupabaseConfigured,
@@ -77,8 +78,6 @@ const clapSound = s3Sound('clap.mp3');
     stashPendingBuy,
     takePendingBuy,
     returnUrlForLot,
-    buyLotShared,
-    mapBuyError,
     fetchSharedHistory,
     getSessionUid,
   } from '@/lib/supabase';
@@ -154,9 +153,7 @@ const clapSound = s3Sound('clap.mp3');
       playClapFallback();
       showNotice(`ЗАБРАЛ! Привет твой: ${entry.title} — ушло ${entry.price} Пивкойнов`, true);
     }
-    window.dispatchEvent(
-      new CustomEvent('alysque:bought', { detail: { id: entry.id, price: entry.price } })
-    );
+    announceBought({ id: entry.id, price: entry.price });
   }
 
   function showNotice(text: string, ok: boolean, videoUrl?: string): void {
@@ -439,7 +436,7 @@ const clapSound = s3Sound('clap.mp3');
   yesBtn?.addEventListener('click', async () => {
     if (!pending) return;
     const { id, title, owner, video } = pending;
-    let price = pending.price;
+    const price = pending.price;
     // Гейт «хватит/не хватит» — серверный (тикет 08): BEFORE ответит
     // `insufficient funds`, покажем честно. Без настроенного хранилища
     // покупать нечего — честная ошибка, деньги целы.
@@ -463,70 +460,70 @@ const clapSound = s3Sound('clap.mp3');
       await signInWithTwitch(returnUrlForLot(id));
       return;
     }
-    // Shared-покупка (тикет 10): свежий select N перед записью + INSERT
-    // с ожиданием confirm сервера. Итог — фактически уплаченная цена.
+    // Перекуп за одним швом (buyLot из lib/lots.ts): свежая N, INSERT,
+    // маппинг ошибок — внутри; здесь только switch по итогу.
+    // Итог — фактически уплаченная серверная цена.
     setBusy(true);
     if (yesBtn instanceof HTMLButtonElement) yesBtn.textContent = 'Ждём сервер…';
+    let result: Awaited<ReturnType<typeof buyLot>>;
     try {
-      const st = await fetchLotState(id, null);
-      const fresh = st?.nextPrice ?? null;
-      if (fresh !== null && Number.isFinite(fresh) && fresh > 0 && pending && pending.id === id) {
-        price = fresh;
-        pending.price = fresh;
-      }
-      const done = await buyLotShared(id);
-      const paid =
-        Number.isFinite(done.price_paid) && done.price_paid > 0 ? done.price_paid : price;
-      celebrate({ id, title, price: paid, owner, video });
-    } catch (err) {
-      const info = mapBuyError(err);
-      if (info.kind === 'cooldown') {
-        startPause(info.retryAfterSec ?? PAUSE_SEC);
-        return;
-      }
-      if (info.kind === 'rate-limit') {
-        showLimit();
-        showNotice('Лимит: 10 покупок за 10 минут — приходи позже, Пивкойны целы.', false);
-        return;
-      }
+      result = await buyLot(id);
+    } catch {
       restoreBuyButton();
-      if (info.kind === 'insufficient-funds') {
-        closeModal();
+      showNotice('Не записалось в общее хранилище — Пивкойны целы, попробуй ещё.', false);
+      return;
+    }
+    if (result.status === 'ok') {
+      const paid = result.paid > 0 ? result.paid : price;
+      celebrate({ id, title, price: paid, owner, video });
+      return;
+    }
+    if (result.kind === 'cooldown') {
+      startPause(result.retryAfterSec ?? PAUSE_SEC);
+      return;
+    }
+    if (result.kind === 'rate-limit') {
+      showLimit();
+      showNotice('Лимит: 10 покупок за 10 минут — приходи позже, Пивкойны целы.', false);
+      return;
+    }
+    restoreBuyButton();
+    if (result.kind === 'insufficient-funds') {
+      closeModal();
+      showNotice(
+        'Не хватает Пивкойнов — пойжем жоско в гамбу или забери Ежедневный вход, а этот привет подождёт.',
+        false
+      );
+      return;
+    }
+    if (result.kind === 'unauthenticated') {
+      stashPendingBuy(id);
+      showNotice(
+        'СТРИМ ВКЛЮЧИЛСЯ, А ТЫ? Сессия кончилась — войди через Twitch, потом вернём к лоту.',
+        false
+      );
+      await signInWithTwitch(returnUrlForLot(id));
+      return;
+    }
+    switch (result.kind) {
+      case 'own-lot':
+        showNotice('Этот привет уже твой — перекупать нечего.', false);
+        break;
+      case 'missing-lot':
         showNotice(
-          'Не хватает Пивкойнов — пойжем жоско в гамбу или забери Ежедневный вход, а этот привет подождёт.',
+          'Лот ещё не переехал в общее хранилище — покупка не записана, Пивкойны целы.',
           false
         );
-        return;
-      }
-      if (info.kind === 'unauthenticated') {
-        stashPendingBuy(id);
-        showNotice(
-          'СТРИМ ВКЛЮЧИЛСЯ, А ТЫ? Сессия кончилась — войди через Twitch, потом вернём к лоту.',
-          false
-        );
-        await signInWithTwitch(returnUrlForLot(id));
-        return;
-      }
-      switch (info.kind) {
-        case 'own-lot':
-          showNotice('Этот привет уже твой — перекупать нечего.', false);
-          break;
-        case 'missing-lot':
-          showNotice(
-            'Лот ещё не переехал в общее хранилище — покупка не записана, Пивкойны целы.',
-            false
-          );
-          break;
-        case 'price-cap':
-          showNotice('Цена упёрлась в потолок — дальше некуда, Пивкойны целы.', false);
-          break;
-        case 'offline':
-          showNotice('Сеть упала: покупка не записана, Пивкойны целы. Попробуй ещё.', false);
-          break;
-        default:
-          showNotice('Не записалось в общее хранилище — Пивкойны целы, попробуй ещё.', false);
-          break;
-      }
+        break;
+      case 'price-cap':
+        showNotice('Цена упёрлась в потолок — дальше некуда, Пивкойны целы.', false);
+        break;
+      case 'offline':
+        showNotice('Сеть упала: покупка не записана, Пивкойны целы. Попробуй ещё.', false);
+        break;
+      default:
+        showNotice('Не записалось в общее хранилище — Пивкойны целы, попробуй ещё.', false);
+        break;
     }
   });
 

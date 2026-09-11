@@ -20,7 +20,7 @@
  */
 
 import { getSessionUid, getSupabase } from './supabase';
-import { fetchLotCatalog, subscribeLots } from './lots';
+import { fetchLotCatalog, subscribeLots, onBought } from './lots';
 import { sellerLine, type OutbidEvent } from './outbid-event';
 import { playOutbidSound } from './outbid-sound';
 import { MAX_NOTICES, ensureCorner, makeRebuyButton, showNotice } from './outbid-notices';
@@ -348,9 +348,9 @@ export function initOutbidNotice(): void {
     });
     // Купил обратно — записи про этот лот не актуальны: убрать из истории
     // и закрыть висящие окошки.
-    window.addEventListener('alysque:bought', (e) => {
-      const id = (e as CustomEvent<{ id?: unknown }>).detail?.id;
-      if (typeof id !== 'string' || id.length === 0) return;
+    onBought((detail) => {
+      const id = detail.id;
+      if (id.length === 0) return;
       const before = history.length;
       for (let i = history.length - 1; i >= 0; i--) {
         if (history[i].slug === id) history.splice(i, 1);

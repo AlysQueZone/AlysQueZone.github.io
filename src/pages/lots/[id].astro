@@ -81,7 +81,7 @@ const base = import.meta.env.BASE_URL;
     fetchSharedHistory,
     getSessionUid,
   } from '@/lib/supabase';
-  import { fetchLotCatalog, subscribeLots } from '@/lib/lots';
+  import { fetchLotCatalog, subscribeLots, onBought } from '@/lib/lots';
 
   const section = document.querySelector('[data-lot-history]');
   const lotId = section instanceof HTMLElement ? (section.dataset.lotId ?? '') : '';
@@ -158,9 +158,9 @@ const base = import.meta.env.BASE_URL;
     }
   }
 
-  // Перерисовка — только от shared/Realtime; локальный инвентарь не читаем.
-  window.addEventListener('alysque:bought', (e) => {
-    if ((e as CustomEvent).detail?.id === lotId) {
+  // Перерисовка — только от каталога/Realtime; локальный инвентарь не читаем.
+  onBought((detail) => {
+    if (detail.id === lotId) {
       void refreshShared();
     }
   });

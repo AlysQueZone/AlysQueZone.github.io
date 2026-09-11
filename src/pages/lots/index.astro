@@ -45,7 +45,7 @@ const lots = await fetchCatalogLots();
   // Локальный инвентарь не читаем; перерисовка — от Realtime.
   // Без PUBLIC_SUPABASE_* — честная деградация: остаётся запечённый каталог.
   import { getSupabase, isSupabaseConfigured, getSessionUid } from '@/lib/supabase';
-  import { fetchLotCatalog, subscribeLots, type LotState } from '@/lib/lots';
+  import { fetchLotCatalog, subscribeLots, onBought, type LotState } from '@/lib/lots';
 
   const GUEST_TEXT = 'Войди через Twitch — тут будут твои приветы';
   const EMPTY_TEXT = 'Пока пусто — забери первый привет ниже';
@@ -163,8 +163,8 @@ const lots = await fetchCatalogLots();
       if (!document.hidden) void refresh();
     });
     window.addEventListener('focus', () => void refresh());
-    // Своя покупка — перезапрос shared (локальные данные события не используем).
-    window.addEventListener('alysque:bought', () => void refresh());
+    // Своя покупка — перезапрос каталога (локальные данные события не используем).
+    onBought(() => void refresh());
     // Вход/выход меняет только бейдж «ТВОЙ» и секцию «Мои приветы».
     getSupabase()?.auth.onAuthStateChange(() => void refresh());
   } else {

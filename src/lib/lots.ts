@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 
-import { getSupabase, subscribeSharedLots } from './supabase';
+import { getSupabase, subscribeSharedLots, buyLotShared } from './supabase';
 
 /**
  * Лот каталога: выставленный на бирже привет с видео.
@@ -197,4 +197,169 @@ export async function fetchLotState(slug: string, uid: string | null): Promise<L
  */
 export function subscribeLots(onChange: () => void, slug?: string): () => void {
   return subscribeSharedLots(onChange, slug);
+}
+
+// ---------------------------------------------------------------------------
+// Перекуп: выполнение покупки за одним швом.
+//
+// Контракт с БД (тикет 10, см. supabase/migrations/*_shared_lots.sql): клиент
+// делает один INSERT в purchases только с lot_id + buyer_uid. Цену,
+// identity, паузу, кап и гейт денег считает BEFORE-триггер — клиентские
+// значения игнорируются, итог — всегда price_paid сервера.
+// ---------------------------------------------------------------------------
+
+export type BuyErrorKind =
+  | 'cooldown'
+  | 'rate-limit'
+  | 'own-lot'
+  | 'insufficient-funds'
+  | 'unauthenticated'
+  | 'missing-lot'
+  | 'price-cap'
+  | 'offline'
+  | 'write-error';
+
+interface BuyErrorInfo {
+  kind: BuyErrorKind;
+  /** Для паузы — сколько секунд ждать (парсится из текста триггера). */
+  retryAfterSec?: number;
+  raw: string;
+}
+
+/** Запасная пауза, если текст триггера не распарсился (в миграции — 30с). */
+const BUY_COOLDOWN_FALLBACK_SEC = 30;
+
+function buyErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === 'object' && err !== null && 'message' in err) {
+    return String((err as { message: unknown }).message);
+  }
+  return String(err);
+}
+
+function parseCooldownSec(msg: string): number {
+  const hms = msg.match(/(\d+):(\d{2}):(\d{2})/);
+  if (hms) {
+    const sec = Number(hms[1]) * 3600 + Number(hms[2]) * 60 + Number(hms[3]);
+    if (Number.isFinite(sec) && sec > 0 && sec <= 3600) return sec;
+  }
+  const sec = msg.match(/(\d+)\s*(?:s|sec|сек)/i);
+  if (sec) {
+    const n = Number(sec[1]);
+    if (Number.isFinite(n) && n > 0 && n <= 3600) return n;
+  }
+  return BUY_COOLDOWN_FALLBACK_SEC;
+}
+
+/**
+ * Маппинг ошибок Postgres/триггера на честные виды.
+ * Матчится по коду/сообщению триггера: cooldown / rate limit /
+ * not authenticated (см. enforce_purchase_rules в миграциях).
+ */
+function mapBuyError(err: unknown): BuyErrorInfo {
+  const raw = buyErrorMessage(err);
+  const low = raw.toLowerCase();
+  if (low.includes('cooldown')) {
+    return { kind: 'cooldown', retryAfterSec: parseCooldownSec(raw), raw };
+  }
+  if (low.includes('rate limit') || low.includes('max ') || low.includes('too many')) {
+    return { kind: 'rate-limit', raw };
+  }
+  if (low.includes('already yours')) {
+    return { kind: 'own-lot', raw };
+  }
+  if (
+    low.includes('not authenticated') ||
+    low.includes('row-level security') ||
+    low.includes('jwt') ||
+    low.includes('no twitch identity')
+  ) {
+    return { kind: 'unauthenticated', raw };
+  }
+  if (low.includes('not found')) {
+    return { kind: 'missing-lot', raw };
+  }
+  if (low.includes('price cap')) {
+    return { kind: 'price-cap', raw };
+  }
+  // Деньги покупки — серверный гейт (тикет 08, BEFORE-триггер):
+  // счёта нет или баланса не хватило на серверную цену.
+  if (low.includes('insufficient funds') || low.includes('insufficient_funds')) {
+    return { kind: 'insufficient-funds', raw };
+  }
+  if (
+    low.includes('failed to fetch') ||
+    low.includes('networkerror') ||
+    low.includes('network error') ||
+    low.includes('load failed') ||
+    low.includes('offline') ||
+    err instanceof TypeError
+  ) {
+    return { kind: 'offline', raw };
+  }
+  return { kind: 'write-error', raw };
+}
+
+/**
+ * Итог перекупа: успех с фактически уплаченной серверной ценой
+ * либо блокировка с видом и сырым текстом сервера (raw — для отладки,
+ * показ пользуется kind).
+ */
+export type BuyResult =
+  | { status: 'ok'; paid: number; buyer: string }
+  | { status: 'blocked'; kind: BuyErrorKind; retryAfterSec?: number; raw: string };
+
+/**
+ * Перекуп одним вызовом: свежая N перед записью (проекция для показа —
+ * итог всё равно посчитает сервер), затем INSERT с ожиданием confirm.
+ * Доменные исходы не бросает — возвращает BuyResult; бросает только
+ * при ненастроенном хранилище (caller guards через isSupabaseConfigured).
+ */
+export async function buyLot(slug: string): Promise<BuyResult> {
+  const sb = getSupabase();
+  if (!sb) throw new Error('supabase not configured');
+  try {
+    const st = await fetchLotState(slug, null);
+    const staged = st?.nextPrice ?? null;
+    const done = await buyLotShared(slug);
+    const paid =
+      Number.isFinite(done.price_paid) && done.price_paid > 0 ? done.price_paid : (staged ?? 0);
+    return { status: 'ok', paid, buyer: done.buyer_login };
+  } catch (err) {
+    const info = mapBuyError(err);
+    return { status: 'blocked', kind: info.kind, retryAfterSec: info.retryAfterSec, raw: info.raw };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Событие «лот куплен»: кидает модалка после успеха, слушают витрина,
+// страница лота и колокол перекупов. Payload типизирован здесь —
+// рассинхрон комментария и кода (кейс 2026-09-11) больше не молчит.
+// ---------------------------------------------------------------------------
+
+/** Payload события «лот куплен»: какой лот и за сколько ушёл серверу. */
+export interface BoughtDetail {
+  id: string;
+  price: number;
+}
+
+/** Объявить покупку (из модалки после успеха). */
+export function announceBought(detail: BoughtDetail): void {
+  window.dispatchEvent(new CustomEvent('alysque:bought', { detail }));
+}
+
+/**
+ * Подписаться на покупки: чужая форма detail отбрасывается guard'ом.
+ * Возвращает функцию отписки.
+ */
+export function onBought(cb: (detail: BoughtDetail) => void): () => void {
+  const handler = (e: Event): void => {
+    const detail = (e as CustomEvent<unknown>).detail;
+    if (typeof detail !== 'object' || detail === null) return;
+    const { id, price } = detail as Record<string, unknown>;
+    if (typeof id !== 'string' || typeof price !== 'number') return;
+    cb({ id, price });
+  };
+  window.addEventListener('alysque:bought', handler);
+  return () => window.removeEventListener('alysque:bought', handler);
 }
