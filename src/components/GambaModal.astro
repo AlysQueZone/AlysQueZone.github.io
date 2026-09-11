@@ -8,7 +8,7 @@
  // атрибутом data-gamba-button сама откроет модалку (скрипт делегированный).
  //
  // Звуки — публичный бакет media (тикет 10, §3 спеки): абсолютные S3-URL без ${base}.
-import { S3_MEDIA_BASE, s3Sound } from '../lib/media.ts';
+import { s3Sound } from '../lib/media.ts';
 import {
   GAMBA_DAILY_LIMIT,
   GAMBA_JACKPOT_SOUNDS,
@@ -16,7 +16,6 @@ import {
   GAMBA_SPIN_SOUNDS,
   GAMBA_WIN_SOUNDS,
 } from '../lib/gamba.ts';
-const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
 /** Звуковые пулы — из констант lib/gamba.ts (единый источник правды). */
 const SPIN_POOL = GAMBA_SPIN_SOUNDS.map((f) => s3Sound(f)).join(',');
 const WIN_POOL = GAMBA_WIN_SOUNDS.map((f) => s3Sound(f)).join(',');
@@ -28,10 +27,6 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
 
 <div
   id="gamba-modal"
-  data-bg={`${S3_SOUNDS}/gamba-bg.mp3`}
-  data-win={`${S3_SOUNDS}/gamba-win1k.mp3`}
-  data-lose={`${S3_SOUNDS}/m4-scum.mp3`}
-  data-jackpot={`${S3_SOUNDS}/gamba-win100k.mp3`}
   data-limit={GAMBA_DAILY_LIMIT}
   data-spin-pool={SPIN_POOL}
   data-win-pool={WIN_POOL}
@@ -262,17 +257,14 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
     }
   }
 
-  /** Рандом-пулы звуков гамбы (Q1–Q2): равномерный выбор внутри категории. */
-  function pool(key: string, fallbackKey?: string): string[] {
+  /** Рандом-пулы звуков гамбы: равномерный выбор внутри категории. */
+  function pool(key: string): string[] {
     if (!modal) return [];
     const raw = modal.dataset[key] ?? '';
-    const list = raw
+    return raw
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean);
-    if (list.length > 0) return list;
-    const fb = fallbackKey ? modal.dataset[fallbackKey] : undefined;
-    return fb ? [fb] : [];
   }
 
   function pick<T>(list: T[]): T | undefined {
@@ -294,24 +286,10 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
     }
   }
 
-  function playBg(src: string | undefined): void {
-    stopAll();
-    if (!src) return;
-    try {
-      bgAudio = new Audio(src);
-      bgAudio.loop = true;
-      bgAudio.volume = 0.6;
-      const p = bgAudio.play();
-      if (p && typeof p.catch === 'function') p.catch(() => {});
-    } catch {
-      bgAudio = null;
-    }
-  }
-
   /** Случайная фраза кручения — one-shot поверх щелчков (gamba-bg — один из вариантов пула, не луп). */
   function playSpin(): void {
     stopAll();
-    const src = pick(pool('spinPool', 'bg'));
+    const src = pick(pool('spinPool'));
     if (!src) return;
     try {
       bgAudio = new Audio(src);
@@ -356,9 +334,9 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
     }
   }
 
-  /** Случайный исходник из пула категории (старые + новые равноправны). */
-  function playOutcomePool(poolKey: string, fallbackKey: string): void {
-    playOutcome(pick(pool(poolKey, fallbackKey)));
+  /** Случайный исходник из пула категории. */
+  function playOutcomePool(poolKey: string): void {
+    playOutcome(pick(pool(poolKey)));
   }
 
   function setBusy(busy: boolean): void {
@@ -453,13 +431,13 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
       // (худший исход таблицы I, мимо нет) — lose-пул; мелочь/крупно —
       // win-пул, джекпот — jackpot-пул. legacy miss — lose-пул.
       if (outcome === 'return' || outcome === 'miss') {
-        playOutcomePool('losePool', 'lose');
+        playOutcomePool('losePool');
       } else if (outcome === 'small' || outcome === 'big') {
-        playOutcomePool('winPool', 'win');
+        playOutcomePool('winPool');
       } else if (outcome === 'jackpot') {
-        playOutcomePool('jackpotPool', 'jackpot');
+        playOutcomePool('jackpotPool');
       } else {
-        playOutcomePool('losePool', 'lose');
+        playOutcomePool('losePool');
       }
       if (result) showOutcome(outcome);
       // Исход показан — ключ попытки истекает, следующий спин будет новым.
