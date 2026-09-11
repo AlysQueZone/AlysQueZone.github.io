@@ -7,10 +7,11 @@
  * Локальный кошелёк удалён в тикете 11 — денег в клиенте нет вовсе.
  *
  * Таблица выплат I — кран под прибором (ребаланс, тикет 08, seed-конфиг
- * в БД, `public.gamba_payouts`, ставка 100, кэп 10 спинов/сутки): минимум —
+ * в БД, `public.gamba_payouts`, ставка 100, кэп 20 спинов/сутки): минимум —
  * возврат 75% → 100 (при своих, net 0; мимо нет вовсе), мелочь 17% → 150
  * (+50), крупно 7% → 250 (+150), джекпот x10 1% → 1000 (EV ~128, было ~97.5
- * у H; доля «в плюсе» 25%). Печать worst-case ~59k ≈ стокам.
+ * у H; доля «в плюсе» 25%). Печать worst-case ~59k ≈ стокам при кэпе 5
+ * (при 20 — кратно выше, принято).
  * Секретов здесь нет: только publishable-ключ через getSupabase().
  */
 
@@ -22,7 +23,43 @@ export const GAMBA_STAKE = 100;
 
 /** Дневной лимит спинов — display-mirror, source of truth — DB (c_daily_limit в spin_gamba). */
 // display-mirror, source of truth — DB
-export const GAMBA_DAILY_LIMIT = 10;
+export const GAMBA_DAILY_LIMIT = 20;
+
+/**
+ * Звуковые пулы гамбы — единый источник правды (имена файлов в бакете
+ * media/sounds; URL собирает s3Sound() / GambaModal).
+ *
+ * Спин (кручение, случайный one-shot поверх щелчков): sova, maknagens,
+ * toptop, gamba-bg, win-taktak (последний исторически с префиксом win,
+ * по смыслу — фраза кручения «тактактакуе»).
+ * Выигрыш small/big, джекпот, проигрыш — свои пулы; возврат церемониально
+ * равен проигрышу (худший исход таблицы I, мимо нет) и звучит lose-пулом.
+ */
+export const GAMBA_SPIN_SOUNDS = [
+  'gamba-spin-sova.mp3',
+  'gamba-spin-maknagens.mp3',
+  'gamba-spin-toptop.mp3',
+  'gamba-bg.mp3',
+  'gamba-win-taktak.mp3',
+] as const;
+
+export const GAMBA_WIN_SOUNDS = [
+  'gamba-win1k.mp3',
+  'gamba-win-ideal.mp3',
+  'gamba-win-oooo.mp3',
+  'gamba-win-pivo.mp3',
+] as const;
+
+export const GAMBA_JACKPOT_SOUNDS = [
+  'gamba-win100k.mp3',
+  'gamba-super-vanna.mp3',
+  'gamba-super-snow.mp3',
+] as const;
+
+export const GAMBA_LOSE_SOUNDS = [
+  'm4-scum.mp3',
+  'gamba-lose-higan.mp3',
+] as const;
 
 export type GambaOutcome = 'miss' | 'return' | 'small' | 'big' | 'jackpot';
 

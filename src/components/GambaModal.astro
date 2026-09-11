@@ -8,9 +8,20 @@
  // атрибутом data-gamba-button сама откроет модалку (скрипт делегированный).
  //
  // Звуки — публичный бакет media (тикет 10, §3 спеки): абсолютные S3-URL без ${base}.
-import { S3_MEDIA_BASE } from '../lib/media.ts';
-import { GAMBA_DAILY_LIMIT } from '../lib/gamba.ts';
+import { S3_MEDIA_BASE, s3Sound } from '../lib/media.ts';
+import {
+  GAMBA_DAILY_LIMIT,
+  GAMBA_JACKPOT_SOUNDS,
+  GAMBA_LOSE_SOUNDS,
+  GAMBA_SPIN_SOUNDS,
+  GAMBA_WIN_SOUNDS,
+} from '../lib/gamba.ts';
 const S3_SOUNDS = `${S3_MEDIA_BASE}/sounds`;
+/** Звуковые пулы — из констант lib/gamba.ts (единый источник правды). */
+const SPIN_POOL = GAMBA_SPIN_SOUNDS.map((f) => s3Sound(f)).join(',');
+const WIN_POOL = GAMBA_WIN_SOUNDS.map((f) => s3Sound(f)).join(',');
+const JACKPOT_POOL = GAMBA_JACKPOT_SOUNDS.map((f) => s3Sound(f)).join(',');
+const LOSE_POOL = GAMBA_LOSE_SOUNDS.map((f) => s3Sound(f)).join(',');
 /** 7TV-эмоут GAMBA канала (ID проверен 2026-09-09 через 7TV API сета). */
 const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp';
 ---
@@ -21,10 +32,11 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
   data-win={`${S3_SOUNDS}/gamba-win1k.mp3`}
   data-lose={`${S3_SOUNDS}/m4-scum.mp3`}
   data-jackpot={`${S3_SOUNDS}/gamba-win100k.mp3`}
-  data-spin-pool={`${S3_SOUNDS}/gamba-spin-sova.mp3,${S3_SOUNDS}/gamba-spin-maknagens.mp3,${S3_SOUNDS}/gamba-spin-toptop.mp3,${S3_SOUNDS}/gamba-win-taktak.mp3`}
-  data-win-pool={`${S3_SOUNDS}/gamba-win1k.mp3,${S3_SOUNDS}/gamba-win-ideal.mp3,${S3_SOUNDS}/gamba-win-oooo.mp3,${S3_SOUNDS}/gamba-win-pivo.mp3`}
-  data-jackpot-pool={`${S3_SOUNDS}/gamba-win100k.mp3,${S3_SOUNDS}/gamba-super-vanna.mp3,${S3_SOUNDS}/gamba-super-snow.mp3`}
-  data-lose-pool={`${S3_SOUNDS}/m4-scum.mp3,${S3_SOUNDS}/gamba-lose-higan.mp3`}
+  data-limit={GAMBA_DAILY_LIMIT}
+  data-spin-pool={SPIN_POOL}
+  data-win-pool={WIN_POOL}
+  data-jackpot-pool={JACKPOT_POOL}
+  data-lose-pool={LOSE_POOL}
   class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4"
   role="dialog"
   aria-modal="true"
@@ -145,7 +157,8 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
     'В котле меньше сотни — ставка 100 не влезла. Забери Ежедневный вход и возвращайся пойжемать 🙂';
   const GUEST_TEXT = 'Гамба только для своих — войди через Twitch, и пойжем вместе 🍺';
   const RATE_TEXT = 'Не жми так жоско — дай колесу отдышаться пару секунд 🙂';
-  const LIMIT_TEXT = 'Счастливые спины на сегодня кончились (10 в день) — возвращайся завтра 🙂';
+  const limitN = modal?.dataset.limit ?? '20';
+  const LIMIT_TEXT = `Счастливые спины на сегодня кончились (${limitN} в день) — возвращайся завтра 🙂`;
   const OFFLINE_TEXT = 'Офлайн: спин не записан, Пивкойны целы. Вернись с сетью.';
   const ERROR_TEXT = 'Не крутанулось — Пивкойны целы, попробуй ещё.';
 
@@ -295,7 +308,7 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
     }
   }
 
-  /** Случайная фраза кручения — one-shot поверх щелчков, без лупа gamba-bg. */
+  /** Случайная фраза кручения — one-shot поверх щелчков (gamba-bg — один из вариантов пула, не луп). */
   function playSpin(): void {
     stopAll();
     const src = pick(pool('spinPool', 'bg'));
@@ -436,11 +449,11 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
       spinning = false;
       setBusy(false);
       if (!modal) return;
-      // Церемония по исходам (тикет 08): возврат — нейтральная фраза
-      // кручения (не win — при своих не победа), мелочь/крупно — win-пул,
-      // джекпот — jackpot-пул. legacy miss — lose-пул, новых не бывает.
-      if (outcome === 'return') {
-        playOutcomePool('spinPool', 'bg');
+      // Церемония по исходам: возврат церемониально равен проигрышу
+      // (худший исход таблицы I, мимо нет) — lose-пул; мелочь/крупно —
+      // win-пул, джекпот — jackpot-пул. legacy miss — lose-пул.
+      if (outcome === 'return' || outcome === 'miss') {
+        playOutcomePool('losePool', 'lose');
       } else if (outcome === 'small' || outcome === 'big') {
         playOutcomePool('winPool', 'win');
       } else if (outcome === 'jackpot') {
