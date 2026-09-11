@@ -1,5 +1,0 @@
-Gamba table F sim (ticket 16): stake 100, miss 30% -> 0, +50 40% -> 150, +200 22% -> 300, jackpot x10 8% -> 1000
-exact EV = 0.30*0 + 0.40*150 + 0.22*300 + 0.08*1000 = 206.0 per 100 stake
-MC N=1000000 (mulberry32 seed=16): mean=206.11, counts={"miss":300085,"small":399404,"big":220447,"jackpot":80064}
-share in-profit spins (small+big+jackpot) = 69.99% (expected 70%)
-conclusion: MC matches exact EV 206.0 within noise
