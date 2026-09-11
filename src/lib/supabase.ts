@@ -38,7 +38,9 @@ export function getSupabase(): SupabaseClient | null {
 }
 
 /** Ник Чатерса из метаданных Twitch (login — только снапшот, см. спеку). */
-export function displayLogin(user: { user_metadata?: Record<string, unknown> } | null | undefined): string {
+export function displayLogin(
+  user: { user_metadata?: Record<string, unknown> } | null | undefined
+): string {
   const md = user?.user_metadata ?? {};
   const cand = md['user_name'] ?? md['preferred_username'] ?? md['name'];
   return typeof cand === 'string' && cand.length > 0 ? cand : 'чатерс';
@@ -77,7 +79,7 @@ export function takePendingBuy(): string | null {
     fromStorage = sessionStorage.getItem(PENDING_BUY_KEY);
     sessionStorage.removeItem(PENDING_BUY_KEY);
   } catch {
-    fromStorage = null;
+    // приватный режим — возврат сработает через ?buy= в URL
   }
   if (typeof window === 'undefined') return fromStorage;
   const fromUrl = new URL(window.location.href).searchParams.get('buy');
@@ -165,7 +167,9 @@ export async function fetchSharedLots(): Promise<Map<string, SharedLotState>> {
       .select('slug,title,video_url,price,owner_login,owner_uid,updated_at');
     let rows: unknown = full.error ? null : full.data;
     if (!Array.isArray(rows)) {
-      const legacy = await sb.from('lots').select('slug,title,price,owner_login,owner_uid,updated_at');
+      const legacy = await sb
+        .from('lots')
+        .select('slug,title,price,owner_login,owner_uid,updated_at');
       if (legacy.error || !Array.isArray(legacy.data)) return empty;
       rows = legacy.data;
     }
@@ -187,7 +191,7 @@ export async function fetchSharedLots(): Promise<Map<string, SharedLotState>> {
  */
 export async function fetchSharedHistory(
   slug: string,
-  staticOwner: string | null,
+  staticOwner: string | null
 ): Promise<SharedHistoryEntry[]> {
   const sb = getSupabase();
   if (!sb) return [];
@@ -236,11 +240,11 @@ export function subscribeSharedLots(onChange: () => void, slug?: string): () => 
   const sb = getSupabase();
   if (!sb) return () => {};
   try {
-    const channel = sb.channel(
-      slug ? `alysque:lot:${slug}` : 'alysque:lots',
-      { config: { broadcast: { self: false } } },
-    );
-    const filter = slug ? { event: '*' as const, schema: 'public', table: 'lots', filter: `slug=eq.${slug}` }
+    const channel = sb.channel(slug ? `alysque:lot:${slug}` : 'alysque:lots', {
+      config: { broadcast: { self: false } },
+    });
+    const filter = slug
+      ? { event: '*' as const, schema: 'public', table: 'lots', filter: `slug=eq.${slug}` }
       : { event: '*' as const, schema: 'public', table: 'lots' };
     channel.on('postgres_changes', filter, () => onChange()).subscribe();
     return () => {

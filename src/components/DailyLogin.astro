@@ -14,7 +14,7 @@
 <div id="daily-notice-root" aria-live="polite"></div>
 
 <script>
-  import { getSupabase, isSupabaseConfigured } from '../lib/supabase.ts';
+  import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
   import {
     claimDaily,
     dayNumForStreak,
@@ -22,8 +22,8 @@
     markAutoDailyDay,
     readAutoDailyDay,
     todayUtcDate,
-  } from '../lib/daily.ts';
-  import { boom } from '../lib/confetti.ts';
+  } from '@/lib/daily';
+  import { boom } from '@/lib/confetti';
 
   function paintBalance(balance: number): void {
     document.querySelectorAll('[data-wallet-balance]').forEach((el) => {
@@ -43,8 +43,7 @@
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
     overlay.setAttribute('aria-label', 'Ежедневный вход');
-    overlay.className =
-      'fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4';
+    overlay.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4';
     const box = document.createElement('div');
     box.className = 'card-pixel w-full max-w-sm p-5 text-center';
     const headRow = document.createElement('div');

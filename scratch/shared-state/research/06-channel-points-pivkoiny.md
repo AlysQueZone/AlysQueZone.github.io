@@ -28,13 +28,13 @@
 
 Все URL ниже — `https://api.twitch.tv/helix/...`, во всех запросах заголовки `Authorization: Bearer <user-token>` + `Client-Id: <client-id>` (примеры — в референсе каждого эндпоинта, [Twitch API Reference](https://dev.twitch.tv/docs/api/reference/)).
 
-| Операция | Endpoint | Скоп |
-|---|---|---|
-| Создать награду | `POST /channel_points/custom_rewards?broadcaster_id=...` | `channel:manage:redemptions` |
-| Список наград | `GET /channel_points/custom_rewards?broadcaster_id=...` | `channel:read:redemptions` или `channel:manage:redemptions` |
-| Список обменов награды | `GET /channel_points/custom_rewards/redemptions?broadcaster_id=...&reward_id=...&status=UNFULFILLED` | `channel:read:redemptions` или `channel:manage:redemptions` |
-| Подтвердить/отменить обмен | `PATCH /channel_points/custom_rewards/redemptions?id=...&broadcaster_id=...&reward_id=...`, body `{"status":"FULFILLED"}` или `{"status":"CANCELED"}` | `channel:manage:redemptions` |
-| Изменить/удалить награду | `PATCH` / `DELETE /channel_points/custom_rewards?broadcaster_id=...&id=...` | `channel:manage:redemptions` |
+| Операция                   | Endpoint                                                                                                                                              | Скоп                                                        |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| Создать награду            | `POST /channel_points/custom_rewards?broadcaster_id=...`                                                                                              | `channel:manage:redemptions`                                |
+| Список наград              | `GET /channel_points/custom_rewards?broadcaster_id=...`                                                                                               | `channel:read:redemptions` или `channel:manage:redemptions` |
+| Список обменов награды     | `GET /channel_points/custom_rewards/redemptions?broadcaster_id=...&reward_id=...&status=UNFULFILLED`                                                  | `channel:read:redemptions` или `channel:manage:redemptions` |
+| Подтвердить/отменить обмен | `PATCH /channel_points/custom_rewards/redemptions?id=...&broadcaster_id=...&reward_id=...`, body `{"status":"FULFILLED"}` или `{"status":"CANCELED"}` | `channel:manage:redemptions`                                |
+| Изменить/удалить награду   | `PATCH` / `DELETE /channel_points/custom_rewards?broadcaster_id=...&id=...`                                                                           | `channel:manage:redemptions`                                |
 
 Соответствие скопов эндпоинтам зафиксировано в таблице скопов ([Scopes: channel:read:redemptions, channel:manage:redemptions](https://dev.twitch.tv/docs/authentication/scopes/)), требования каждого эндпоинта — в его секции референса ([Create Custom Rewards](https://dev.twitch.tv/docs/api/reference/#create-custom-rewards), [Get Custom Reward Redemption](https://dev.twitch.tv/docs/api/reference/#get-custom-reward-redemption), [Update Redemption Status](https://dev.twitch.tv/docs/api/reference/#update-redemption-status)).
 

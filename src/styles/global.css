@@ -1,12 +1,12 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @theme {
   /* Gamba-стиль C (прототип /prototype/fonts ?variant=C на ветке
      prototype/fonts): Press Start 2P — короткие заголовки/бейджи,
      Rubik — весь читаемый текст. Длинные строки (названия лотов,
      мем-тексты) пикселем не набираем — нечитаемо. */
-  --font-display: "Press Start 2P", "Rubik", system-ui, sans-serif;
-  --font-sans: "Rubik", system-ui, -apple-system, sans-serif;
+  --font-display: 'Press Start 2P', 'Rubik', system-ui, sans-serif;
+  --font-sans: 'Rubik', system-ui, -apple-system, sans-serif;
   /* D1 «Маджента CTA» финал (тикет 29, референс colors2.html ?variant=D1):
      фон #FFF6BF, бар #FFE4A6, карточки #FFE6AC + бордер #F0C46C.
      Старый CTA-токен перекрашен в мадженту. */
@@ -102,7 +102,9 @@
     font-weight: 900;
     text-transform: uppercase;
     cursor: pointer;
-    transition: transform 80ms steps(2, end), box-shadow 80ms steps(2, end);
+    transition:
+      transform 80ms steps(2, end),
+      box-shadow 80ms steps(2, end);
   }
 
   .btn-arcade:hover {
@@ -152,8 +154,14 @@
 
   /* Мигание в духе INSERT COIN: резкое, через steps. */
   @keyframes arcade-blink {
-    0%, 55% { opacity: 1; }
-    56%, 100% { opacity: 0.2; }
+    0%,
+    55% {
+      opacity: 1;
+    }
+    56%,
+    100% {
+      opacity: 0.2;
+    }
   }
 
   .animate-blink {
@@ -174,8 +182,12 @@
   }
 
   @keyframes marquee-scroll {
-    from { transform: translateX(0); }
-    to { transform: translateX(-50%); }
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {

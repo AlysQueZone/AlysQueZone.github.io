@@ -11,6 +11,7 @@ Status: resolved
 ## Done
 
 Прод: https://alysquezone.github.io/
+
 - `npm run build`: ок, 23 страницы.
 - `npm run deploy`: Published; `last-modified: Fri, 04 Sep 2026 20:37:43 GMT`.
 - `curl -sI`: `/` 200, `/lots/` 200, `/lots/lot-meme-myth/` 200.

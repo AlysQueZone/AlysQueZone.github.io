@@ -11,6 +11,7 @@ Status: resolved
 3. `npm run deploy` (build обязан проходить; при красном — блокер в тикет, не резолвить).
 4. Включить Pages (`gh api .../pages -X POST` с source `gh-pages`, path `/`), default branch → `main` (`gh repo edit ... --default-branch main`), подождать сборку (при зависании `building` — `POST pages/builds`).
 5. Проверить: `curl` `/` и `/lots/` → 200, 18 лотов в порядке (ЛУК → rare → common), contributors API — только `AlysQueZone`.
+
 - Кода и истории не править, `AGENTS.md` не трогать, человеку ничего не спрашивать.
 
 ## Acceptance

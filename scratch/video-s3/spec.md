@@ -20,13 +20,13 @@ UI-звуки — публичный бакет `media`; `data/lots.json` уда
   20 строк, вкл. `luk-legend` — его строка удаляется следующим шагом, backfill для него не нужен);
 - Обнулить сид-владельцев только у лотов без живых покупок:
   `update public.lots set owner_uid=null, owner_twitch_id=null, owner_login=null
-   where not exists (select 1 from public.purchases where lot_id = lots.id)`;
+ where not exists (select 1 from public.purchases where lot_id = lots.id)`;
 - Снос ЛУКа: `delete from public.lots where slug = 'luk-legend'`;
   `alter table public.lots drop column is_locked`;
   переписать `enforce_purchase_rules()` без `v_locked` (убрать select `is_locked` и exception
   `is not for sale`; пауза per-(user,lot), кап 10/10мин, цена +10% — без изменений);
 - Бакет: `insert into storage.buckets (id, name, public) values ('media','media',true)
-  on conflict (id) do nothing`
+on conflict (id) do nothing`
   (`file_size_limit`/mime — по документации creating-buckets; RLS не меняем:
   `lots_select_public` покрывает новые колонки; storage-политики не нужны —
   заливка идёт через Dashboard и обходит RLS).

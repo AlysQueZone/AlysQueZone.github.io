@@ -12,7 +12,7 @@
  * Секретов здесь нет: только publishable-ключ через getSupabase().
  */
 
-import { getSupabase } from './supabase.ts';
+import { getSupabase } from './supabase';
 
 /** Ключ локальной метки «автоклейм в этот UTC-день уже отработал». */
 export const AUTO_DAILY_KEY = 'alysque:daily-auto-day';
@@ -67,9 +67,7 @@ export function markAutoDailyDay(day: string = todayUtcDate()): void {
 }
 
 function asClaimRow(data: unknown): Record<string, unknown> | null {
-  const row = (Array.isArray(data) ? data[0] : data) as unknown as
-    | Record<string, unknown>
-    | null;
+  const row = (Array.isArray(data) ? data[0] : data) as unknown as Record<string, unknown> | null;
   return row && typeof row === 'object' ? row : null;
 }
 

@@ -14,7 +14,7 @@ Status: resolved
 - RLS не меняем (`lots_select_public` покрывает новые колонки; клиент их править не может). Маппинг видео — `UPDATE`-миграциями с `WHERE video_url IS NULL`.
 - Контракт фронта (для спеки): `data-lot-audio` → `data-lot-video` (кнопки, BuyModal celebrate, outbid-алерт читает из DOM как сейчас); `fetchSharedLots` селектит новые колонки; витрина умеет рисовать владельца NULL; `emotes.ts`-маппинг по slug не трогаем. `CONTEXT.md`: Мем-лот → «Лот с видео; при покупке играет своё видео», термин ЛУК удалён.
 - Разблокирует тикеты прототипа, ручного маппинга и пайплайна своих видео.
-Blocked by: 01, 02
+  Blocked by: 01, 02
 
 ## Question
 

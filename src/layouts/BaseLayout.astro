@@ -13,9 +13,9 @@ import '@fontsource/rubik/cyrillic-400.css';
 import '@fontsource/rubik/cyrillic-700.css';
 import '@fontsource/rubik/cyrillic-800.css';
 import '@fontsource/rubik/cyrillic-900.css';
-import GambaModal from '../components/GambaModal.astro';
-import DailyLogin from '../components/DailyLogin.astro';
-import AuthButton from '../components/AuthButton.astro';
+import GambaModal from '@/components/GambaModal.astro';
+import DailyLogin from '@/components/DailyLogin.astro';
+import AuthButton from '@/components/AuthButton.astro';
 
 interface Props {
   title?: string;
@@ -39,10 +39,11 @@ const base = import.meta.env.BASE_URL;
       aria-hidden="true"
       class="pointer-events-none fixed inset-0 -z-20 bg-cover bg-center bg-no-repeat"
       style={`background-image: url('${base}bg/sunflowers.webp')`}
-    >
-    </div>
-    <div aria-hidden="true" class="pointer-events-none fixed inset-0 -z-10 bg-[rgba(255,246,191,0.88)]">
-    </div>
+    ></div>
+    <div
+      aria-hidden="true"
+      class="pointer-events-none fixed inset-0 -z-10 bg-[rgba(255,246,191,0.88)]"
+    ></div>
     <header class="sticky top-0 z-10 border-b-4 border-milk bg-bar/95 backdrop-blur">
       <div class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-3">
         <a href={`${base}`} class="font-display text-xs tracking-wide uppercase">
@@ -56,7 +57,10 @@ const base = import.meta.env.BASE_URL;
           >
             🎰 гамба на пивкойны
           </button>
-          <div data-wallet-chip class="hidden items-center gap-2 border-[3px] border-milk bg-void px-3 py-1 text-sm font-black shadow-[3px_3px_0_rgb(66_32_6/0.9)]">
+          <div
+            data-wallet-chip
+            class="hidden items-center gap-2 border-[3px] border-milk bg-void px-3 py-1 text-sm font-black shadow-[3px_3px_0_rgb(66_32_6/0.9)]"
+          >
             <span class="text-melon">◉</span>
             <span data-wallet-balance>—</span>
             <span class="text-mist/70">Пивкойнов</span>
@@ -73,7 +77,14 @@ const base = import.meta.env.BASE_URL;
         строка живых правил (те же цифры, что в окне «Правила биржи»). -->
       <div class="marquee border-t-2 border-milk/20 bg-milk py-1" aria-hidden="true">
         <p class="marquee-track font-display text-[9px] text-cream uppercase">
-          <span data-deal-log-a class="mx-4">Комиссия биржи 7% &#9733; перекуп &#43;10% &#215;15, дальше &#43;1 &#9733; гамба до x10 &#183; 20 спинов в день &#9733; вход 200/200/250 &#9733;&nbsp;</span><span data-deal-log-b class="mx-4">Комиссия биржи 7% &#9733; перекуп &#43;10% &#215;15, дальше &#43;1 &#9733; гамба до x10 &#183; 20 спинов в день &#9733; вход 200/200/250 &#9733;&nbsp;</span>
+          <span data-deal-log-a class="mx-4">
+            Комиссия биржи 7% &#9733; перекуп &#43;10% &#215;15, дальше &#43;1 &#9733; гамба до x10
+            &#183; 20 спинов в день &#9733; вход 200/200/250 &#9733;&nbsp;
+          </span>
+          <span data-deal-log-b class="mx-4">
+            Комиссия биржи 7% &#9733; перекуп &#43;10% &#215;15, дальше &#43;1 &#9733; гамба до x10
+            &#183; 20 спинов в день &#9733; вход 200/200/250 &#9733;&nbsp;
+          </span>
         </p>
       </div>
     </header>
@@ -90,7 +101,8 @@ const base = import.meta.env.BASE_URL;
     >
       <div class="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
         <p class="text-sm font-bold text-milk">
-          🔊 Включи звук<br class="sm:hidden" />
+          🔊 Включи звук
+          <br class="sm:hidden" />
           <span class="sm:ml-3">🛡️ Без VPN часть штук может не грузиться</span>
         </p>
         <button
@@ -124,9 +136,9 @@ const base = import.meta.env.BASE_URL;
       });
     </script>
     <script>
-      import { getSupabase, getSessionUid, isSupabaseConfigured } from '../lib/supabase.ts';
-      import { fetchMyBalance, subscribeMyBalance } from '../lib/balance.ts';
-      import { initOutbidNotice } from '../lib/outbid-notice.ts';
+      import { getSupabase, getSessionUid, isSupabaseConfigured } from '@/lib/supabase';
+      import { fetchMyBalance, subscribeMyBalance } from '@/lib/balance';
+      import { initOutbidNotice } from '@/lib/outbid-notice';
       initOutbidNotice();
       // Бегущая строка-лог (ребаланс, тикет 06): последние ~10 сделок из
       // purchases (публичный SELECT) через realtime-подписку на INSERT.
@@ -171,7 +183,7 @@ const base = import.meta.env.BASE_URL;
             .on(
               'postgres_changes',
               { event: 'INSERT', schema: 'public', table: 'purchases' },
-              () => void refreshDealLog(),
+              () => void refreshDealLog()
             )
             .subscribe();
         } catch {
@@ -228,7 +240,6 @@ const base = import.meta.env.BASE_URL;
       getSupabase()?.auth.onAuthStateChange(() => {
         void resubscribe();
       });
-
     </script>
   </body>
 </html>

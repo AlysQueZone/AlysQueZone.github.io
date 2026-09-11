@@ -18,6 +18,7 @@ Status: resolved
 4. Включить Pages при нужде (`gh api repos/AlysQueZone/AlysQueZone.github.io/pages` GET, иначе POST с source `gh-pages`), затем `npm run deploy`.
 5. Проверить: `curl -sI https://alysquezone.github.io/` 200 + hero в HTML; подождать публикацию и перепроверить.
 6. `spec.md`: обновить 2–3 строки про прод-URL/base (минимум).
+
 - НЕ трогать: лоты, тему, компоненты, звуки, чужие тикеты. Кода страниц не править (при красном build — блокер в тикет, не резолвить).
 
 ## Acceptance

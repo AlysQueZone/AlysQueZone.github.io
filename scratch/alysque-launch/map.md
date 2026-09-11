@@ -20,6 +20,7 @@
 - [Финальная спека и порядок build-работ](scratch/alysque-launch/issues/06-final-spec-build-order.md): победитель A, buy-flow «всё в localStorage» + «Мои приветы» (термин в `CONTEXT.md`), теплые акценты, кодят субагенты, только GitHub Pages без Surge; выход — `spec.md` + build-тикеты 08–12.
 
 ## Not yet specified
+
 - Кастомный домен и SEO/шаринг в чат Twitch/Telegram — позже, пока fog.
 
 ## Out of scope

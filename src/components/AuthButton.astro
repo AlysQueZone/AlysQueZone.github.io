@@ -6,11 +6,7 @@
 ---
 
 <div data-auth class="flex items-center gap-2">
-  <button
-    type="button"
-    data-auth-login
-    class="btn-arcade bg-twitch px-4 py-2 text-xs text-white"
-  >
+  <button type="button" data-auth-login class="btn-arcade bg-twitch px-4 py-2 text-xs text-white">
     ▶ Войти через Twitch
   </button>
   <span data-auth-user-wrap class="hidden items-center gap-2">
@@ -37,7 +33,7 @@
     displayLogin,
     signInWithTwitch,
     signOut,
-  } from '../lib/supabase.ts';
+  } from '@/lib/supabase';
 
   const root = document.querySelector('[data-auth]');
   const loginBtn = root?.querySelector('[data-auth-login]');

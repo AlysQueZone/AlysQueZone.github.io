@@ -13,19 +13,19 @@
 
 ## Точные версии (npm registry на 2026-09-11, `npm view`)
 
-| Пакет | Версия | Роль |
-|---|---|---|
-| `eslint` | `10.10.0` → ставить `^10.10.0` | ядро, flat config |
-| `@eslint/js` | `10.0.1` → `^10.0.1` | `js.configs.recommended` |
-| `globals` | `17.12.0` → `^17.12.0` | `browser`/`node` globals для flat config |
-| `typescript-eslint` | `8.70.0` → `^8.70.0` | TS-плагин+парсер (рекомендовано вместо `@typescript-eslint/parser` отдельно) |
-| `eslint-plugin-astro` | `3.1.0` → `^3.1.0` (peer: `eslint >=10`, `typescript-eslint >=8.61.0`) | парсер `.astro` + `configs.recommended` |
-| `eslint-config-prettier` | `10.1.8` → `^10.1.8` | гасит конфликтующие стилистические правила, всегда последним |
-| `prettier` | `3.9.6` → `^3.9.6` | форматтер |
-| `prettier-plugin-astro` | `1.0.0` → `^1.0.0` (peer: `prettier ^3.5.3`) | парсер `.astro` для Prettier |
-| `prettier-plugin-tailwindcss` | `0.8.1` → `^0.8.1` (опционально) | сортировка классов, строго последним плагином |
-| `husky` | `9.1.7` → `^9.1.7` | менеджер хуков (`npx husky init`, скрипт `prepare`) |
-| `lint-staged` | `17.5.1` → `^17.5.1` | линт только staged-файлов |
+| Пакет                         | Версия                                                                 | Роль                                                                         |
+| ----------------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `eslint`                      | `10.10.0` → ставить `^10.10.0`                                         | ядро, flat config                                                            |
+| `@eslint/js`                  | `10.0.1` → `^10.0.1`                                                   | `js.configs.recommended`                                                     |
+| `globals`                     | `17.12.0` → `^17.12.0`                                                 | `browser`/`node` globals для flat config                                     |
+| `typescript-eslint`           | `8.70.0` → `^8.70.0`                                                   | TS-плагин+парсер (рекомендовано вместо `@typescript-eslint/parser` отдельно) |
+| `eslint-plugin-astro`         | `3.1.0` → `^3.1.0` (peer: `eslint >=10`, `typescript-eslint >=8.61.0`) | парсер `.astro` + `configs.recommended`                                      |
+| `eslint-config-prettier`      | `10.1.8` → `^10.1.8`                                                   | гасит конфликтующие стилистические правила, всегда последним                 |
+| `prettier`                    | `3.9.6` → `^3.9.6`                                                     | форматтер                                                                    |
+| `prettier-plugin-astro`       | `1.0.0` → `^1.0.0` (peer: `prettier ^3.5.3`)                           | парсер `.astro` для Prettier                                                 |
+| `prettier-plugin-tailwindcss` | `0.8.1` → `^0.8.1` (опционально)                                       | сортировка классов, строго последним плагином                                |
+| `husky`                       | `9.1.7` → `^9.1.7`                                                     | менеджер хуков (`npx husky init`, скрипт `prepare`)                          |
+| `lint-staged`                 | `17.5.1` → `^17.5.1`                                                   | линт только staged-файлов                                                    |
 
 TS-совместимость: `typescript-eslint@8.70.0` peer — `typescript >=4.8.4 <6.1.0`, наш `^5.7.3` покрыт.
 
@@ -91,9 +91,7 @@ export default {
     'prettier-plugin-astro',
     'prettier-plugin-tailwindcss', // обязан быть последним
   ],
-  overrides: [
-    { files: '*.astro', options: { parser: 'astro' } },
-  ],
+  overrides: [{ files: '*.astro', options: { parser: 'astro' } }],
 };
 ```
 
@@ -120,6 +118,7 @@ export default {
 ```
 
 `.husky/pre-commit`:
+
 ```sh
 npx lint-staged
 ```

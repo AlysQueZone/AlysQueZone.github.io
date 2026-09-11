@@ -9,6 +9,7 @@ Blocked by: 15, 16
 ## Факты разведки (проверены 2026-09-04)
 
 4 прямых линка `.../alert_orig.webm` (vp9+opus, ~9–10с, 284–768КБ) — качаются обычным curl, ffmpeg есть:
+
 - m1 `https://cdns.memealerts.com/p/66961426e904cc2377372321/a24b3e2f-5f63-42bc-b40a-346eb305464d/alert_orig.webm` — в кадре чат `@nyanyachos`, пишет `bEnDQuEt`. Лот rare 1200: id `lot-meme-nyachos`, title «Здраствуйте, nyanyachos», owner `bEnDQuEt`, history [{from `las1que`, to `bEnDQuEt`, price 900}], meme «@nyanyachos».
 - m2 `https://cdns.memealerts.com/p/672ba6a81135f4340a61a4d0/6e47bcfc-453d-47da-8b6f-958c2a25bc4a/alert_orig.webm` — чиби-аватарка машет, привет сразу нескольким. Лот rare 700: id `lot-meme-optom`, title «Привет сразу всем (оптом)», owner `foxindique`, history [{from `VandaLQuE`, to `foxindique`, price 500}], meme «оптовый привет».
 - m3 `https://cdns.memealerts.com/p/64f8378906d68898c5b8e508/2d11fea1-bda2-493a-9774-510e15c6a589/alert_orig.webm` — четыре кота смотрят на руку. Лот rare 800: id `lot-meme-mass`, title «Массовый привет (коты одобряют)», owner `coolbeback`, history [{from `4Deli`, to `coolbeback`, price 600}], meme «массовый привет».

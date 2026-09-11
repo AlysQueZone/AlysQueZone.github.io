@@ -10,7 +10,7 @@
  * - Секретов здесь нет: только publishable-ключ через getSupabase().
  */
 
-import { getSupabase } from './supabase.ts';
+import { getSupabase } from './supabase';
 
 /** Стартовый баланс — зеркало серверного дефолта (триггер handle_new_profile). */
 export const DB_START_BALANCE = 1000;
@@ -31,11 +31,7 @@ export async function fetchMyBalance(): Promise<number | null> {
     const { data: sessionData } = await sb.auth.getSession();
     const uid = sessionData.session?.user.id;
     if (!uid) return null;
-    const { data, error } = await sb
-      .from('profiles')
-      .select('balance')
-      .eq('user_id', uid)
-      .single();
+    const { data, error } = await sb.from('profiles').select('balance').eq('user_id', uid).single();
     if (error || !data) return null;
     const balance = Number((data as unknown as { balance: unknown }).balance);
     return Number.isFinite(balance) && balance >= 0 ? balance : null;
@@ -48,10 +44,7 @@ export async function fetchMyBalance(): Promise<number | null> {
  * Живая подписка на свой баланс (postgres_changes по public.profiles).
  * Без настроенного хранилища или uid — noop-отписка.
  */
-export function subscribeMyBalance(
-  uid: string,
-  onBalance: (balance: number) => void,
-): () => void {
+export function subscribeMyBalance(uid: string, onBalance: (balance: number) => void): () => void {
   const sb = getSupabase();
   if (!sb || !uid) return () => {};
   try {
@@ -71,7 +64,7 @@ export function subscribeMyBalance(
           const row = (payload.new ?? {}) as Record<string, unknown>;
           const balance = Number(row['balance']);
           if (Number.isFinite(balance) && balance >= 0) onBalance(balance);
-        },
+        }
       )
       .subscribe();
     return () => {

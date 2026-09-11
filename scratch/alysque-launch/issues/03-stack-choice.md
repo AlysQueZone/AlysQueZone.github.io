@@ -16,18 +16,19 @@ Blocked by: 01
 
 ### Решение: Astro + TypeScript + Tailwind CSS (через Vite-плагин)
 
-| Пакет | Версия (pin на 2026-09-04) | Источник |
-|---|---|---|
-| `astro` | `^7.2.9` (stable, релиз 27.08.2026; доки подтверждают линейку 7.2.x как latest) | `astrobuild.eu/en/releases` (live из withastro/astro), `docs.astro.build/en/upgrade-astro` |
-| `tailwindcss` | `^4.3.3` (stable, релиз 16.07.2026) | `github.com/tailwindlabs/tailwindcss/releases`, `tailwindcss.com/blog` |
-| `@tailwindcss/vite` | `^4.3.x` (та же линейка, что `tailwindcss`) | `tailwindcss.com` + `@tailwindcss/vite` поддерживает Vite 8 с v4.2.2 (`#19790`) |
-| `@astrojs/check` / `typescript` | `typescript ^5` (≥5.7; Next 16 требует минимум 5.1, Astro-гайды рекомендуют 5.7+) | `nextjs.org/docs/app/guides/upgrading/version-16`, Astro tutorial 2026 |
-| `gh-pages` | `^6.3.0` (latest) | `github.com/tschaub/gh-pages/releases` |
-| Node | 22 LTS (Astro 6+ дропнул Node 18/20; раннеры GitHub Actions в 2026 — Node 24) | Astro tutorial 2026 (`tech-insider.org`), Andy Nguyen guide 05.2026 |
+| Пакет                           | Версия (pin на 2026-09-04)                                                        | Источник                                                                                   |
+| ------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `astro`                         | `^7.2.9` (stable, релиз 27.08.2026; доки подтверждают линейку 7.2.x как latest)   | `astrobuild.eu/en/releases` (live из withastro/astro), `docs.astro.build/en/upgrade-astro` |
+| `tailwindcss`                   | `^4.3.3` (stable, релиз 16.07.2026)                                               | `github.com/tailwindlabs/tailwindcss/releases`, `tailwindcss.com/blog`                     |
+| `@tailwindcss/vite`             | `^4.3.x` (та же линейка, что `tailwindcss`)                                       | `tailwindcss.com` + `@tailwindcss/vite` поддерживает Vite 8 с v4.2.2 (`#19790`)            |
+| `@astrojs/check` / `typescript` | `typescript ^5` (≥5.7; Next 16 требует минимум 5.1, Astro-гайды рекомендуют 5.7+) | `nextjs.org/docs/app/guides/upgrading/version-16`, Astro tutorial 2026                     |
+| `gh-pages`                      | `^6.3.0` (latest)                                                                 | `github.com/tschaub/gh-pages/releases`                                                     |
+| Node                            | 22 LTS (Astro 6+ дропнул Node 18/20; раннеры GitHub Actions в 2026 — Node 24)     | Astro tutorial 2026 (`tech-insider.org`), Andy Nguyen guide 05.2026                        |
 
 Важное изменение 2025–2026: официальная интеграция `@astrojs/tailwind` **deprecated** — предпочтительный путь Tailwind 4 в Astro это Vite-плагин (`@tailwindcss/vite`) по styling-гайду (`docs.astro.build/en/guides/integrations-guide/tailwind` → redirect на `/en/guides/styling/#tailwind`). Конфиг Tailwind v3 (`tailwind.config.js`) отменён — дизайн-токены живут в CSS через `@theme` (CSS-first config, движок Oxide). Значит бренд-токены тикета 02 (`#9146FF`/`#0E0E10`/пивное золото) кладутся прямо в `src/styles/global.css` через `@theme`, без JS-конфига.
 
 Почему Astro под критерии тикета:
+
 - **Пара с GitHub Pages:** дефолтный артефакт Astro — `dist/`, команда `astro build` (`docs.astro.build/en/guides/deploy`: Build Command `astro build`, Publish directory `dist`); у Astro есть офиц. гайды деплоя и на GitHub Pages, и на Surge (`/en/guides/deploy/github`, `/en/guides/deploy/surge`) — оба исхода тикета 01 покрыты из коробки. Sub-path project site закрывается одной строкой `base: '/<repo>/'` в `astro.config.mjs`.
 - **РФ/статика:** чистый статический HTML в `dist/`, ноль обязательных внешних рантаймов/CDN — открывается везде, где открывается Pages (см. тикет 01).
 - **Скорость лендинга:** Astro рендерит `.astro`-компоненты в статический HTML на билде и по дефолту шипает **zero JS**; интерактив (модалка «Потратить N Пивкойнов?», тост, localStorage-баланс из тикета 04) — точечные `<script>`-острова/`client:*` только там, где нужно, без React-рантайма на каждой странице.
@@ -74,6 +75,7 @@ npm i -D gh-pages@^6.3.0
 ```
 
 `astro.config.mjs`:
+
 ```js
 import { defineConfig } from 'astro/config';
 import tailwindcss from '@tailwindcss/vite';
@@ -86,13 +88,16 @@ export default defineConfig({
 ```
 
 `package.json`:
+
 ```json
-{ "scripts": {
-  "dev": "astro dev",
-  "build": "astro build",
-  "preview": "astro preview",
-  "deploy": "npm run build && gh-pages -d dist"
-} }
+{
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "deploy": "npm run build && gh-pages -d dist"
+  }
+}
 ```
 
 Деплой — `npm run deploy` (URL `https://<user>.github.io/<repo>/`). Запасной Surge из тикета 01 без изменений: `npx --yes surge ./dist alysquezone.surge.sh` (у Astro есть офиц. Surge-гайд). Preview для зрителей — тоже через Surge (`pr-<N>-alysque.surge.sh`), т.к. у Pages нет нативного PR-preview.

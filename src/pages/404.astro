@@ -1,29 +1,27 @@
 ---
-import BaseLayout from '../layouts/BaseLayout.astro';
+import BaseLayout from '@/layouts/BaseLayout.astro';
 
 const base = import.meta.env.BASE_URL;
 ---
 
 <BaseLayout title="AlysQueZone — ТУТ ПУСТО, ЧАТ В ШОКЕ">
   <section class="mx-auto max-w-xl py-10 text-center">
-    <p class="font-display animate-blink text-4xl text-melon" aria-hidden="true">GAME OVER</p>
-    <p class="mt-4 text-7xl" aria-hidden="true">🧳</p>
+    <p class="font-display animate-blink text-4xl text-melon" aria-hidden="true">
+      GAME OVER
+    </p>
+    <p class="mt-4 text-7xl" aria-hidden="true">
+      🧳
+    </p>
     <h1 class="font-display mt-4 text-sm leading-loose uppercase">404. Привет не найден</h1>
     <p class="mt-4 text-mist/70">
-      Стрим включился, а ты? Такой страницы нет — видимо, привет увернулся как Gedo0.
-      Пойжем жоско обратно на биржу. Жду тебя 🙂🙂🙂
+      Стрим включился, а ты? Такой страницы нет — видимо, привет увернулся как Gedo0. Пойжем жоско
+      обратно на биржу. Жду тебя 🙂🙂🙂
     </p>
     <div class="mt-6 flex flex-wrap justify-center gap-4">
-      <a
-        href={`${base}lots/`}
-        class="btn-arcade btn-arcade-primary px-6 py-3"
-      >
+      <a href={`${base}lots/`} class="btn-arcade btn-arcade-primary px-6 py-3">
         ▶ На биржу
       </a>
-      <a
-        href={`${base}`}
-        class="btn-arcade btn-arcade-ghost px-6 py-3 text-mist/70"
-      >
+      <a href={`${base}`} class="btn-arcade btn-arcade-ghost px-6 py-3 text-mist/70">
         На главную
       </a>
     </div>

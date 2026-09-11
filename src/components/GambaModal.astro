@@ -1,21 +1,21 @@
 ---
- // Рулетка «гамба на пивкойны» (тикет 09, pivkoiny-backend): исход считает
- // сервер одним вызовом spin_gamba (ставка 100, дебет + кредит + возврат
- // исхода в одной транзакции), клиент лишь рисует присланное.
-  // Клиентского RNG и локальных грантов нет; локальный кошелёк удалён (тикет 11).
- //
- // Использование: положить <GambaModal /> в layout; кнопка в шапке с
- // атрибутом data-gamba-button сама откроет модалку (скрипт делегированный).
- //
- // Звуки — публичный бакет media (тикет 10, §3 спеки): абсолютные S3-URL без ${base}.
-import { s3Sound } from '../lib/media.ts';
+// Рулетка «гамба на пивкойны» (тикет 09, pivkoiny-backend): исход считает
+// сервер одним вызовом spin_gamba (ставка 100, дебет + кредит + возврат
+// исхода в одной транзакции), клиент лишь рисует присланное.
+// Клиентского RNG и локальных грантов нет; локальный кошелёк удалён (тикет 11).
+//
+// Использование: положить <GambaModal /> в layout; кнопка в шапке с
+// атрибутом data-gamba-button сама откроет модалку (скрипт делегированный).
+//
+// Звуки — публичный бакет media (тикет 10, §3 спеки): абсолютные S3-URL без ${base}.
+import { s3Sound } from '@/lib/media';
 import {
   GAMBA_DAILY_LIMIT,
   GAMBA_JACKPOT_SOUNDS,
   GAMBA_LOSE_SOUNDS,
   GAMBA_SPIN_SOUNDS,
   GAMBA_WIN_SOUNDS,
-} from '../lib/gamba.ts';
+} from '@/lib/gamba';
 /** Звуковые пулы — из констант lib/gamba.ts (единый источник правды). */
 const SPIN_POOL = GAMBA_SPIN_SOUNDS.map((f) => s3Sound(f)).join(',');
 const WIN_POOL = GAMBA_WIN_SOUNDS.map((f) => s3Sound(f)).join(',');
@@ -38,22 +38,19 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
   aria-labelledby="gamba-title"
 >
   <div class="card-pixel w-full max-w-md p-5 text-center">
-    <h3 id="gamba-title" class="font-display text-xs leading-relaxed uppercase">🎰 Гамба на пивкойны</h3>
+    <h3 id="gamba-title" class="font-display text-xs leading-relaxed uppercase">
+      🎰 Гамба на пивкойны
+    </h3>
     <div class="relative mx-auto mt-3 h-72 w-72 max-w-full">
       <canvas id="gamba-wheel" width="560" height="560" class="h-72 w-72 max-w-full"></canvas>
       <div
         aria-hidden="true"
         class="absolute top-0 left-1/2 -translate-x-1/2 border-x-12 border-t-20 border-x-transparent border-t-melon"
-      >
-      </div>
+      ></div>
     </div>
     <p id="gamba-result" class="mt-3 min-h-6 text-sm font-black" role="status"></p>
     <div class="mt-3 flex flex-wrap justify-center gap-3">
-      <button
-        id="gamba-spin"
-        type="button"
-        class="btn-arcade btn-arcade-primary px-6 py-2 text-sm"
-      >
+      <button id="gamba-spin" type="button" class="btn-arcade btn-arcade-primary px-6 py-2 text-sm">
         Крутить за 100
         <img
           src={GAMBA_URL}
@@ -80,8 +77,8 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
 </div>
 
 <script>
-  import { getSupabase, isSupabaseConfigured, signInWithTwitch } from '../lib/supabase.ts';
-  import { fetchMyBalance } from '../lib/balance.ts';
+  import { getSupabase, isSupabaseConfigured, signInWithTwitch } from '@/lib/supabase';
+  import { fetchMyBalance } from '@/lib/balance';
   import {
     GAMBA_PAYTABLE,
     GAMBA_STAKE,
@@ -91,7 +88,7 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
     spinGambaWithRetry,
     type GambaOutcome,
     type GambaPayRow,
-  } from '../lib/gamba.ts';
+  } from '@/lib/gamba';
 
   // 12 сегментов — визуальная аппроксимация таблицы I (тикет 08)
   // (9 возвратов / 1 мелкий / 1 крупный / 1 джекпот ≈ веса 75/17/7/1 —
@@ -121,7 +118,9 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
     return acc;
   }, {});
   if (_counts['R'] !== 9 || _counts['S'] !== 1 || _counts['B'] !== 1 || _counts['J'] !== 1) {
-    throw new Error(`bad WHEEL_PATTERN counts (R/S/B/J=${_counts['R']}/${_counts['S']}/${_counts['B']}/${_counts['J']})`);
+    throw new Error(
+      `bad WHEEL_PATTERN counts (R/S/B/J=${_counts['R']}/${_counts['S']}/${_counts['B']}/${_counts['J']})`
+    );
   }
   const SEGMENTS: WheelSegment[] = [...WHEEL_PATTERN].map((ch) => {
     const seg = SEGMENT_SPECS[ch];
@@ -198,8 +197,7 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
   let outcomeAudio: HTMLAudioElement | null = null;
   let tickCtx: AudioContext | null = null;
 
-  const ctx =
-    canvas instanceof HTMLCanvasElement ? canvas.getContext('2d') : null;
+  const ctx = canvas instanceof HTMLCanvasElement ? canvas.getContext('2d') : null;
 
   /** Рисует колесо, повёрнутое на angle (стрелка сверху). */
   function draw(angle: number): void {
@@ -385,7 +383,7 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
     // при раскатке, legacy miss): тогда крутим на случайный сегмент —
     // это лишь церемония, правду говорит только строка результата.
     const candidates = SEGMENTS.map((s, i) => (s.outcome === wheelOutcome ? i : -1)).filter(
-      (i) => i >= 0,
+      (i) => i >= 0
     );
     const target =
       candidates.length > 0
@@ -414,7 +412,7 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
       draw(angle);
       // Щелчок при проходе границы сегмента — по мере ease-out редеют сами.
       const idx = Math.floor(
-        (((-Math.PI / 2 - angle) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) / SEG,
+        ((((-Math.PI / 2 - angle) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) / SEG
       );
       if (idx !== lastTick) {
         lastTick = idx;
@@ -512,7 +510,7 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
     setBusy(true);
     if (result) result.textContent = 'Стучимся к серверу за исходом…';
     let spinOutcome: GambaOutcome;
-    let spinBalance: number | null = null;
+    let spinBalance: number | null;
     // Ключ держится на попытку: генерируется на спин, повтор той же попытки
     // (ретрай/офлайн-повтор в spinGambaWithRetry, следующий клик после ошибки
     // без исхода) шлёт ТОТ ЖЕ ключ. Истекает только после показанного исхода

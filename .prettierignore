@@ -1,0 +1,9 @@
+dist
+.astro
+node_modules
+public/*.mp3
+# legacy-архивы: не переформатировать (шум в диффе)
+scratch/alysque-launch/prototype/
+scratch/alysque-launch/research/chat-2864275043.json
+scratch/polish-01/prototype/
+scratch/video-s3/prototype/

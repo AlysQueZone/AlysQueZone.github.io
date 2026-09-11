@@ -8,7 +8,7 @@
 // Использование: положить <RulesModal /> на страницу с hero и повесить
 // data-rules-button на кнопку открытия — скрипт ниже делегированный.
 // Закрытие: «Понятно» / крестик / клик по затемнению / Escape.
-import { GAMBA_DAILY_LIMIT, GAMBA_PAYTABLE } from '../lib/gamba.ts';
+import { GAMBA_DAILY_LIMIT, GAMBA_PAYTABLE } from '@/lib/gamba';
 ---
 
 <div
@@ -36,34 +36,34 @@ import { GAMBA_DAILY_LIMIT, GAMBA_PAYTABLE } from '../lib/gamba.ts';
       <li>
         <p class="font-display text-[10px] uppercase text-ember">Комиссия биржи 7%</p>
         <p class="mt-1 text-mist/80">
-          Платит продавец из выручки (округление вверх, минимум 1), комиссия
-          сгорает. Покупатель платит ровно цену кнопки — без сюрпризов.
+          Платит продавец из выручки (округление вверх, минимум 1), комиссия сгорает. Покупатель
+          платит ровно цену кнопки — без сюрпризов.
         </p>
       </li>
       <li>
         <p class="font-display text-[10px] uppercase text-stream">Рост цены</p>
         <p class="mt-1 text-mist/80">
-          Первые 15 покупок лота поднимают цену на +10% (вверх, минимум +1),
-          дальше — ровно на +1. Разгоняй первым — топы не улетают.
+          Первые 15 покупок лота поднимают цену на +10% (вверх, минимум +1), дальше — ровно на +1.
+          Разгоняй первым — топы не улетают.
         </p>
       </li>
       <li>
-        <p class="font-display text-[10px] uppercase text-pivko">Гамба · ставка 100 · {GAMBA_DAILY_LIMIT} спинов в день</p>
+        <p class="font-display text-[10px] uppercase text-pivko">
+          Гамба · ставка 100 · {GAMBA_DAILY_LIMIT} спинов в день
+        </p>
         <ul data-rules-gamba class="mt-1 flex flex-col gap-1 text-mist/80">
-          {
-            GAMBA_PAYTABLE.map((row) => (
-              <li class="border-2 border-milk/60 bg-void px-2 py-1">
-                {row.label} — {row.chance}
-              </li>
-            ))
-          }
+          {GAMBA_PAYTABLE.map((row) => (
+            <li class="border-2 border-milk/60 bg-void px-2 py-1">
+              {row.label} — {row.chance}
+            </li>
+          ))}
         </ul>
       </li>
       <li>
         <p class="font-display text-[10px] uppercase text-rind">Ежедневный вход</p>
         <p class="mt-1 text-mist/80">
-          Дни 1–3: 200 / 200 / 250. Дальше: 150 / 200 / 250 / 500 (7-й день),
-          затем цикл заново. Старт — 1000. Пропуск streak не сбрасывает.
+          Дни 1–3: 200 / 200 / 250. Дальше: 150 / 200 / 250 / 500 (7-й день), затем цикл заново.
+          Старт — 1000. Пропуск streak не сбрасывает.
         </p>
       </li>
     </ul>
@@ -78,7 +78,7 @@ import { GAMBA_DAILY_LIMIT, GAMBA_PAYTABLE } from '../lib/gamba.ts';
 </div>
 
 <script>
-  import { fetchGambaPaytable, type GambaPayRow } from '../lib/gamba.ts';
+  import { fetchGambaPaytable, type GambaPayRow } from '@/lib/gamba';
 
   const modal = document.getElementById('rules-modal');
   const gambaList = modal?.querySelector('[data-rules-gamba]');

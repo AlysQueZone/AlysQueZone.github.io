@@ -22,19 +22,19 @@
 
 10 из чата VOD 2864275043 (черновики — `research/chatters.md`) + легендарный ЛУК:
 
-| id | title | owner | price | rarity |
-|---|---|---|---|---|
-| `lot-gedo-sleepy` | Спящий привет от Gedo0 | Gedo0 | 250 | common |
-| `lot-gedo-uvernulya` | Привет, который увернулся | Gedo0 | 300 | common |
-| `lot-gedo-flat` | Квартира в Москве (приму в дар) | Gedo0 | 800 | rare |
-| `lot-evil-friendship` | Дружба за 2 привета | evilzerg57 | 400 | common |
-| `lot-cool-holst` | Привет, который не купишь за 14 рублей | coolbeback | 350 | common |
-| `lot-gribo-calendar` | Календарный привет | gRiBoCheQuE | 300 | common |
-| `lot-vandal-privet` | Привет онлайновсеие чуваки | VandaLQuE | 600 | rare |
-| `lot-rush-podelu` | Привет мне по делу | andRushQuE | 200 | common |
-| `lot-las-skum` | Скум на привет | las1que | 150 | common |
-| `lot-andrew-37` | Привет от Андрюши №37 | Андрюша №37 | 100 | common |
-| `luk-legend` | ЛУК — хозяин не менялся | aLySQuE | 9999 | legendary, not_for_sale |
+| id                    | title                                  | owner       | price | rarity                  |
+| --------------------- | -------------------------------------- | ----------- | ----- | ----------------------- |
+| `lot-gedo-sleepy`     | Спящий привет от Gedo0                 | Gedo0       | 250   | common                  |
+| `lot-gedo-uvernulya`  | Привет, который увернулся              | Gedo0       | 300   | common                  |
+| `lot-gedo-flat`       | Квартира в Москве (приму в дар)        | Gedo0       | 800   | rare                    |
+| `lot-evil-friendship` | Дружба за 2 привета                    | evilzerg57  | 400   | common                  |
+| `lot-cool-holst`      | Привет, который не купишь за 14 рублей | coolbeback  | 350   | common                  |
+| `lot-gribo-calendar`  | Календарный привет                     | gRiBoCheQuE | 300   | common                  |
+| `lot-vandal-privet`   | Привет онлайновсеие чуваки             | VandaLQuE   | 600   | rare                    |
+| `lot-rush-podelu`     | Привет мне по делу                     | andRushQuE  | 200   | common                  |
+| `lot-las-skum`        | Скум на привет                         | las1que     | 150   | common                  |
+| `lot-andrew-37`       | Привет от Андрюши №37                  | Андрюша №37 | 100   | common                  |
+| `luk-legend`          | ЛУК — хозяин не менялся                | aLySQuE     | 9999  | legendary, not_for_sale |
 
 ## Фейк-покупка (финал, «всё вместе, но дешево»)
 

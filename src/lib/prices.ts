@@ -19,7 +19,7 @@
  * Секретов здесь нет: только publishable-ключ через getSupabase().
  */
 
-import { getSupabase, subscribeSharedLots } from './supabase.ts';
+import { getSupabase, subscribeSharedLots } from './supabase';
 
 /**
  * Живая цена лота: текущая + следующая (та, что уйдёт серверу).
@@ -57,9 +57,7 @@ export async function fetchLotPrices(): Promise<Map<string, LotPrice>> {
   const sb = getSupabase();
   if (!sb) return empty;
   try {
-    const fromView = await sb
-      .from(VIEW)
-      .select('slug,price,next_price,owner_login,owner_uid');
+    const fromView = await sb.from(VIEW).select('slug,price,next_price,owner_login,owner_uid');
     if (!fromView.error && Array.isArray(fromView.data)) {
       const map = new Map<string, LotPrice>();
       for (const row of fromView.data as unknown as PriceRow[]) {
@@ -134,7 +132,13 @@ export async function fetchLotPrice(slug: string): Promise<LotPrice | null> {
 /** Свежая N одного лота (перед записью). null — N неизвестна (вью нет) или перечитать не вышло, пишем по staged. */
 export async function fetchNextPrice(slug: string): Promise<number | null> {
   const row = await fetchLotPrice(slug);
-  if (!row || typeof row.nextPrice !== 'number' || !Number.isFinite(row.nextPrice) || row.nextPrice <= 0) return null;
+  if (
+    !row ||
+    typeof row.nextPrice !== 'number' ||
+    !Number.isFinite(row.nextPrice) ||
+    row.nextPrice <= 0
+  )
+    return null;
   return row.nextPrice;
 }
 

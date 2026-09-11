@@ -15,7 +15,7 @@
  * Секретов здесь нет: только publishable-ключ через getSupabase().
  */
 
-import { getSupabase } from './supabase.ts';
+import { getSupabase } from './supabase';
 
 /** Фиксированная ставка Гамбы — display-mirror, source of truth — DB (c_stake в spin_gamba). */
 // display-mirror, source of truth — DB
@@ -56,10 +56,7 @@ export const GAMBA_JACKPOT_SOUNDS = [
   'gamba-super-snow.mp3',
 ] as const;
 
-export const GAMBA_LOSE_SOUNDS = [
-  'm4-scum.mp3',
-  'gamba-lose-higan.mp3',
-] as const;
+export const GAMBA_LOSE_SOUNDS = ['m4-scum.mp3', 'gamba-lose-higan.mp3'] as const;
 
 export type GambaOutcome = 'miss' | 'return' | 'small' | 'big' | 'jackpot';
 
@@ -184,7 +181,7 @@ export interface GambaRetryOptions {
  */
 export async function spinGambaWithRetry(
   idempotencyKey: string,
-  opts?: GambaRetryOptions,
+  opts?: GambaRetryOptions
 ): Promise<GambaSpinResult> {
   const retries = Math.max(0, opts?.retries ?? 1);
   let lastErr: unknown = null;

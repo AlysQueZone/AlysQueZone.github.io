@@ -20,12 +20,14 @@ Blocked by: 09, 10, 11
 Pages включён на ветку `gh-pages` (source `/`).
 
 Деплой-фиксы (не код страниц, только plumbing, закоммичены рядом):
+
 - `public/.nojekyll` (новый, пустой): без него Pages прогонял ветку через Jekyll
   и резал `_astro/` (все JS/CSS давали 404, сайт был нестилизован и мёртв).
 - `package.json` `deploy`: добавлен флаг `--dotfiles` (`gh-pages -d dist` по
   умолчанию не публикует dotfiles, и `.nojekyll` не улетал).
 
 curl (2026-09-04 ~17:50 UTC):
+
 - `GET /AlysQueZone/` → 200, `content-type: text/html; charset=utf-8`; в HTML есть
   hero («БИРЖА ПРИВЕТОВ», «Стрим включился, а ты?», «продам привет»).
 - `GET /AlysQueZone/lots/` → 200; в HTML есть лоты (Gedo0, ЛУК, «Скум на привет»).
@@ -34,13 +36,15 @@ curl (2026-09-04 ~17:50 UTC):
 - `_astro/*.js` → 200 `application/javascript`, `_astro/*.css` → 200 `text/css`.
 
 check-host.net (`check-http`, 2 прогона, ~17:44 и ~17:45 UTC):
+
 - ru2 (Moscow, AS210644) → OK 200 (~0.13s) — оба прогона.
 - ru3 (Saint Petersburg, AS210644) → OK 200 (~0.05–0.11s) — оба прогона.
 - ru1 (Moscow, AS14576) → Connect timeout — оба прогона.
-Итог: 2/3 RU-точек открывают прод, тотального блока нет (картина как в тикете 01:
-точечная деградация, не блок). request_id: `4a0344bck847`, `4a034ad8k8d1`.
+  Итог: 2/3 RU-точек открывают прод, тотального блока нет (картина как в тикете 01:
+  точечная деградация, не блок). request_id: `4a0344bck847`, `4a034ad8k8d1`.
 
 Headless e2e на проде (chromium + playwright-core):
+
 - лендинг/биржа/карточка — 200, hero и карточка видны;
 - клик «Купить» → модалка «Потратить 150 Пивкойнов? Владелец: las1que»;
 - «Да, забираю» → баланс 1000→850, `pivkoiny_inventory=["lot-las-skum"]`,

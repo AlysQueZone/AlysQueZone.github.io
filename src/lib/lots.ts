@@ -20,7 +20,7 @@ function buildEnv(): { url: string; key: string } {
   if (!url || !key) {
     throw new Error(
       'SSG каталога требует PUBLIC_SUPABASE_URL и PUBLIC_SUPABASE_PUBLISHABLE_KEY ' +
-        '(тикет 09): каталог — из БД, статического фолбэка нет.',
+        '(тикет 09): каталог — из БД, статического фолбэка нет.'
     );
   }
   return { url, key };
@@ -55,7 +55,7 @@ export async function fetchCatalogLots(): Promise<Lot[]> {
   // NB: postgrest-js игнорирует `signal` в опциях .select() — рабочий API
   // только .abortSignal() (тикет 11, drive-by: иначе SSG виснет навсегда).
   const signal = AbortSignal.timeout(20000);
-  let rows: LotRow[] | null = null;
+  let rows: LotRow[];
   const full = await sb
     .from('lots')
     .select('slug,title,video_url,price,owner_login,owner_uid,updated_at')
@@ -66,7 +66,7 @@ export async function fetchCatalogLots(): Promise<Lot[]> {
     const legacy = await sb.from('lots').select('slug,title,price,owner_login').abortSignal(signal);
     if (legacy.error || !Array.isArray(legacy.data)) {
       throw new Error(
-        `SSG каталога: не смог прочитать таблицу lots из БД: ${legacy.error?.message ?? full.error?.message ?? 'unknown'}`,
+        `SSG каталога: не смог прочитать таблицу lots из БД: ${legacy.error?.message ?? full.error?.message ?? 'unknown'}`
       );
     }
     rows = legacy.data as unknown as LotRow[];

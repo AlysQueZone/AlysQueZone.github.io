@@ -4,23 +4,23 @@
 
 ## 1. Инвентарь `public/sounds/` (15 файлов, ~1.08 МБ суммарно)
 
-| Файл | Размер | Где используется |
-|---|---|---|
-| `clap.mp3` | 24 808 | `BuyModal.astro` (`data-clap-sound`), фолбэк для лотов без своего звука |
-| `gamba-bg.mp3` | 100 486 | `GambaModal.astro` (`data-bg`, фон крутки) |
-| `gamba-win1k.mp3` | 21 603 | `GambaModal.astro` (`data-win1k`) |
-| `gamba-win100k.mp3` | 124 275 | `GambaModal.astro` (`data-win100k`) |
-| `m4-scum.mp3` | 85 251 | `GambaModal.astro` (`data-lose`) — в `data/lots.json` НЕ используется |
-| `outbid.mp3` | 46 073 | `src/lib/outbid-notice.ts` (`soundUrl()`) |
-| `m1-nyachos.mp3` | 142 947 | `data/lots.json` → `lot-meme-nyachos` |
-| `m2-optom.mp3` | 86 499 | `data/lots.json` → `lot-meme-optom` |
-| `m3-mass.mp3` | 85 563 | `data/lots.json` → `lot-meme-mass` |
-| `n1-repeat.mp3` | 71 139 | `data/lots.json` → `lot-meme-repeat` |
-| `n2-remolol.mp3` | 31 707 | `data/lots.json` → `lot-meme-remolol` |
-| `n3-salat.mp3` | 59 139 | `data/lots.json` → `lot-meme-salat` |
-| `n4-quevizar.mp3` | 40 443 | `data/lots.json` → `lot-meme-quevizar` |
-| `r1-myth.mp3` | 104 619 | `data/lots.json` → `lot-meme-myth` |
-| `r2-evilzeg.mp3` | 57 675 | `data/lots.json` → `lot-meme-evilzeg` |
+| Файл                | Размер  | Где используется                                                        |
+| ------------------- | ------- | ----------------------------------------------------------------------- |
+| `clap.mp3`          | 24 808  | `BuyModal.astro` (`data-clap-sound`), фолбэк для лотов без своего звука |
+| `gamba-bg.mp3`      | 100 486 | `GambaModal.astro` (`data-bg`, фон крутки)                              |
+| `gamba-win1k.mp3`   | 21 603  | `GambaModal.astro` (`data-win1k`)                                       |
+| `gamba-win100k.mp3` | 124 275 | `GambaModal.astro` (`data-win100k`)                                     |
+| `m4-scum.mp3`       | 85 251  | `GambaModal.astro` (`data-lose`) — в `data/lots.json` НЕ используется   |
+| `outbid.mp3`        | 46 073  | `src/lib/outbid-notice.ts` (`soundUrl()`)                               |
+| `m1-nyachos.mp3`    | 142 947 | `data/lots.json` → `lot-meme-nyachos`                                   |
+| `m2-optom.mp3`      | 86 499  | `data/lots.json` → `lot-meme-optom`                                     |
+| `m3-mass.mp3`       | 85 563  | `data/lots.json` → `lot-meme-mass`                                      |
+| `n1-repeat.mp3`     | 71 139  | `data/lots.json` → `lot-meme-repeat`                                    |
+| `n2-remolol.mp3`    | 31 707  | `data/lots.json` → `lot-meme-remolol`                                   |
+| `n3-salat.mp3`      | 59 139  | `data/lots.json` → `lot-meme-salat`                                     |
+| `n4-quevizar.mp3`   | 40 443  | `data/lots.json` → `lot-meme-quevizar`                                  |
+| `r1-myth.mp3`       | 104 619 | `data/lots.json` → `lot-meme-myth`                                      |
+| `r2-evilzeg.mp3`    | 57 675  | `data/lots.json` → `lot-meme-evilzeg`                                   |
 
 Все текущие ссылки строятся как `${base}sounds/<file>.mp3`, где `base = import.meta.env.BASE_URL` (`astro.config.mjs`: `base: '/'`).
 В `lots.json` пути хранятся без base (`sounds/m1-nyachos.mp3`), base подставляется при рендере (`LotCard.astro`, кнопки `data-lot-audio`).

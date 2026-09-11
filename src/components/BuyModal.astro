@@ -8,8 +8,8 @@
 // При покупке играет видео лота со звуком (видимо, в уведомлении); без video_url — clap с S3.
 // Клик по такой кнопке сам откроет модалку — скрипт ниже делегированный.
 // После покупки кидается window CustomEvent('alysque:bought', { detail: { id } }).
-import { ALYSQUE_CLAP_DARK } from '../lib/emotes.ts';
-import { s3Sound } from '../lib/media.ts';
+import { ALYSQUE_CLAP_DARK } from '@/lib/emotes';
+import { s3Sound } from '@/lib/media';
 
 // UI-звуки — публичный бакет media (тикет 10, §3 спеки): абсолютный S3-URL без ${base}.
 const clapSound = s3Sound('clap.mp3');
@@ -25,8 +25,17 @@ const clapSound = s3Sound('clap.mp3');
 >
   <div class="card-pixel w-full max-w-sm p-5">
     <div class="flex items-center gap-3">
-      <img src={ALYSQUE_CLAP_DARK} alt="alysqueCLAP" width="56" height="56" loading="lazy" class="h-14 w-14 shrink-0 border-2 border-milk object-contain" />
-      <h3 id="buy-modal-title" class="font-display text-[11px] leading-relaxed uppercase">Купить привет?</h3>
+      <img
+        src={ALYSQUE_CLAP_DARK}
+        alt="alysqueCLAP"
+        width="56"
+        height="56"
+        loading="lazy"
+        class="h-14 w-14 shrink-0 border-2 border-milk object-contain"
+      />
+      <h3 id="buy-modal-title" class="font-display text-[11px] leading-relaxed uppercase">
+        Купить привет?
+      </h3>
     </div>
     <p id="buy-modal-text" class="mt-2 text-sm font-bold text-mist"></p>
     <div class="mt-4 flex flex-wrap gap-3">
@@ -59,8 +68,8 @@ const clapSound = s3Sound('clap.mp3');
   // funds`), итог — price_paid сервера, N — из прайс-фида БД (тикет 11).
   // Локальный кошелёк удалён, фолбэка без настроенного хранилища нет:
   // подтверждать нечему — говорим честно.
-  import { boom } from '../lib/confetti.ts';
-  import { fetchLotPrice, fetchNextPrice } from '../lib/prices.ts';
+  import { boom } from '@/lib/confetti';
+  import { fetchLotPrice, fetchNextPrice } from '@/lib/prices';
   import {
     getSupabase,
     isSupabaseConfigured,
@@ -73,7 +82,7 @@ const clapSound = s3Sound('clap.mp3');
     fetchSharedHistory,
     getSessionUid,
     subscribeSharedLots,
-  } from '../lib/supabase.ts';
+  } from '@/lib/supabase';
 
   const modal = document.getElementById('buy-modal');
   const modalText = document.getElementById('buy-modal-text');
@@ -82,7 +91,8 @@ const clapSound = s3Sound('clap.mp3');
   const noBtn = document.getElementById('buy-modal-no');
   const notice = document.getElementById('buy-notice');
 
-  let pending: { id: string; title: string; price: number; owner: string; video?: string } | null = null;
+  let pending: { id: string; title: string; price: number; owner: string; video?: string } | null =
+    null;
   let noticeTimer: number | undefined;
   let pauseTimer: number | undefined;
   /** Сколько секунд паузы осталось на кнопке (0 — кнопка свободна). */
@@ -126,16 +136,28 @@ const clapSound = s3Sound('clap.mp3');
    *  Итог — фактически уплаченная серверная цена + confetti + видео лота
    *  в уведомлении (без video_url — clap с S3). «Мои приветы» обновит
    *  витрина из shared по событию. */
-  function celebrate(entry: { id: string; title: string; price: number; owner: string; video?: string }): void {
+  function celebrate(entry: {
+    id: string;
+    title: string;
+    price: number;
+    owner: string;
+    video?: string;
+  }): void {
     closeModal();
     boom();
     if (entry.video) {
-      showNotice(`ЗАБРАЛ! Привет твой: ${entry.title} — ушло ${entry.price} Пивкойнов`, true, entry.video);
+      showNotice(
+        `ЗАБРАЛ! Привет твой: ${entry.title} — ушло ${entry.price} Пивкойнов`,
+        true,
+        entry.video
+      );
     } else {
       playClapFallback();
       showNotice(`ЗАБРАЛ! Привет твой: ${entry.title} — ушло ${entry.price} Пивкойнов`, true);
     }
-    window.dispatchEvent(new CustomEvent('alysque:bought', { detail: { id: entry.id, price: entry.price } }));
+    window.dispatchEvent(
+      new CustomEvent('alysque:bought', { detail: { id: entry.id, price: entry.price } })
+    );
   }
 
   function showNotice(text: string, ok: boolean, videoUrl?: string): void {
@@ -153,7 +175,7 @@ const clapSound = s3Sound('clap.mp3');
       'text-base',
       'text-lg',
       'top-1/2',
-      '-translate-y-1/2',
+      '-translate-y-1/2'
     );
     notice.classList.add('bottom-16');
     const span = document.createElement('span');
@@ -170,7 +192,7 @@ const clapSound = s3Sound('clap.mp3');
         'gap-2',
         'text-lg',
         'top-1/2',
-        '-translate-y-1/2',
+        '-translate-y-1/2'
       );
       const video = document.createElement('video');
       video.src = videoUrl;
@@ -397,7 +419,10 @@ const clapSound = s3Sound('clap.mp3');
       const { data } = (await sb?.auth.getSession()) ?? { data: { session: null } };
       if (!data.session) {
         stashPendingBuy(id);
-        showNotice('СТРИМ ВКЛЮЧИЛСЯ, А ТЫ? Сначала вход через Twitch — потом вернём к лоту.', false);
+        showNotice(
+          'СТРИМ ВКЛЮЧИЛСЯ, А ТЫ? Сначала вход через Twitch — потом вернём к лоту.',
+          false
+        );
         await signInWithTwitch(returnUrlForLot(id));
         return;
       }
@@ -432,7 +457,10 @@ const clapSound = s3Sound('clap.mp3');
     const { data } = (await sb?.auth.getSession()) ?? { data: { session: null } };
     if (!data.session) {
       stashPendingBuy(id);
-      showNotice('СТРИМ ВКЛЮЧИЛСЯ, А ТЫ? Сессия кончилась — войди через Twitch, потом вернём к лоту.', false);
+      showNotice(
+        'СТРИМ ВКЛЮЧИЛСЯ, А ТЫ? Сессия кончилась — войди через Twitch, потом вернём к лоту.',
+        false
+      );
       await signInWithTwitch(returnUrlForLot(id));
       return;
     }
@@ -447,7 +475,8 @@ const clapSound = s3Sound('clap.mp3');
         pending.price = fresh;
       }
       const done = await buyLotShared(id);
-      const paid = Number.isFinite(done.price_paid) && done.price_paid > 0 ? done.price_paid : price;
+      const paid =
+        Number.isFinite(done.price_paid) && done.price_paid > 0 ? done.price_paid : price;
       celebrate({ id, title, price: paid, owner, video });
     } catch (err) {
       const info = mapBuyError(err);
@@ -463,12 +492,18 @@ const clapSound = s3Sound('clap.mp3');
       restoreBuyButton();
       if (info.kind === 'insufficient-funds') {
         closeModal();
-        showNotice('Не хватает Пивкойнов — пойжем жоско в гамбу или забери Ежедневный вход, а этот привет подождёт.', false);
+        showNotice(
+          'Не хватает Пивкойнов — пойжем жоско в гамбу или забери Ежедневный вход, а этот привет подождёт.',
+          false
+        );
         return;
       }
       if (info.kind === 'unauthenticated') {
         stashPendingBuy(id);
-        showNotice('СТРИМ ВКЛЮЧИЛСЯ, А ТЫ? Сессия кончилась — войди через Twitch, потом вернём к лоту.', false);
+        showNotice(
+          'СТРИМ ВКЛЮЧИЛСЯ, А ТЫ? Сессия кончилась — войди через Twitch, потом вернём к лоту.',
+          false
+        );
         await signInWithTwitch(returnUrlForLot(id));
         return;
       }
@@ -477,7 +512,10 @@ const clapSound = s3Sound('clap.mp3');
           showNotice('Этот привет уже твой — перекупать нечего.', false);
           break;
         case 'missing-lot':
-          showNotice('Лот ещё не переехал в общее хранилище — покупка не записана, Пивкойны целы.', false);
+          showNotice(
+            'Лот ещё не переехал в общее хранилище — покупка не записана, Пивкойны целы.',
+            false
+          );
           break;
         case 'price-cap':
           showNotice('Цена упёрлась в потолок — дальше некуда, Пивкойны целы.', false);
