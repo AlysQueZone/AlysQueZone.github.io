@@ -15,13 +15,13 @@
  * - колокольчик в шапке: счётчик непрочитанных + панель истории за сессию
  *   (макс 10, у каждой записи кнопка перекупа). Только залогиненным.
  *
- * Свой Realtime-канал на таблицу лотов (`subscribeSharedLots` не трогаем,
- * отсюда только `getSessionUid`/`getSupabase`).
+ * Свой Realtime-канал на таблицу лотов (плюс общий тик через subscribeLots
+ * из lib/lots.ts для живых цен кнопок возврата).
  */
 
-import { getSessionUid, getSupabase, fetchSharedLots, subscribeSharedLots } from './supabase';
-import { fetchLotPrices } from './prices';
-import { resolveTitle, sellerLine, type OutbidEvent } from './outbid-event';
+import { getSessionUid, getSupabase } from './supabase';
+import { fetchLotCatalog, subscribeLots } from './lots';
+import { sellerLine, type OutbidEvent } from './outbid-event';
 import { playOutbidSound } from './outbid-sound';
 import { MAX_NOTICES, ensureCorner, makeRebuyButton, showNotice } from './outbid-notices';
 
@@ -30,9 +30,11 @@ const BELL_ID = 'outbid-bell';
 const BELL_COUNT_ID = 'outbid-bell-count';
 const BELL_PANEL_ID = 'outbid-bell-panel';
 
-/** Живая N из прайс-фида БД (src/lib/prices.ts): slug → следующая цена.
+/** Живая N из каталога БД (src/lib/lots.ts): slug → следующая цена.
  *  Формулы в клиенте нет — карту наполняет refreshPrices() по подписке. */
 const liveNext = new Map<string, number>();
+/** Названия лотов из того же каталога — событие резолвится без чтения DOM. */
+const liveTitles = new Map<string, string>();
 
 /** Один раз за страницу. Повторный вызов — noop. */
 export function initOutbidNotice(): void {
@@ -204,16 +206,18 @@ export function initOutbidNotice(): void {
     });
   }
 
-  /** Перечитать N из БД и освежить живые кнопки (+ открытую панель колокола). */
+  /** Перечитать каталог из БД и освежить живые кнопки (+ открытую панель колокола). */
   async function refreshPrices(): Promise<void> {
     try {
-      const map = await fetchLotPrices();
+      const catalog = await fetchLotCatalog(null);
       liveNext.clear();
-      for (const [slug, p] of map) {
+      liveTitles.clear();
+      for (const [slug, st] of catalog) {
         // null (вью отсутствует) — в карту не кладём: показ даст «…», не враньё на шаг.
-        if (typeof p.nextPrice === 'number' && Number.isFinite(p.nextPrice) && p.nextPrice > 0) {
-          liveNext.set(slug, p.nextPrice);
+        if (typeof st.nextPrice === 'number' && Number.isFinite(st.nextPrice) && st.nextPrice > 0) {
+          liveNext.set(slug, st.nextPrice);
         }
+        liveTitles.set(slug, st.title);
       }
       refreshRebuyButtons();
       if (bellPanel && bellPanel.style.display !== 'none') renderPanel();
@@ -251,12 +255,13 @@ export function initOutbidNotice(): void {
 
   async function refreshMine(): Promise<void> {
     try {
-      const [nextUid, states] = await Promise.all([getSessionUid(), fetchSharedLots()]);
+      const nextUid = await getSessionUid();
       uid = nextUid;
       mine.clear();
       if (uid !== null) {
-        for (const [slug, s] of states) {
-          if (s.owner_uid !== null && s.owner_uid === uid) mine.add(slug);
+        const catalog = await fetchLotCatalog(uid);
+        for (const [slug, st] of catalog) {
+          if (st.mine) mine.add(slug);
         }
       }
     } catch {
@@ -269,6 +274,7 @@ export function initOutbidNotice(): void {
     price?: unknown;
     owner_login?: unknown;
     owner_uid?: unknown;
+    video_url?: unknown;
   }
 
   function handleRow(next: LotRow, prev: LotRow | null): void {
@@ -286,12 +292,15 @@ export function initOutbidNotice(): void {
         typeof next.owner_login === 'string' && next.owner_login.length > 0
           ? next.owner_login
           : 'Чатерс';
+      const video =
+        typeof next.video_url === 'string' && next.video_url.length > 0 ? next.video_url : null;
       onOutbid({
         slug: next.slug,
-        title: resolveTitle(next.slug),
+        title: liveTitles.get(next.slug) ?? next.slug,
         by,
         price,
         at: Date.now(),
+        video,
       });
     } else if (nextOwner === uid) {
       mine.add(next.slug);
@@ -326,9 +335,9 @@ export function initOutbidNotice(): void {
     await refreshMine();
     syncBellVisibility();
     ensureSubscribed();
-    // Живая N кнопок возврата: перечитываем прайс-фид по каждому тику лотов.
+    // Живая N кнопок возврата: перечитываем каталог по каждому тику лотов.
     void refreshPrices();
-    subscribeSharedLots(() => {
+    subscribeLots(() => {
       void refreshPrices();
     });
     getSupabase()?.auth.onAuthStateChange(() => {

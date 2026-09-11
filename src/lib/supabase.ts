@@ -102,24 +102,12 @@ export function returnUrlForLot(lotId: string): string {
 // ---------------------------------------------------------------------------
 // Живая витрина (тикет 09, shared-state).
 //
-// Каталог (названия, video_url) живёт в БД (public.lots)
-// и читается отсюда же: SSG берёт слаги из БД на билде (см. fetchCatalogLots
-// в lib/lots.ts), витрина дотягивает shared-слой поверх: владельца
-// (owner_login), цену и хвост перепродаж. Без настроенных
-// PUBLIC_SUPABASE_* — честная деградация: функции возвращают пусто,
-// подписка — noop, страница показывает запечённый на билде каталог.
+// Каталог (названия, video_url) живёт в БД (public.lots), живой слой поверх —
+// в lib/lots.ts (fetchLotCatalog: вью lots_with_next_price одним запросом).
+// Здесь остались сырой адаптер подписки, хвост перепродаж и покупка.
+// Без настроенных PUBLIC_SUPABASE_* — честная деградация: функции возвращают
+// пусто, подписка — noop, страница показывает запечённый на билде каталог.
 // ---------------------------------------------------------------------------
-
-/** Shared-состояние одного Лота: slug = id каталога из БД. */
-export interface SharedLotState {
-  slug: string;
-  title: string;
-  video_url: string | null;
-  price: number;
-  owner_login: string | null;
-  owner_uid: string | null;
-  updated_at: string | null;
-}
 
 /** Одна запись общего хвоста перепродаж: from — предыдущий Владелец. */
 export interface SharedHistoryEntry {
@@ -139,48 +127,6 @@ export async function getSessionUid(): Promise<string | null> {
     return data.session?.user.id ?? null;
   } catch {
     return null;
-  }
-}
-
-/** Все shared-состояния Лотов одним запросом (витрина). Ошибка → пустая карта. */
-export async function fetchSharedLots(): Promise<Map<string, SharedLotState>> {
-  const empty = new Map<string, SharedLotState>();
-  const sb = getSupabase();
-  if (!sb) return empty;
-  // Полный селект по §3 спеки.
-  const toState = (row: Record<string, unknown>): SharedLotState | null => {
-    const slug = row['slug'];
-    if (typeof slug !== 'string') return null;
-    return {
-      slug,
-      title: typeof row['title'] === 'string' ? (row['title'] as string) : slug,
-      video_url: typeof row['video_url'] === 'string' ? (row['video_url'] as string) : null,
-      price: Number(row['price']),
-      owner_login: typeof row['owner_login'] === 'string' ? (row['owner_login'] as string) : null,
-      owner_uid: typeof row['owner_uid'] === 'string' ? (row['owner_uid'] as string) : null,
-      updated_at: typeof row['updated_at'] === 'string' ? (row['updated_at'] as string) : null,
-    };
-  };
-  try {
-    const full = await sb
-      .from('lots')
-      .select('slug,title,video_url,price,owner_login,owner_uid,updated_at');
-    let rows: unknown = full.error ? null : full.data;
-    if (!Array.isArray(rows)) {
-      const legacy = await sb
-        .from('lots')
-        .select('slug,title,price,owner_login,owner_uid,updated_at');
-      if (legacy.error || !Array.isArray(legacy.data)) return empty;
-      rows = legacy.data;
-    }
-    const map = new Map<string, SharedLotState>();
-    for (const row of rows as unknown as Record<string, unknown>[]) {
-      const state = toState(row);
-      if (state) map.set(state.slug, state);
-    }
-    return map;
-  } catch {
-    return empty;
   }
 }
 

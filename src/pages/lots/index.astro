@@ -6,9 +6,6 @@ import { fetchCatalogLots } from '@/lib/lots';
 
 // Каталог — из БД на билде (тикет 09): без PUBLIC_SUPABASE_* билд падает явно.
 const lots = await fetchCatalogLots();
-
-// Каталог для клиентского рендера «Моих приветов» (читает скрипт витрины).
-const catalog = lots.map((lot) => ({ id: lot.id, title: lot.title, price: lot.price }));
 ---
 
 <BaseLayout title="AlysQueZone — БИРЖА ПРИВЕТОВ">
@@ -38,43 +35,20 @@ const catalog = lots.map((lot) => ({ id: lot.id, title: lot.title, price: lot.pr
     </div>
   </section>
 
-  <span data-lots-catalog class="hidden" set:html={JSON.stringify(catalog)} />
   <BuyModal />
 </BaseLayout>
 
 <script>
-  // Живая витрина (тикет 09): shared-Владелец/цена поверх каталога из БД.
-  // Названия, Редкость, мем-тексты и видео запечены на билде из БД —
-  // скрипт дотягивает только владельца, цену, свежие данные кнопки «Купить»
-  // и бейдж «ТВОЙ» (owner_uid == сессия). Владелец NULL — бейдж скрыт.
-  // «Мои приветы» — только из БД: лоты, где owner_uid == uid сессии.
-  // Локальный инвентарь не читаем; перерисовка — от shared/Realtime.
+  // Живая витрина: каталог + цены + «мой» флаг — одним запросом
+  // из lib/lots.ts (fetchLotCatalog). Владелец NULL — бейдж скрыт.
+  // «Мои приветы» — только из БД: лоты, где mine (owner_uid == uid сессии).
+  // Локальный инвентарь не читаем; перерисовка — от Realtime.
   // Без PUBLIC_SUPABASE_* — честная деградация: остаётся запечённый каталог.
-  import {
-    getSupabase,
-    isSupabaseConfigured,
-    fetchSharedLots,
-    getSessionUid,
-    subscribeSharedLots,
-  } from '@/lib/supabase';
-  import { fetchLotPrices } from '@/lib/prices';
-  import type { SharedLotState } from '@/lib/supabase';
+  import { getSupabase, isSupabaseConfigured, getSessionUid } from '@/lib/supabase';
+  import { fetchLotCatalog, subscribeLots, type LotState } from '@/lib/lots';
 
   const GUEST_TEXT = 'Войди через Twitch — тут будут твои приветы';
   const EMPTY_TEXT = 'Пока пусто — забери первый привет ниже';
-
-  function readCatalog(): { id: string; title: string; price: number }[] {
-    const tag = document.querySelector('[data-lots-catalog]');
-    if (!tag) return [];
-    try {
-      const parsed: unknown = JSON.parse(tag.textContent ?? '[]');
-      return Array.isArray(parsed)
-        ? (parsed as { id: string; title: string; price: number }[])
-        : [];
-    } catch {
-      return [];
-    }
-  }
 
   function showMyNote(text: string, count: number): void {
     const slot = document.querySelector('[data-my-privety]');
@@ -88,7 +62,7 @@ const catalog = lots.map((lot) => ({ id: lot.id, title: lot.title, price: lot.pr
     slot.appendChild(p);
   }
 
-  function renderMyGreetings(states: Map<string, SharedLotState>, uid: string | null): void {
+  function renderMyGreetings(states: Map<string, LotState>, uid: string | null): void {
     const slot = document.querySelector('[data-my-privety]');
     const counter = document.querySelector('[data-my-privety-count]');
     if (!slot) return;
@@ -96,28 +70,22 @@ const catalog = lots.map((lot) => ({ id: lot.id, title: lot.title, price: lot.pr
       showMyNote(GUEST_TEXT, 0);
       return;
     }
-    const catalog = readCatalog();
-    const byId = new Map(catalog.map((l) => [l.id, l]));
-    const mine = [...states.entries()].filter(
-      ([, s]) => s.owner_uid !== null && s.owner_uid === uid
-    );
+    const mine = [...states.values()].filter((s) => s.mine);
     if (counter) counter.textContent = String(mine.length);
     if (mine.length === 0) {
       showMyNote(EMPTY_TEXT, 0);
       return;
     }
     slot.innerHTML = '';
-    for (const [id, s] of mine) {
-      const known = byId.get(id);
-      const title = known ? known.title : id;
-      const price = Number.isFinite(s.price) ? s.price : (known?.price ?? 0);
+    for (const s of mine) {
+      const price = Number.isFinite(s.price) ? s.price : 0;
       const row = document.createElement('div');
       row.className =
         'border-2 border-milk bg-panel px-3 py-2 text-sm shadow-[3px_3px_0_rgb(66_32_6/0.9)]';
       const link = document.createElement('a');
-      link.href = `./${encodeURIComponent(id)}/`;
+      link.href = `./${encodeURIComponent(s.slug)}/`;
       link.className = 'font-bold hover:underline';
-      link.textContent = title;
+      link.textContent = s.title;
       row.appendChild(link);
       const priceSpan = document.createElement('span');
       priceSpan.className = 'text-pivko';
@@ -148,7 +116,7 @@ const catalog = lots.map((lot) => ({ id: lot.id, title: lot.title, price: lot.pr
       const buyBtn = card.querySelector('[data-buy-lot]');
       if (buyBtn instanceof HTMLButtonElement) {
         if (buyBtn.dataset.lotOwner !== undefined) buyBtn.dataset.lotOwner = owner;
-        // Staged-цена кнопки — живая N из прайс-фида БД (тикет 11); N неизвестна —
+        // Staged-цена кнопки — живая N из каталога (fetchLotCatalog); N неизвестна —
         // staged текущая (сервер всё равно посчитает настоящую), а показ — «…».
         if (buyBtn.dataset.lotPrice !== undefined) buyBtn.dataset.lotPrice = String(next ?? price);
         // Свой лот купить нельзя (перекуп у себя бессмыслен): кнопка гаснет.
@@ -167,41 +135,29 @@ const catalog = lots.map((lot) => ({ id: lot.id, title: lot.title, price: lot.pr
       if (refreshing) return;
       refreshing = true;
       try {
-        const [states, uid, prices] = await Promise.all([
-          fetchSharedLots(),
-          getSessionUid(),
-          fetchLotPrices(),
-        ]);
+        const uid = await getSessionUid();
+        const catalog = await fetchLotCatalog(uid);
         document.querySelectorAll('[data-lot-card]').forEach((node) => {
           if (!(node instanceof HTMLElement)) return;
           const id = node.dataset.lotCard ?? '';
-          const shared = states.get(id);
-          if (!shared || !Number.isFinite(shared.price)) return;
-          const live = prices.get(id);
-          // Живая N из прайс-фида; null (вью нет) — «…», не текущая цена как N.
-          const next =
-            live &&
-            typeof live.nextPrice === 'number' &&
-            Number.isFinite(live.nextPrice) &&
-            live.nextPrice > 0
-              ? live.nextPrice
-              : null;
+          const st = catalog.get(id);
+          if (!st || !Number.isFinite(st.price)) return;
           applyCard(
             node,
-            shared.owner_login ?? node.querySelector('[data-shared-owner]')?.textContent ?? '—',
-            shared.price,
-            uid !== null && shared.owner_uid !== null && shared.owner_uid === uid,
-            next
+            st.owner_login ?? node.querySelector('[data-shared-owner]')?.textContent ?? '—',
+            st.price,
+            st.mine,
+            st.nextPrice
           );
         });
-        renderMyGreetings(states, uid);
+        renderMyGreetings(catalog, uid);
       } finally {
         refreshing = false;
       }
     }
 
     void refresh();
-    subscribeSharedLots(() => void refresh());
+    subscribeLots(() => void refresh());
     // Свежесть при возврате на вкладку (Realtime мог пропустить): перезапрос.
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) void refresh();

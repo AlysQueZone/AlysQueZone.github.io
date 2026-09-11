@@ -65,11 +65,11 @@ const clapSound = s3Sound('clap.mp3');
 
 <script>
   // Денег в клиенте нет: гейт «хватит/не хватит» — серверный (`insufficient
-  // funds`), итог — price_paid сервера, N — из прайс-фида БД (тикет 11).
+  // funds`), итог — price_paid сервера, N — из живого каталога БД (lots.ts).
   // Локальный кошелёк удалён, фолбэка без настроенного хранилища нет:
   // подтверждать нечему — говорим честно.
   import { boom } from '@/lib/confetti';
-  import { fetchLotPrice, fetchNextPrice } from '@/lib/prices';
+  import { fetchLotState, subscribeLots } from '@/lib/lots';
   import {
     getSupabase,
     isSupabaseConfigured,
@@ -81,7 +81,6 @@ const clapSound = s3Sound('clap.mp3');
     mapBuyError,
     fetchSharedHistory,
     getSessionUid,
-    subscribeSharedLots,
   } from '@/lib/supabase';
 
   const modal = document.getElementById('buy-modal');
@@ -332,7 +331,7 @@ const clapSound = s3Sound('clap.mp3');
   }
 
   /**
-   * Проекция цены из прайс-фида БД (тикет 11): лот перекупили при открытой
+   * Проекция цены из живого каталога БД: лот перекупили при открытой
    * модалке — новая N видна до нажатия, отдельного ретрая нет.
    * Пауза/лимит владеют кнопкой — их не затираем; когда отпустят,
    * цена подтянется (см. конец startPause).
@@ -341,7 +340,7 @@ const clapSound = s3Sound('clap.mp3');
     if (!pending || pending.id !== lotId || limitHit || pauseLeft > 0) return;
     if (!isSupabaseConfigured()) return;
     try {
-      const row = await fetchLotPrice(lotId);
+      const row = await fetchLotState(lotId, null);
       if (!row || !pending || pending.id !== lotId || limitHit || pauseLeft > 0) return;
       if (row.owner_login) pending.owner = row.owner_login;
       const next = row.nextPrice;
@@ -385,7 +384,7 @@ const clapSound = s3Sound('clap.mp3');
     // Живые проекции: пауза (моя последняя покупка этого лота) + цена (N из БД).
     const lotId = pending.id;
     try {
-      lotUnsub = subscribeSharedLots(() => {
+      lotUnsub = subscribeLots(() => {
         void refreshPauseProjection(lotId);
         void refreshPriceProjection(lotId);
       }, lotId);
@@ -469,7 +468,8 @@ const clapSound = s3Sound('clap.mp3');
     setBusy(true);
     if (yesBtn instanceof HTMLButtonElement) yesBtn.textContent = 'Ждём сервер…';
     try {
-      const fresh = await fetchNextPrice(id);
+      const st = await fetchLotState(id, null);
+      const fresh = st?.nextPrice ?? null;
       if (fresh !== null && Number.isFinite(fresh) && fresh > 0 && pending && pending.id === id) {
         price = fresh;
         pending.price = fresh;

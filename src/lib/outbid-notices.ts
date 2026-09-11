@@ -7,14 +7,14 @@
  * готовое событие и карта живых цен.
  */
 
-import { resolveVideo, sellerLine, type OutbidEvent } from './outbid-event';
+import { sellerLine, type OutbidEvent } from './outbid-event';
 
 export const MAX_NOTICES = 3;
 const NOTICE_TTL_MS = 20000;
 const LEAVE_TTL_MS = 3000;
 const CORNER_ID = 'outbid-corner';
 
-/** Живая N из прайс-фида БД (src/lib/prices.ts): slug → следующая цена. */
+/** Живая N из каталога БД (src/lib/lots.ts): slug → следующая цена. */
 export type LivePrices = Map<string, number>;
 
 /** Кнопка перекупа в стиле сайта (как «Купить» на карточках: bg-stream).
@@ -38,8 +38,7 @@ export function makeRebuyButton(ev: OutbidEvent, liveNext: LivePrices): HTMLButt
   btn.dataset.lotOwner = ev.by;
   // Живая кнопка: refreshPrices() правит текст и staged-цену по подписке.
   btn.dataset.rebuyLive = '1';
-  const video = resolveVideo(ev.slug);
-  if (video) btn.dataset.lotVideo = video;
+  if (ev.video) btn.dataset.lotVideo = ev.video;
   return btn;
 }
 
