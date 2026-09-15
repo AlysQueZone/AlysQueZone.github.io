@@ -30,8 +30,8 @@ export const GAMBA_DAILY_LIMIT = 20;
  * media/sounds; URL собирает s3Sound() / GambaModal).
  *
  * Спин (кручение, случайный one-shot поверх щелчков): sova, maknagens,
- * toptop, gamba-bg, win-taktak (последний исторически с префиксом win,
- * по смыслу — фраза кручения «тактактакуе»).
+ * toptop, sapogi, gamba-bg, win-taktak (последний исторически с префиксом
+ * win, по смыслу — фраза кручения «тактактакуе»).
  * Выигрыш small/big, джекпот, проигрыш — свои пулы; возврат церемониально
  * равен проигрышу (худший исход таблицы I, мимо нет) и звучит lose-пулом.
  */
@@ -39,6 +39,7 @@ export const GAMBA_SPIN_SOUNDS = [
   'gamba-spin-sova.mp3',
   'gamba-spin-maknagens.mp3',
   'gamba-spin-toptop.mp3',
+  'gamba-spin-sapogi.mp3',
   'gamba-bg.mp3',
   'gamba-win-taktak.mp3',
 ] as const;
