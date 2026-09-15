@@ -15,6 +15,6 @@
 Контент лотов живёт в `content/lots.toml` (источник правды), **не** в миграциях — миграции только схема. Порядок:
 
 1. Своё видео → тройка выше → `storage_upload.py --dest videos/` (URL `.../media/videos/<slug>.webm`); хотлинк-мем → просто готовый URL.
-2. Добавить `[[lots]]` в манифест: `slug`, `title`, `price` (стартовая), `video_url`.
+2. Добавить `[[lots]]` в манифест: `slug`, `title`, `price` (стартовая), `video_url`. Ник в `title` — по реестру ников (`docs/agents/chatters.md`): писать канон, при резолве дописать алиас.
 3. `just lots-seed` — пересобрать локальный `supabase/seed.sql`; `just lots-sync` — upsert в прод (существующим лотам `price`/владелец не трогаются, это runtime-состояние триггеров).
 4. Сайт собирается из БД на билде → `npm run deploy`.

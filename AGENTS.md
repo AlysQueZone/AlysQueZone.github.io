@@ -15,6 +15,7 @@
 - Стиль / импорты / SSR / SQL-гайд / `just` → `docs/agents/code-style.md`.
 - Гамба-звуки / комиссия / рост цены → `docs/agents/economy.md`.
 - Эмоуты / чат VOD / мемы / пасты / стата → `docs/agents/twitch-sources.md`.
+- Ники чатерсов / реестр / резолв написания → `docs/agents/chatters.md`.
 - Новый лот / `ffmpeg` / `media` / `INSERT INTO lots` → `docs/agents/media-pipeline.md`.
 - Issues-трекинг (`scratch/`) → `docs/agents/issue-tracker.md`.
 - Триаж-лейблы (`needs-triage` … `wontfix`) → `docs/agents/triage-labels.md`.
