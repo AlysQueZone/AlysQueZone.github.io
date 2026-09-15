@@ -64,6 +64,7 @@ export const GAMBA_JACKPOT_SOUNDS = [
   'gamba-super-vanna.mp3',
   'gamba-super-snow.mp3',
   'gamba-super-ebaaaat.mp3',
+  'gamba-super-vnimanie-ay.mp3',
 ] as const;
 
 export const GAMBA_LOSE_SOUNDS = [
