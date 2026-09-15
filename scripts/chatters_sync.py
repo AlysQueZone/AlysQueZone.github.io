@@ -168,10 +168,10 @@ def fetch_vod(video_id, max_pages=None):
             edges, has_next = gql_page(video_id, offset)
         except SystemExit as exc:
             # За концом VOD Twitch отдаёт service error вместо пустых edges: если данные
-            # уже собраны, это конец, а не сбой.
-            if not seen:
+            # уже собраны, это конец, а не сбой. Прочие сбои (429 и т.п.) не глотаем.
+            if not seen or "service error" not in str(exc):
                 raise
-            print("  VOD %s: конец чата (%s)" % (video_id, exc))
+            print("  VOD %s: конец чата" % video_id)
             break
         pages += 1
         fresh = 0
