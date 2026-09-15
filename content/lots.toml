@@ -1,0 +1,164 @@
+# Контент лотов — источник правды. Схему правим миграциями, контент — здесь.
+# Синк в прод: `just lots-sync` (миграции не нужны). Локальный сид: `just lots-seed`.
+#
+# price — СТАРТОВАЯ цена: используется на INSERT нового лота и в supabase/seed.sql.
+#   Уже живущие в проде лоты sync не трогает по цене/владельцу — это runtime-состояние
+#   триггеров покупки (см. docs/agents/economy.md).
+# video_url — финальный публичный URL. Свои видео — media/videos/<slug>.webm,
+#   тройку webm/mp4/webp готовит docs/agents/media-pipeline.md.
+
+[[lots]]
+slug = "lot-meme-arhion24"
+title = "o7 arhion24"
+price = 800
+video_url = "https://cdns.memealerts.com/p/69bcde52b57c1c9b432af084/0fcaba76-262b-4768-be63-9ae9daa7a390/alert_orig.webm"
+
+[[lots]]
+slug = "lot-meme-assistant"
+title = "Привет, я ваш виртуальный помощник"
+price = 800
+video_url = "https://cdns.memealerts.com/p/64ceae64bde979e95d878442/30feb2e2-3eed-4878-8f80-895746b46d32/alert_orig.webm"
+
+[[lots]]
+slug = "lot-meme-avrora"
+title = "Привет Аврора"
+price = 800
+video_url = "https://cdns.memealerts.com/p/67192f892e1f470e296d67ca/7fb39f55-2e3a-42aa-80fd-95a0835d3e09/alert_orig.webm"
+
+[[lots]]
+slug = "lot-meme-bradhi"
+title = "Грубый привет от Брадхи"
+price = 800
+video_url = "https://cdns.memealerts.com/p/64ceae64bde979e95d878442/708a27b8-3213-4b8d-aead-2190c17ad493/alert_orig.webm"
+
+[[lots]]
+slug = "lot-meme-evilzeg"
+title = "Привет Evilzeg"
+price = 900
+video_url = "https://cdns.memealerts.com/p/66961426e904cc2377372321/cdd80a79-9dd9-4a44-a5a7-016de293f8d6/alert_orig.webm"
+
+[[lots]]
+slug = "lot-meme-foxindique-nexizzzz"
+title = "Привет foxindique и nexizzzz"
+price = 800
+video_url = "https://cdns.memealerts.com/p/672ba6a81135f4340a61a4d0/9ccdb2ec-b274-4a0a-8fe9-34604a7779e5/alert_orig.webm"
+
+[[lots]]
+slug = "lot-meme-mass"
+title = "Массовый привет (коты одобряют)"
+price = 800
+video_url = "https://cdns.memealerts.com/p/64f8378906d68898c5b8e508/2d11fea1-bda2-493a-9774-510e15c6a589/alert_orig.webm"
+
+[[lots]]
+slug = "lot-meme-monakh"
+title = "Доброе утро Монах"
+price = 800
+video_url = "https://cdns.memealerts.com/p/694ade20c4649c766c8e3d80/70c03e18-173a-4d8e-8cb3-22b7507dce86/alert_orig.webm"
+
+[[lots]]
+slug = "lot-meme-myth"
+title = "Миф о бесплатном пивете"
+price = 1000
+video_url = "https://cdns.memealerts.com/p/649b210acfd0d2a8f427e00f/1870f6b6-c0d7-45c9-b39f-f7c00c5220b7/alert_orig.webm"
+
+[[lots]]
+slug = "lot-meme-ne-mem"
+title = "Привет я не мем"
+price = 800
+video_url = "https://cdns.memealerts.com/p/64ceae64bde979e95d878442/d9700c9e-e658-49b6-ae98-8ca1b3da9350/alert_orig.webm"
+
+[[lots]]
+slug = "lot-meme-nyachos"
+title = "Здраствуйте, nyanyachos"
+price = 1200
+video_url = "https://cdns.memealerts.com/p/66961426e904cc2377372321/a24b3e2f-5f63-42bc-b40a-346eb305464d/alert_orig.webm"
+
+[[lots]]
+slug = "lot-meme-optom"
+title = "Привет сразу всем (оптом)"
+price = 700
+video_url = "https://cdns.memealerts.com/p/672ba6a81135f4340a61a4d0/6e47bcfc-453d-47da-8b6f-958c2a25bc4a/alert_orig.webm"
+
+[[lots]]
+slug = "lot-meme-pokupayu-avroru"
+title = "Покупаю аврору"
+price = 800
+video_url = "https://cdns.memealerts.com/p/67192f892e1f470e296d67ca/3bc7c111-2d9e-4d3b-aa09-4c6bc6bc1feb/alert_orig.webm"
+
+[[lots]]
+slug = "lot-meme-quevizar"
+title = "Привет для Quevizar"
+price = 850
+video_url = "https://cdns.memealerts.com/p/649b210acfd0d2a8f427e00f/5d46287f-92a9-4897-a7cb-dbd4449e8d15/alert_orig.webm"
+
+[[lots]]
+slug = "lot-meme-remolol"
+title = "Привет для remolol"
+price = 750
+video_url = "https://cdns.memealerts.com/p/66961426e904cc2377372321/0acec35f-0179-466e-a2ca-7995d46328ea/alert_orig.webm"
+
+[[lots]]
+slug = "lot-meme-repeat"
+title = "Второй повторный привет"
+price = 650
+video_url = "https://cdns.memealerts.com/p/672ba6a81135f4340a61a4d0/debfc8c4-16a3-45b0-89ed-9b81f92100e6/alert_orig.webm"
+
+[[lots]]
+slug = "lot-meme-salat"
+title = "Привет для Салата"
+price = 750
+video_url = "https://cdns.memealerts.com/p/672ba6a81135f4340a61a4d0/fe6b3373-284a-438a-b6f7-041394b31c77/alert_orig.webm"
+
+[[lots]]
+slug = "lot-privet-4deli"
+title = "Привет 4Deli"
+price = 800
+video_url = "https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-4deli.webm"
+
+[[lots]]
+slug = "lot-privet-axel"
+title = "Привет Axel"
+price = 800
+video_url = "https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-axel.webm"
+
+[[lots]]
+slug = "lot-privet-coolbeback"
+title = "Привет Coolbeback"
+price = 800
+video_url = "https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-coolbeback.webm"
+
+[[lots]]
+slug = "lot-privet-evilzerg57-double"
+title = "Двойной привет по цене одного Evilzerg57"
+price = 800
+video_url = "https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-evilzerg57-double.webm"
+
+[[lots]]
+slug = "lot-privet-olyacaramel"
+title = "Покупка OlyaCaramel"
+price = 800
+video_url = "https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-olyacaramel.webm"
+
+[[lots]]
+slug = "lot-privet-revixit"
+title = "Привет Revixit"
+price = 800
+video_url = "https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-revixit.webm"
+
+[[lots]]
+slug = "lot-privet-sooblonde"
+title = "Привет Sooblonde"
+price = 800
+video_url = "https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-sooblonde.webm"
+
+[[lots]]
+slug = "lot-privet-spirit"
+title = "Привет Spiritbanbanban"
+price = 800
+video_url = "https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-spirit.webm"
+
+[[lots]]
+slug = "lot-privet-vandalque"
+title = "Привет VandalQuE"
+price = 800
+video_url = "https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-vandalque.webm"

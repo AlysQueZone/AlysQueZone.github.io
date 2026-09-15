@@ -7,3 +7,5 @@ MCP `supabase` (`opencode.json`) — на все операции: схема, �
 Deploy to production ВКЛ: мерж в `main` сам применяет миграции. Схему менять только миграциями; правки из дашборда забирать через `db pull`.
 
 Вью со сменой состава/порядка колонок — только через `DROP VIEW + CREATE`: `CREATE OR REPLACE` падает 42P16 и блокирует очередь (кейс 2026-09-10).
+
+`public.lots` — это контент: правится `content/lots.toml` + `scripts/lots_sync.py` (`just lots-sync`), не миграциями. Локальный сид — `supabase/seed.sql` (генерится `just lots-seed`).

@@ -18,45 +18,9 @@ import mimetypes
 import os
 import sys
 import urllib.error
-import urllib.parse
 import urllib.request
 
-KEY_NAMES = ("SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEY", "SERVICE_ROLE_KEY")
-
-
-def load_dotenv(path):
-    values = {}
-    try:
-        with open(path, "r", encoding="utf-8") as fh:
-            for line in fh:
-                line = line.strip()
-                if not line or line.startswith("#") or "=" not in line:
-                    continue
-                name, _, value = line.partition("=")
-                values[name.strip()] = value.strip().strip("'\"")
-    except FileNotFoundError:
-        pass
-    return values
-
-
-def resolve(name, dotenv):
-    value = os.environ.get(name)
-    if value and value.strip():
-        return value.strip()
-    value = dotenv.get(name)
-    if value and value.strip() and not value.startswith("["):
-        return value
-    return None
-
-
-def ref_from_url(url):
-    try:
-        host = urllib.parse.urlparse(url).hostname or ""
-        if host.endswith(".supabase.co"):
-            return host[: -len(".supabase.co")]
-    except Exception:
-        pass
-    return None
+from supabase_common import load_dotenv, ref_from_url, resolve, resolve_service_key
 
 
 def upload_file(key, base, bucket, dest, path, content_type, upsert):
@@ -117,11 +81,7 @@ def main():
     args = ap.parse_args()
 
     dotenv = load_dotenv(args.env)
-    key = None
-    for name in KEY_NAMES:
-        key = resolve(name, dotenv)
-        if key:
-            break
+    key = resolve_service_key(dotenv)
     if not key:
         print(
             "Нет ключа: задай SUPABASE_SERVICE_ROLE_KEY в окружении или в %s" % args.env

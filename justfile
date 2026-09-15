@@ -51,6 +51,18 @@ format:
     npm run format
 
 # -------------------------------------
+# Контент лотов
+# -------------------------------------
+
+# Синк content/lots.toml в прод (Supabase)
+lots-sync:
+    python3 scripts/lots_sync.py
+
+# Пересобрать supabase/seed.sql из манифеста
+lots-seed:
+    python3 scripts/lots_sync.py --write-seed
+
+# -------------------------------------
 # Другое
 # -------------------------------------
 

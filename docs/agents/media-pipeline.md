@@ -9,4 +9,12 @@
   `ffmpeg -i in.mp4 -vframes 1 -q:v 80 out.webp`.
 - Звук из чужого webm: `ffmpeg -i in.webm -vn -codec:a libmp3lame -q:a 5 out.mp3` → в `sounds/`.
 - Заливка байтов — только скриптом `scripts/storage_upload.py` из корня (MCP/SQL байты не несут; ключ `SUPABASE_SERVICE_ROLE_KEY` в `.env`, ключ держится в окружении): `python3 scripts/storage_upload.py --bucket media --dest sounds/ a.mp3 b.mp3` или `--dir /tmp/out/ --pattern "*.mp3"`; URL `https://<ref>.supabase.co/storage/v1/object/public/media/<path>`.
-- Новый лот — миграцией `INSERT INTO public.lots (slug,title,price,video_url)` с NULL-владельцами; хотлинк-мемам `UPDATE ... SET video_url=... WHERE video_url IS NULL`.
+
+## Лот (карточка)
+
+Контент лотов живёт в `content/lots.toml` (источник правды), **не** в миграциях — миграции только схема. Порядок:
+
+1. Своё видео → тройка выше → `storage_upload.py --dest videos/` (URL `.../media/videos/<slug>.webm`); хотлинк-мем → просто готовый URL.
+2. Добавить `[[lots]]` в манифест: `slug`, `title`, `price` (стартовая), `video_url`.
+3. `just lots-seed` — пересобрать локальный `supabase/seed.sql`; `just lots-sync` — upsert в прод (существующим лотам `price`/владелец не трогаются, это runtime-состояние триггеров).
+4. Сайт собирается из БД на билде → `npm run deploy`.
