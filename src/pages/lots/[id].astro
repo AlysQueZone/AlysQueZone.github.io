@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import BuyModal from '@/components/BuyModal.astro';
+import LotTitle from '@/components/LotTitle.astro';
 import LotVideo from '@/components/LotVideo.astro';
 import { fetchCatalogLots, type Lot } from '@/lib/lots';
 
@@ -25,7 +26,9 @@ const base = import.meta.env.BASE_URL;
   </a>
 
   <article class="card-pixel mt-4 p-5 sm:p-8">
-    <h1 class="mt-4 text-2xl font-black sm:text-3xl">{lot.title}</h1>
+    <h1 class="mt-4 text-2xl font-black sm:text-3xl">
+      <LotTitle title={lot.title} />
+    </h1>
     <div class="mt-4 w-full max-w-md">
       <LotVideo videoUrl={lot.video_url} title={lot.title} />
     </div>
