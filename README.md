@@ -15,6 +15,8 @@
 
 Нужны Node.js 18+ и npm.
 
+Плюс `PUBLIC_SUPABASE_URL` и `PUBLIC_SUPABASE_PUBLISHABLE_KEY` в `.env` (шаблон — `.env.example`) — без них сайт не соберётся.
+
 ```bash
 npm install
 npm run dev

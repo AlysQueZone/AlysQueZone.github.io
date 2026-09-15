@@ -13,7 +13,7 @@
 
 - Preview-клик / релиз (`gh-pages`, миграции в `main`) → `docs/agents/shipping.md`.
 - Supabase-схема / RLS / миграции / отладка → `docs/agents/supabase.md`.
-- Стиль / импорты / SSR / SQL-гайд / `just` → `docs/agents/code-style.md`.
+- Стиль / импорты / рендер / SQL-гайд / `just` → `docs/agents/code-style.md`.
 - Гамба-звуки / комиссия / рост цены → `docs/agents/economy.md`.
 - Эмоуты / чат VOD / мемы / пасты / стата → `docs/agents/twitch-sources.md`.
 - Ники чатерсов / реестр / резолв написания → `docs/agents/chatters.md`.
