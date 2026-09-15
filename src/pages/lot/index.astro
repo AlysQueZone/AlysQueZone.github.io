@@ -1,0 +1,185 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import BuyModal from '@/components/BuyModal.astro';
+import LotVideo from '@/components/LotVideo.astro';
+
+// Страница Лота — один маршрут `/lot/?id=<slug>`: каркас без данных, поля
+// заполняет клиент из БД (см. docs/adr/0002). Работает для лота, которого
+// не было на сборке. Старые адреса `/lots/<slug>/` не поддерживаются.
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="AlysQueZone — ЛОТ">
+  <a href={`${base}lots/`} class="text-sm font-bold text-stream hover:underline">
+    ← Назад на биржу
+  </a>
+
+  <article class="card-pixel mt-4 hidden p-5 sm:p-8" data-lot-view>
+    <h1 class="mt-4 text-2xl font-black sm:text-3xl" data-lot-title></h1>
+    <div class="mt-4 w-full max-w-md">
+      <LotVideo videoUrl={null} title="" />
+    </div>
+    <p class="mt-2 text-sm text-mist/70">
+      владелец:{' '}
+      <b data-lot-owner data-shared-owner class="text-mist">
+        {' '}
+        —{' '}
+      </b>{' '}
+      <span data-mine-badge class="hidden font-bold text-rind">
+        {' '}
+        · ТВОЙ{' '}
+      </span>
+    </p>
+    <p data-shared-price class="mt-3 text-2xl font-black text-pivko">
+      — 🍺
+    </p>
+
+    <div class="mt-5">
+      <button type="button" class="btn-arcade btn-arcade-primary px-6 py-3" data-buy-lot disabled>
+        Забрать
+      </button>
+    </div>
+  </article>
+
+  <section
+    aria-label="История перепродаж"
+    class="card-pixel mt-6 hidden p-5 sm:p-8"
+    data-lot-history
+  >
+    <h2 class="font-display text-xs uppercase">История перепродаж</h2>
+    <p data-history-empty class="mt-3 text-sm font-bold text-mist/60">
+      Пока никто не забирал — стань первым
+    </p>
+    <ul data-history-list class="mt-3 flex flex-col gap-2 text-sm font-bold"></ul>
+  </section>
+
+  <p data-lot-missing class="card-pixel mt-4 hidden p-5 text-sm font-bold text-mist/60 sm:p-8">
+    Такого лота нет — возможно, привет уже увёл другой чатерс. Вернись на биржу.
+  </p>
+
+  <BuyModal />
+</BaseLayout>
+
+<script>
+  // Страница лота: slug — из query (`?id=`), состояние и хвост перепродаж —
+  // из БД через lib/lots.ts и lib/supabase.ts. Перерисовка — от Realtime,
+  // фокуса/возврата на вкладку и своей покупки. Без PUBLIC_SUPABASE_* — «нет лота».
+  import {
+    getSupabase,
+    isSupabaseConfigured,
+    getSessionUid,
+    fetchSharedHistory,
+  } from '@/lib/supabase';
+  import { fetchLotState, subscribeLots, onBought, type LotState } from '@/lib/lots';
+  import { initLotVideos, fillVideo } from '@/lib/lot-video';
+  import { setTitleEmotes } from '@/lib/emotes';
+
+  const slug = (new URLSearchParams(window.location.search).get('id') ?? '').trim();
+
+  const view = document.querySelector('[data-lot-view]');
+  const missing = document.querySelector('[data-lot-missing]');
+  const history = document.querySelector('[data-lot-history]');
+  const titleEl = document.querySelector('[data-lot-title]');
+  const videoRoot = document.querySelector('[data-lot-video-root]');
+  const ownerEl = document.querySelector('[data-lot-owner]');
+  const priceEl = document.querySelector('[data-shared-price]');
+  const mineBadge = document.querySelector('[data-mine-badge]');
+  const buyBtn = document.querySelector('[data-buy-lot]');
+  const list = document.querySelector('[data-history-list]');
+  const emptyNote = document.querySelector('[data-history-empty]');
+
+  function toggle(el: Element | null, show: boolean): void {
+    if (el instanceof HTMLElement) el.classList.toggle('hidden', !show);
+  }
+
+  function showMissing(): void {
+    toggle(view, false);
+    toggle(history, false);
+    toggle(missing, true);
+    document.title = 'Лот не найден — AlysQueZone';
+  }
+
+  function fillDetail(st: LotState): void {
+    toggle(view, true);
+    toggle(missing, false);
+    toggle(history, true);
+    setTitleEmotes(titleEl, st.title);
+    document.title = `${st.title} — AlysQueZone`;
+    fillVideo(videoRoot, st.video_url, st.title);
+    initLotVideos(document);
+    if (ownerEl) ownerEl.textContent = st.owner_login ?? '—';
+    if (priceEl) priceEl.textContent = `${st.price} 🍺`;
+    if (mineBadge instanceof HTMLElement) mineBadge.classList.toggle('hidden', !st.mine);
+    if (buyBtn instanceof HTMLButtonElement) {
+      buyBtn.dataset.buyLot = st.slug;
+      buyBtn.dataset.lotTitle = st.title;
+      // Staged-цена — живая N из каталога; сервер всё равно посчитает настоящую.
+      buyBtn.dataset.lotPrice = String(st.nextPrice ?? st.price);
+      buyBtn.dataset.lotOwner = st.owner_login ?? '—';
+      if (st.video_url) buyBtn.dataset.lotVideo = st.video_url;
+      else delete buyBtn.dataset.lotVideo;
+      // Свой лот купить нельзя: кнопка гаснет.
+      buyBtn.disabled = st.mine;
+      buyBtn.textContent = st.mine
+        ? 'Твой привет'
+        : st.nextPrice !== null
+          ? `Забрать за ${st.nextPrice} 🍺`
+          : 'Забрать за … 🍺';
+      buyBtn.classList.toggle('opacity-50', st.mine);
+    }
+  }
+
+  function renderSharedHistory(
+    entries: { from: string; to: string; price: number; buyer_uid: string }[],
+    uid: string | null
+  ): void {
+    if (!list) return;
+    list.querySelectorAll('[data-shared-entry]').forEach((el) => el.remove());
+    const frag = document.createDocumentFragment();
+    for (const h of entries) {
+      const li = document.createElement('li');
+      li.setAttribute('data-shared-entry', 'true');
+      li.className = 'border-2 border-stream bg-void px-3 py-2 shadow-[3px_3px_0_rgb(66_32_6/0.9)]';
+      const mine = uid !== null && h.buyer_uid !== '' && h.buyer_uid === uid;
+      li.textContent = `${h.from} → ${h.to} · ${h.price} 🍺${mine ? ' · ТВОЙ' : ''}`;
+      frag.appendChild(li);
+    }
+    list.appendChild(frag);
+    if (emptyNote instanceof HTMLElement) {
+      emptyNote.classList.toggle('hidden', list.children.length > 0);
+    }
+  }
+
+  let refreshing = false;
+  async function refreshDetail(): Promise<void> {
+    if (refreshing || !isSupabaseConfigured()) return;
+    refreshing = true;
+    try {
+      const uid = await getSessionUid();
+      const st = slug.length > 0 ? await fetchLotState(slug, uid) : null;
+      if (!st) {
+        showMissing();
+        return;
+      }
+      fillDetail(st);
+      const tail = await fetchSharedHistory(slug, st.owner_login);
+      renderSharedHistory(tail, uid);
+    } finally {
+      refreshing = false;
+    }
+  }
+
+  if (isSupabaseConfigured()) {
+    void refreshDetail();
+    subscribeLots(() => void refreshDetail(), slug);
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) void refreshDetail();
+    });
+    window.addEventListener('focus', () => void refreshDetail());
+    // Своя покупка — перезапрос (локальные данные события не используем).
+    onBought(() => void refreshDetail());
+    getSupabase()?.auth.onAuthStateChange(() => void refreshDetail());
+  } else {
+    showMissing();
+  }
+</script>

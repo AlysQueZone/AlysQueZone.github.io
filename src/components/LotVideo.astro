@@ -1,114 +1,49 @@
 ---
-// V2 инлайн-видео лота (тикет 09, прототип scratch/video-s3/prototype/inline-video.html):
-// webp-постер + оверлей «▶ смотреть»; клик → инлайн-<video controls autoplay
-// playsinline> (source webm из video_url + mp4 заменой хвоста
-// alert_orig.webm→alert_orig.mp4; постер — заменой на .webp).
-// При мёртвом URL скрипт возвращает постер обратно.
-// Один компонент на LotCard.astro и lots/[id].astro.
+// Инлайн-видео лота (прототип scratch/video-s3/prototype/inline-video.html):
+// webp-постер + оверлей «▶ смотреть»; источники и клик — в lib/lot-video.ts.
+// Корень рендерится всегда (шаблон карточки витрины заполняется клиентом);
+// нет видео — корень скрыт. Один компонент на карточку и страницу лота.
+import { videoSources } from '@/lib/lot-video';
+
 interface Props {
   videoUrl?: string | null;
-  title: string;
+  title?: string;
 }
 
-const { videoUrl, title } = Astro.props;
-const webm = videoUrl ?? '';
-// Тройка MemeAlerts: webm — канон, mp4/постер выводятся заменой хвоста.
-// Будущие свои URL без .webm (напр. .mp4 из Storage) — как есть, без битого постера.
-const isWebm = /\.webm(\?.*)?$/i.test(webm);
-const isMp4 = /\.mp4(\?.*)?$/i.test(webm);
-const mp4 = isWebm ? webm.replace(/\.webm(\?.*)?$/i, '.mp4$1') : isMp4 ? webm : '';
-const poster = isWebm ? webm.replace(/\.webm(\?.*)?$/i, '.webp$1') : '';
+const { videoUrl, title = '' } = Astro.props;
+const { webm, mp4, poster } = videoSources(videoUrl);
 const hasVideo = webm.length > 0;
 ---
 
-{hasVideo && (
-  <div
-    data-lot-video-root
-    data-video-webm={webm}
-    data-video-mp4={mp4}
-    data-video-poster={poster}
-    data-video-title={title}
-    class="relative aspect-square w-full overflow-hidden border-2 border-milk bg-black"
+<div
+  data-lot-video-root
+  data-video-webm={webm || undefined}
+  data-video-mp4={mp4 || undefined}
+  data-video-poster={poster || undefined}
+  data-video-title={title}
+  class:list={[
+    'relative aspect-square w-full overflow-hidden border-2 border-milk bg-black',
+    !hasVideo && 'hidden',
+  ]}
+>
+  <img
+    src={poster || undefined}
+    alt={title}
+    loading="lazy"
+    class="h-full w-full object-cover"
+    data-lot-video-poster
+  />
+  <button
+    type="button"
+    data-lot-video-play
+    class="absolute inset-0 flex cursor-pointer items-center justify-center bg-black/35"
   >
-    <img
-      src={poster || undefined}
-      alt={title}
-      loading="lazy"
-      class="h-full w-full object-cover"
-      data-lot-video-poster
-    />
-    <button
-      type="button"
-      data-lot-video-play
-      class="absolute inset-0 flex cursor-pointer items-center justify-center bg-black/35"
-    >
-      <span class="btn-arcade btn-arcade-primary px-4 py-2 text-xs">▶ смотреть</span>
-    </button>
-  </div>
-)}
+    <span class="btn-arcade btn-arcade-primary px-4 py-2 text-xs">▶ смотреть</span>
+  </button>
+</div>
 
 <script>
-  function playInlineVideo(root: HTMLElement): void {
-    const webm = root.dataset.videoWebm ?? '';
-    const mp4 = root.dataset.videoMp4 ?? '';
-    const poster = root.dataset.videoPoster ?? '';
-    if (!webm) return;
-    const original = root.innerHTML;
-    let restored = false;
-    const restorePoster = (): void => {
-      if (restored) return;
-      restored = true;
-      root.innerHTML = original;
-      delete root.dataset.videoInit;
-      initLotVideos();
-    };
-    const video = document.createElement('video');
-    video.controls = true;
-    video.autoplay = true;
-    video.playsInline = true;
-    video.setAttribute('playsinline', '');
-    video.preload = 'metadata';
-    if (poster) video.poster = poster;
-    video.className = 'h-full w-full object-cover';
-    // Сорсы по расширению канона: webm (+выводной mp4) либо одиночный mp4.
-    const sources: { src: string; type: string }[] = [];
-    if (isWebm(webm)) {
-      sources.push({ src: webm, type: 'video/webm' });
-      if (mp4 && mp4 !== webm) sources.push({ src: mp4, type: 'video/mp4' });
-    } else if (mp4) {
-      sources.push({ src: mp4, type: 'video/mp4' });
-    }
-    let failed = 0;
-    for (const s of sources) {
-      const el = document.createElement('source');
-      el.src = s.src;
-      el.type = s.type;
-      // Мёртвый URL: все сорсы битые → остаётся постер.
-      el.addEventListener('error', () => {
-        failed += 1;
-        if (failed >= sources.length) restorePoster();
-      });
-      video.appendChild(el);
-    }
-    video.addEventListener('error', restorePoster);
-    root.innerHTML = '';
-    root.appendChild(video);
-  }
-
-  function isWebm(url: string): boolean {
-    return /\.webm(\?.*)?$/i.test(url);
-  }
-
-  function initLotVideos(): void {
-    document.querySelectorAll('[data-lot-video-root]').forEach((node) => {
-      if (!(node instanceof HTMLElement)) return;
-      if (node.dataset.videoInit === '1') return;
-      node.dataset.videoInit = '1';
-      node.querySelector('[data-lot-video-play]')?.addEventListener('click', () => {
-        playInlineVideo(node);
-      });
-    });
-  }
+  import { initLotVideos } from '@/lib/lot-video';
 
   initLotVideos();
 </script>

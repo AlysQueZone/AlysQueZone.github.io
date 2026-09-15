@@ -1,21 +1,11 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import RulesModal from '@/components/RulesModal.astro';
-import { fetchCatalogLots } from '@/lib/lots';
 
 const base = import.meta.env.BASE_URL;
-// Случайные приветы — 4 лота наугад из каталога БД на каждой сборке (ребаланс:
-// витрина не приедается, «топа» больше нет — дорогие лоты не караулят вход).
-// Без PUBLIC_SUPABASE_* билд падает явно. Не хардкод.
-function pickRandom<T>(rows: T[], n: number): T[] {
-  const pool = [...rows];
-  for (let i = pool.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [pool[i], pool[j]] = [pool[j] as T, pool[i] as T];
-  }
-  return pool.slice(0, n);
-}
-const randomLots = pickRandom(await fetchCatalogLots(), 4);
+// Случайные приветы — 4 лота наугад из живого каталога БД, выбор в браузере
+// (ребаланс: витрина не приедается, «топа» больше нет — дорогие лоты не
+// караулят вход). Не хардкод.
 ---
 
 <BaseLayout title="AlysQueZone — БИРЖА ПРИВЕТОВ">
@@ -87,15 +77,10 @@ const randomLots = pickRandom(await fetchCatalogLots(), 4);
         Все лоты →
       </a>
     </div>
-    <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      {randomLots.map((lot) => (
-        <article class="card-pixel flex min-w-0 flex-col p-5 transition hover:-translate-y-0.5">
-          <h3 class="mt-3 font-extrabold break-words">{lot.title}</h3>
-          <p class="mt-1 truncate text-sm text-mist/60">владелец: {lot.owner ?? '—'}</p>
-          <p class="mt-3 text-xl font-black text-pivko">{lot.price} 🍺</p>
-        </article>
-      ))}
-    </div>
+    <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4" data-random-lots></div>
+    <p data-random-state class="mt-3 text-sm font-bold text-mist/60">
+      Загружаю приветы…
+    </p>
     <div class="card-pixel card-pixel-accent mt-8 p-6 text-center sm:p-8">
       <p class="font-display text-xs uppercase sm:text-sm">Готов забрать свой привет?</p>
       <p class="mt-3 text-sm text-mist/70">Жду тебя 🙂🙂🙂 Пойжем жоско на стрим.</p>
@@ -106,3 +91,46 @@ const randomLots = pickRandom(await fetchCatalogLots(), 4);
   </section>
   <RulesModal />
 </BaseLayout>
+
+<script>
+  // Случайные приветы — из живого каталога БД, выбор в браузере (не на билде).
+  import { getSessionUid, isSupabaseConfigured } from '@/lib/supabase';
+  import { fetchLotCatalog } from '@/lib/lots';
+
+  const slot = document.querySelector('[data-random-lots]');
+  const note = document.querySelector('[data-random-state]');
+  const PICK = 4;
+
+  function miniCard(title: string, owner: string | null, price: number): HTMLElement {
+    const card = document.createElement('article');
+    card.className = 'card-pixel flex min-w-0 flex-col p-5 transition hover:-translate-y-0.5';
+    const h = document.createElement('h3');
+    h.className = 'mt-3 font-extrabold break-words';
+    h.textContent = title;
+    card.appendChild(h);
+    const ownerP = document.createElement('p');
+    ownerP.className = 'mt-1 truncate text-sm text-mist/60';
+    ownerP.textContent = `владелец: ${owner ?? '—'}`;
+    card.appendChild(ownerP);
+    const priceP = document.createElement('p');
+    priceP.className = 'mt-3 text-xl font-black text-pivko';
+    priceP.textContent = `${price} 🍺`;
+    card.appendChild(priceP);
+    return card;
+  }
+
+  async function renderRandom(): Promise<void> {
+    if (!(slot instanceof HTMLElement)) return;
+    const uid = await getSessionUid();
+    const pool = [...(await fetchLotCatalog(uid)).values()];
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j] as (typeof pool)[number], pool[i] as (typeof pool)[number]];
+    }
+    const pick = pool.slice(0, PICK);
+    slot.replaceChildren(...pick.map((st) => miniCard(st.title, st.owner_login, st.price)));
+    if (note instanceof HTMLElement) note.classList.toggle('hidden', pick.length > 0);
+  }
+
+  if (isSupabaseConfigured()) void renderRandom();
+</script>

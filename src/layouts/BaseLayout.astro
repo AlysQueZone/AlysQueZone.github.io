@@ -16,6 +16,7 @@ import '@fontsource/rubik/cyrillic-900.css';
 import GambaModal from '@/components/GambaModal.astro';
 import DailyLogin from '@/components/DailyLogin.astro';
 import AuthButton from '@/components/AuthButton.astro';
+import { assertSupabaseConfigured } from '@/lib/supabase';
 
 interface Props {
   title?: string;
@@ -23,6 +24,9 @@ interface Props {
 
 const { title = 'AlysQueZone — БИРЖА ПРИВЕТОВ' } = Astro.props;
 const base = import.meta.env.BASE_URL;
+
+// Билд-гейт: без PUBLIC_SUPABASE_* сайт нерабочий (витрина — проекция БД).
+assertSupabaseConfigured();
 ---
 
 <!doctype html>

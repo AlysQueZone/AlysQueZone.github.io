@@ -24,6 +24,20 @@ export function isSupabaseConfigured(): boolean {
   return Boolean(SUPABASE_URL && PUBLISHABLE_KEY);
 }
 
+/**
+ * Билд-гейт: без публичных ключей сайт заведомо нерабочий (витрина и лоты —
+ * проекция БД), поэтому на сборке падаем явно. Вызывается из BaseLayout —
+ * отрисовка любой страницы. В рантайме деградация мягкая (isSupabaseConfigured).
+ */
+export function assertSupabaseConfigured(): void {
+  if (!isSupabaseConfigured()) {
+    throw new Error(
+      'Сборка требует PUBLIC_SUPABASE_URL и PUBLIC_SUPABASE_PUBLISHABLE_KEY: ' +
+        'витрина и лоты — проекция БД, запечённой статики нет.'
+    );
+  }
+}
+
 export function getSupabase(): SupabaseClient | null {
   if (client) return client;
   if (!isSupabaseConfigured()) return null;
@@ -106,7 +120,7 @@ export function returnUrlForLot(lotId: string): string {
 // в lib/lots.ts (fetchLotCatalog: вью lots_with_next_price одним запросом).
 // Здесь остались сырой адаптер подписки, хвост перепродаж и покупка.
 // Без настроенных PUBLIC_SUPABASE_* — честная деградация: функции возвращают
-// пусто, подписка — noop, страница показывает запечённый на билде каталог.
+// пусто, подписка — noop; на сборке такие ключи обязательны (assertSupabaseConfigured).
 // ---------------------------------------------------------------------------
 
 /** Одна запись общего хвоста перепродаж: from — предыдущий Владелец. */
@@ -315,7 +329,7 @@ export function subscribeSharedLots(onChange: () => void, slug?: string): () => 
 // Успех — только после confirm сервера (ответ без error).
 // ---------------------------------------------------------------------------
 
-/** Лоты в БД живут по slug = статичному id из каталога (сидирование — тикет 12). */
+/** Лоты в БД живут по slug: он же ключ страницы лота (`/lot/?id=<slug>`). */
 export interface SharedPurchase {
   price_paid: number;
   buyer_login: string;

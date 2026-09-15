@@ -1,33 +1,18 @@
-import { createClient } from '@supabase/supabase-js';
-
 import { getSupabase, subscribeSharedLots, buyLotShared } from './supabase';
-
-/**
- * Лот каталога: выставленный на бирже привет с видео.
- *
- * Каталог живёт в БД (таблица public.lots), статики больше нет.
- * `id` = slug из БД.
- */
-export interface Lot {
-  id: string;
-  title: string;
-  owner: string | null;
-  price: number;
-  video_url?: string | null;
-}
 
 /**
  * Живое состояние Лота: каталог + прайс-фид + флаг «мой» за один запрос.
  *
- * Раньше понятие было разорвано на три шва: SSG-каталог здесь же,
- * shared-состояния в supabase.ts и живые цены в prices.ts — витрина делала
- * два запроса и сшивала карты вручную. Теперь один запрос к вью
- * `lots_with_next_price` (N считает БД тем же выражением, что и
- * BEFORE-триггер, клиент формулы не знает и не хранит).
+ * Раньше понятие было разорвано на три шва: SSG-каталог, shared-состояния
+ * в supabase.ts и живые цены в prices.ts — витрина делала два запроса и сшивала
+ * карты вручную. Теперь один запрос к вью `lots_with_next_price` (N считает БД
+ * тем же выражением, что и BEFORE-триггер, клиент формулы не знает и не хранит).
  *
  * nextPrice null — N неизвестна (вью отсутствует, читаем таблицу lots):
  * показ рисует «…», а не price. mine — owner_uid == uid сессии
  * (uid передаёт caller, модуль сессию не читает).
+ * Витрина и страница лота целиком рисуются из этой карты клиентом (см.
+ * docs/adr/0002); запечённого на билде каталога нет.
  */
 export interface LotState {
   slug: string;
@@ -40,39 +25,11 @@ export interface LotState {
   mine: boolean;
 }
 
-function buildEnv(): { url: string; key: string } {
-  const url = import.meta.env.PUBLIC_SUPABASE_URL as string | undefined;
-  const key = import.meta.env.PUBLIC_SUPABASE_PUBLISHABLE_KEY as string | undefined;
-  if (!url || !key) {
-    throw new Error(
-      'SSG каталога требует PUBLIC_SUPABASE_URL и PUBLIC_SUPABASE_PUBLISHABLE_KEY ' +
-        '(тикет 09): каталог — из БД, статического фолбэка нет.'
-    );
-  }
-  return { url, key };
-}
-
 type LotRow = Record<string, unknown>;
 
 function str(row: LotRow, key: string): string | null {
   const value = row[key];
   return typeof value === 'string' ? value : null;
-}
-
-function toLot(row: LotRow): Lot | null {
-  const slug = row['slug'];
-  const title = row['title'];
-  const price = Number(row['price']);
-  if (typeof slug !== 'string' || typeof title !== 'string' || !Number.isFinite(price)) {
-    return null;
-  }
-  return {
-    id: slug,
-    title,
-    owner: str(row, 'owner_login'),
-    price,
-    video_url: str(row, 'video_url'),
-  };
 }
 
 function toLotState(row: LotRow, uid: string | null): LotState | null {
@@ -106,36 +63,6 @@ function fillCatalog(rows: unknown, uid: string | null): Map<string, LotState> {
 const VIEW = 'lots_with_next_price';
 const VIEW_COLUMNS = 'slug,title,video_url,price,owner_login,owner_uid,next_price';
 const TABLE_COLUMNS = 'slug,title,video_url,price,owner_login,owner_uid';
-
-/**
- * Каталог для SSG на билде — только из БД через PUBLIC_SUPABASE_*.
- * Без env кидает явно (статического фолбэка нет).
- */
-export async function fetchCatalogLots(): Promise<Lot[]> {
-  const { url, key } = buildEnv();
-  const sb = createClient(url, key);
-  // Таймаут на случай stall сети: билд должен падать явно, а не висеть.
-  // NB: postgrest-js игнорирует `signal` в опциях .select() — рабочий API
-  // только .abortSignal() (тикет 11, drive-by: иначе SSG виснет навсегда).
-  const signal = AbortSignal.timeout(20000);
-  const full = await sb
-    .from('lots')
-    .select('slug,title,video_url,price,owner_login,owner_uid,updated_at')
-    .abortSignal(signal);
-  if (full.error || !Array.isArray(full.data)) {
-    throw new Error(
-      `SSG каталога: не смог прочитать таблицу lots из БД: ${full.error?.message ?? 'unknown'}`
-    );
-  }
-  const lots = (full.data as unknown as LotRow[]).flatMap((row) => {
-    const lot = toLot(row);
-    return lot ? [lot] : [];
-  });
-  // Витрина по умолчанию — от дешёвых к дорогим (ребаланс: новичок первым
-  // делом видит доступные лоты). Живой ресорт поверх Realtime не делаем —
-  // порядок первого экрана задаёт SSG.
-  return lots.sort((a, b) => a.price - b.price);
-}
 
 /**
  * Весь живой каталог одним запросом (витрина, колокол, уведомления).

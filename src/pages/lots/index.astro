@@ -2,10 +2,9 @@
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import LotCard from '@/components/LotCard.astro';
 import BuyModal from '@/components/BuyModal.astro';
-import { fetchCatalogLots } from '@/lib/lots';
 
-// Каталог — из БД на билде (тикет 09): без PUBLIC_SUPABASE_* билд падает явно.
-const lots = await fetchCatalogLots();
+// Витрина — каркас: карточек в HTML нет, сетку целиком рисует клиент из БД
+// (см. docs/adr/0002). Шаблон карточки — единственный источник разметки.
 ---
 
 <BaseLayout title="AlysQueZone — БИРЖА ПРИВЕТОВ">
@@ -28,27 +27,39 @@ const lots = await fetchCatalogLots();
 
   <section aria-label="Все лоты" class="mt-8">
     <h2 class="font-display text-xs uppercase">Все лоты</h2>
-    <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {lots.map((lot) => (
-        <LotCard lot={lot} />
-      ))}
-    </div>
+    <p data-lots-state class="mt-3 text-sm font-bold text-mist/60">
+      Загружаю лоты…
+    </p>
+    <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3" data-lot-grid></div>
   </section>
 
   <BuyModal />
+
+  <template data-lot-card-template>
+    <LotCard />
+  </template>
 </BaseLayout>
 
 <script>
-  // Живая витрина: каталог + цены + «мой» флаг — одним запросом
-  // из lib/lots.ts (fetchLotCatalog). Владелец NULL — бейдж скрыт.
+  // Живая витрина: каталог + цены + «мой» флаг — из lib/lots.ts (fetchLotCatalog).
+  // Набор карточек строится/сносится по каталогу (INSERT/DELETE в lots), поля —
+  // по данным; перерисовка от Realtime. Владелец NULL — бейдж скрыт.
   // «Мои приветы» — только из БД: лоты, где mine (owner_uid == uid сессии).
-  // Локальный инвентарь не читаем; перерисовка — от Realtime.
-  // Без PUBLIC_SUPABASE_* — честная деградация: остаётся запечённый каталог.
+  // Локальный инвентарь не читаем. Без PUBLIC_SUPABASE_* — честная деградация.
   import { getSupabase, isSupabaseConfigured, getSessionUid } from '@/lib/supabase';
   import { fetchLotCatalog, subscribeLots, onBought, type LotState } from '@/lib/lots';
+  import { initLotVideos, fillVideo } from '@/lib/lot-video';
+  import { setTitleEmotes } from '@/lib/emotes';
 
+  const base = import.meta.env.BASE_URL;
   const GUEST_TEXT = 'Войди через Twitch — тут будут твои приветы';
   const EMPTY_TEXT = 'Пока пусто — забери первый привет ниже';
+  const LOADING_TEXT = 'Загружаю лоты…';
+  const FAIL_TEXT = 'Лоты не загрузились. Проверь связь и обнови страницу';
+
+  function lotHref(slug: string): string {
+    return `${base}lot/?id=${encodeURIComponent(slug)}`;
+  }
 
   function showMyNote(text: string, count: number): void {
     const slot = document.querySelector('[data-my-privety]');
@@ -60,6 +71,13 @@ const lots = await fetchCatalogLots();
     p.className = 'text-sm font-bold text-mist/60';
     p.textContent = text;
     slot.appendChild(p);
+  }
+
+  function setGridNote(text: string | null): void {
+    const note = document.querySelector('[data-lots-state]');
+    if (!(note instanceof HTMLElement)) return;
+    note.classList.toggle('hidden', text === null);
+    note.textContent = text ?? '';
   }
 
   function renderMyGreetings(states: Map<string, LotState>, uid: string | null): void {
@@ -83,7 +101,7 @@ const lots = await fetchCatalogLots();
       row.className =
         'border-2 border-milk bg-panel px-3 py-2 text-sm shadow-[3px_3px_0_rgb(66_32_6/0.9)]';
       const link = document.createElement('a');
-      link.href = `./${encodeURIComponent(s.slug)}/`;
+      link.href = lotHref(s.slug);
       link.className = 'font-bold hover:underline';
       link.textContent = s.title;
       row.appendChild(link);
@@ -99,63 +117,110 @@ const lots = await fetchCatalogLots();
     }
   }
 
-  if (isSupabaseConfigured()) {
-    const applyCard = (
-      card: HTMLElement,
-      owner: string,
-      price: number,
-      mine: boolean,
-      next: number | null
-    ): void => {
-      const ownerEl = card.querySelector('[data-shared-owner]');
-      if (ownerEl) ownerEl.textContent = owner;
-      const priceEl = card.querySelector('[data-shared-price]');
-      if (priceEl) priceEl.textContent = `${price} 🍺`;
-      const badge = card.querySelector('[data-mine-badge]');
-      if (badge) badge.classList.toggle('hidden', !mine);
-      const buyBtn = card.querySelector('[data-buy-lot]');
-      if (buyBtn instanceof HTMLButtonElement) {
-        if (buyBtn.dataset.lotOwner !== undefined) buyBtn.dataset.lotOwner = owner;
-        // Staged-цена кнопки — живая N из каталога (fetchLotCatalog); N неизвестна —
-        // staged текущая (сервер всё равно посчитает настоящую), а показ — «…».
-        if (buyBtn.dataset.lotPrice !== undefined) buyBtn.dataset.lotPrice = String(next ?? price);
-        // Свой лот купить нельзя (перекуп у себя бессмыслен): кнопка гаснет.
-        buyBtn.disabled = mine;
-        buyBtn.textContent = mine
-          ? 'Твой привет'
-          : next !== null
-            ? `Забрать за ${next} 🍺`
-            : 'Забрать за … 🍺';
-        buyBtn.classList.toggle('opacity-50', mine);
-      }
-    };
+  // slug → текущая цена: порядок витрины без парсинга текста.
+  const prices = new Map<string, number>();
 
-    let refreshing = false;
-    async function refresh(): Promise<void> {
-      if (refreshing) return;
-      refreshing = true;
-      try {
-        const uid = await getSessionUid();
-        const catalog = await fetchLotCatalog(uid);
-        document.querySelectorAll('[data-lot-card]').forEach((node) => {
-          if (!(node instanceof HTMLElement)) return;
-          const id = node.dataset.lotCard ?? '';
-          const st = catalog.get(id);
-          if (!st || !Number.isFinite(st.price)) return;
-          applyCard(
-            node,
-            st.owner_login ?? node.querySelector('[data-shared-owner]')?.textContent ?? '—',
-            st.price,
-            st.mine,
-            st.nextPrice
-          );
-        });
-        renderMyGreetings(catalog, uid);
-      } finally {
-        refreshing = false;
+  /** Заполнить карточку состоянием Лота по data-слотам шаблона. */
+  function fillCard(card: HTMLElement, st: LotState): void {
+    card.dataset.lotCard = st.slug;
+    const link = card.querySelector('[data-lot-link]');
+    if (link instanceof HTMLAnchorElement) link.href = lotHref(st.slug);
+    setTitleEmotes(card.querySelector('[data-lot-title]'), st.title);
+    fillVideo(card.querySelector('[data-lot-video-root]'), st.video_url, st.title);
+    const ownerEl = card.querySelector('[data-shared-owner]');
+    if (ownerEl) ownerEl.textContent = st.owner_login ?? '—';
+    const priceEl = card.querySelector('[data-shared-price]');
+    if (priceEl) priceEl.textContent = `${st.price} 🍺`;
+    const badge = card.querySelector('[data-mine-badge]');
+    if (badge) badge.classList.toggle('hidden', !st.mine);
+    prices.set(st.slug, st.price);
+    const buyBtn = card.querySelector('[data-buy-lot]');
+    if (buyBtn instanceof HTMLButtonElement) {
+      buyBtn.dataset.buyLot = st.slug;
+      buyBtn.dataset.lotTitle = st.title;
+      // Staged-цена кнопки — живая N из каталога; N неизвестна — «…», сервер
+      // всё равно посчитает настоящую.
+      buyBtn.dataset.lotPrice = String(st.nextPrice ?? st.price);
+      buyBtn.dataset.lotOwner = st.owner_login ?? '—';
+      if (st.video_url) buyBtn.dataset.lotVideo = st.video_url;
+      else delete buyBtn.dataset.lotVideo;
+      // Свой лот купить нельзя (перекуп у себя бессмыслен): кнопка гаснет.
+      buyBtn.disabled = st.mine;
+      buyBtn.textContent = st.mine
+        ? 'Твой привет'
+        : st.nextPrice !== null
+          ? `Забрать за ${st.nextPrice} 🍺`
+          : 'Забрать за … 🍺';
+      buyBtn.classList.toggle('opacity-50', st.mine);
+    }
+  }
+
+  // slug → узел карточки: reconcile набора (создать/снести/обновить).
+  const rendered = new Map<string, HTMLElement>();
+
+  function reconcile(states: Map<string, LotState>): void {
+    const grid = document.querySelector('[data-lot-grid]');
+    const tpl = document.querySelector('[data-lot-card-template]');
+    if (!(grid instanceof HTMLElement) || !(tpl instanceof HTMLTemplateElement)) return;
+
+    for (const [slug, el] of [...rendered]) {
+      if (!states.has(slug)) {
+        el.remove();
+        rendered.delete(slug);
+        prices.delete(slug);
       }
     }
 
+    for (const st of states.values()) {
+      if (!Number.isFinite(st.price)) continue;
+      let card = rendered.get(st.slug);
+      if (!card) {
+        const fresh = tpl.content.firstElementChild;
+        if (!(fresh instanceof HTMLElement)) return;
+        card = fresh.cloneNode(true) as HTMLElement;
+        rendered.set(st.slug, card);
+        grid.appendChild(card);
+      }
+      fillCard(card, st);
+    }
+
+    orderGrid(grid);
+    initLotVideos(grid);
+  }
+
+  // Витрина — от дешёвых к дорогим (новичок первым делом видит доступные лоты).
+  // Перестановка — только когда относительный порядок реально изменился.
+  function orderGrid(grid: HTMLElement): void {
+    const desired = [...rendered.keys()].sort(
+      (a, b) => (prices.get(a) ?? 0) - (prices.get(b) ?? 0)
+    );
+    const current = [...grid.querySelectorAll('[data-lot-card]')].map(
+      (n) => (n as HTMLElement).dataset.lotCard ?? ''
+    );
+    if (desired.length === current.length && desired.every((s, i) => s === current[i])) return;
+    for (const slug of desired) {
+      const el = rendered.get(slug);
+      if (el) grid.appendChild(el);
+    }
+  }
+
+  let refreshing = false;
+  async function refresh(): Promise<void> {
+    if (refreshing) return;
+    refreshing = true;
+    try {
+      const uid = await getSessionUid();
+      const catalog = await fetchLotCatalog(uid);
+      reconcile(catalog);
+      setGridNote(catalog.size === 0 ? FAIL_TEXT : null);
+      renderMyGreetings(catalog, uid);
+    } finally {
+      refreshing = false;
+    }
+  }
+
+  if (isSupabaseConfigured()) {
+    setGridNote(LOADING_TEXT);
     void refresh();
     subscribeLots(() => void refresh());
     // Свежесть при возврате на вкладку (Realtime мог пропустить): перезапрос.
@@ -168,6 +233,7 @@ const lots = await fetchCatalogLots();
     // Вход/выход меняет только бейдж «ТВОЙ» и секцию «Мои приветы».
     getSupabase()?.auth.onAuthStateChange(() => void refresh());
   } else {
+    setGridNote(FAIL_TEXT);
     showMyNote(GUEST_TEXT, 0);
   }
 </script>

@@ -1,51 +1,37 @@
 ---
-// Карточка лота для сетки биржи. Каталог — из БД (тикет 09, SSG через
-// fetchCatalogLots из lib/lots.ts); shared-слой (владелец/цена) дотягивает
-// скрипт витрины на lots/index.astro. Владелец NULL — бейджа нет,
-// кнопка покупки активна (первый покупатель — первый владелец).
-// Видео — общий V2-компонент LotVideo (прототип
-// scratch/video-s3/prototype/inline-video.html).
-// Кнопка покупки несёт data-lot-video (тикет 10): BuyModal играет его при покупке.
-import type { Lot } from '@/lib/lots';
-import LotTitle from './LotTitle.astro';
+// Разметка карточки лота для сетки биржи — шаблон: витрина целиком рисуется
+// клиентом из БД (см. docs/adr/0002), полей-данных здесь нет. Скрипт витрины
+// клонирует шаблон и заполняет data-слоты (заголовок/владелец/цена/бейдж/
+// видео/кнопка). Владелец NULL — бейджа нет, кнопка активна (первый
+// покупатель — первый владелец). Видео — общий компонент LotVideo.
 import LotVideo from './LotVideo.astro';
 
-interface Props {
-  lot: Lot;
-}
-
-const { lot } = Astro.props;
 const base = import.meta.env.BASE_URL;
 ---
 
-<article
-  data-lot-card={lot.id}
-  class="card-pixel flex flex-col gap-2 p-4 transition hover:-translate-y-0.5"
->
+<article data-lot-card class="card-pixel flex flex-col gap-2 p-4 transition hover:-translate-y-0.5">
   <h3 class="text-base font-extrabold">
-    <a href={`${base}lots/${lot.id}/`} class="hover:text-ember">
-      <LotTitle title={lot.title} />
+    <a data-lot-link href={`${base}lots/`} class="hover:text-ember">
+      <span data-lot-title></span>
     </a>
   </h3>
-  <LotVideo videoUrl={lot.video_url} title={lot.title} />
+  <LotVideo videoUrl={null} title="" />
   <p class="text-sm text-mist/70">
-    владелец: <span data-shared-owner>{lot.owner ?? '—'}</span>{' '}
+    владелец: <span data-shared-owner>—</span>{' '}
     <span data-mine-badge class="hidden font-bold text-rind">
-      · ТВОЙ
+      {' '}
+      · ТВОЙ{' '}
     </span>
   </p>
   <p data-shared-price class="text-xl font-black text-pivko">
-    {lot.price} 🍺
+    — 🍺
   </p>
   <div class="mt-auto pt-2">
     <button
       type="button"
       class="btn-arcade btn-arcade-primary px-4 py-2 text-sm"
-      data-buy-lot={lot.id}
-      data-lot-title={lot.title}
-      data-lot-price={lot.price}
-      data-lot-owner={lot.owner ?? '—'}
-      data-lot-video={lot.video_url ?? undefined}
+      data-buy-lot
+      disabled
     >
       ▶ Купить
     </button>

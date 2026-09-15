@@ -27,3 +27,28 @@ export function splitTitleEmotes(title: string): TitleSegment[] {
   }
   return segments;
 }
+
+/** Отрисовать заголовок лота в DOM (клиентский рендер витрины и страницы лота). */
+export function renderTitleEmotes(title: string): DocumentFragment {
+  const frag = document.createDocumentFragment();
+  for (const segment of splitTitleEmotes(title)) {
+    if (segment.type === 'emote') {
+      const img = document.createElement('img');
+      img.src = segment.src;
+      img.alt = segment.name;
+      img.title = segment.name;
+      img.loading = 'lazy';
+      img.className = 'inline-block h-[1.1em] w-auto align-[-0.15em]';
+      frag.appendChild(img);
+    } else {
+      frag.appendChild(document.createTextNode(segment.value));
+    }
+  }
+  return frag;
+}
+
+/** Поставить заголовок лота в контейнер (замена содержимого). */
+export function setTitleEmotes(el: Element | null, title: string): void {
+  if (!el) return;
+  el.replaceChildren(renderTitleEmotes(title));
+}
