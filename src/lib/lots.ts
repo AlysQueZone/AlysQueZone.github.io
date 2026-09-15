@@ -64,56 +64,114 @@ const VIEW = 'lots_with_next_price';
 const VIEW_COLUMNS = 'slug,title,video_url,price,owner_login,owner_uid,next_price';
 const TABLE_COLUMNS = 'slug,title,video_url,price,owner_login,owner_uid';
 
+/** Каталог + признак «ответ от БД получен»: пустой каталог ≠ ошибка. */
+export interface CatalogResult {
+  ok: boolean;
+  states: Map<string, LotState>;
+}
+
 /**
  * Весь живой каталог одним запросом (витрина, колокол, уведомления).
  * Вью отсутствует (миграция ещё не применена) — фолбэк на таблицу `lots`
  * с nextPrice null (клиентской формулы нет и не будет).
- * Ошибка или ненастроенное хранилище → пустая карта. Секретов здесь нет:
- * только publishable-ключ через getSupabase().
+ * Ошибка или ненастроенное хранилище → `ok: false` с пустой картой (витрина
+ * отличает «пусто» от «не загрузилось»). Секретов здесь нет: только
+ * publishable-ключ через getSupabase().
  */
-export async function fetchLotCatalog(uid: string | null): Promise<Map<string, LotState>> {
+export async function fetchLotCatalogResult(uid: string | null): Promise<CatalogResult> {
   const empty = new Map<string, LotState>();
   const sb = getSupabase();
-  if (!sb) return empty;
+  if (!sb) return { ok: false, states: empty };
   try {
     const fromView = await sb.from(VIEW).select(VIEW_COLUMNS);
     if (!fromView.error && Array.isArray(fromView.data)) {
-      return fillCatalog(fromView.data, uid);
+      return { ok: true, states: fillCatalog(fromView.data, uid) };
     }
   } catch {
     // вью нет — фолбэк ниже
   }
   try {
     const fromTable = await sb.from('lots').select(TABLE_COLUMNS);
-    if (fromTable.error || !Array.isArray(fromTable.data)) return empty;
-    return fillCatalog(fromTable.data, uid);
+    if (fromTable.error || !Array.isArray(fromTable.data)) return { ok: false, states: empty };
+    return { ok: true, states: fillCatalog(fromTable.data, uid) };
   } catch {
-    return empty;
+    return { ok: false, states: empty };
   }
+}
+
+/** Живой каталог; ошибка/ненастроенное хранилище → пустая карта. */
+export async function fetchLotCatalog(uid: string | null): Promise<Map<string, LotState>> {
+  return (await fetchLotCatalogResult(uid)).states;
+}
+
+/** Один Лот + признак «ответ от БД получен»: нет строки ≠ БД недоступна. */
+export interface LotStateResult {
+  ok: boolean;
+  state: LotState | null;
+}
+
+/** PostgREST-код «строки нет» — это отсутствие Лота, а не сбой запроса. */
+function isNoRow(err: { code?: string } | null | undefined): boolean {
+  return err?.code === 'PGRST116';
 }
 
 /**
  * Живое состояние одного Лота (проекция модалки, свежая N перед записью).
- * null — строки нет, вью и таблица недоступны или хранилище не настроено.
+ * Пробуем вью, затем таблицу. `state: null` при `ok: true` — строки нет;
+ * `ok: false` — вью и таблица недоступны или хранилище не настроено.
  */
-export async function fetchLotState(slug: string, uid: string | null): Promise<LotState | null> {
+export async function fetchLotStateResult(
+  slug: string,
+  uid: string | null
+): Promise<LotStateResult> {
   const sb = getSupabase();
-  if (!sb) return null;
+  if (!sb) return { ok: false, state: null };
   try {
     const fromView = await sb.from(VIEW).select(VIEW_COLUMNS).eq('slug', slug).single();
     if (!fromView.error && fromView.data) {
-      return toLotState(fromView.data as unknown as LotRow, uid);
+      return { ok: true, state: toLotState(fromView.data as unknown as LotRow, uid) };
     }
   } catch {
     // вью нет — фолбэк ниже
   }
   try {
     const fromTable = await sb.from('lots').select(TABLE_COLUMNS).eq('slug', slug).single();
-    if (fromTable.error || !fromTable.data) return null;
-    return toLotState(fromTable.data as unknown as LotRow, uid);
+    if (!fromTable.error && fromTable.data) {
+      return { ok: true, state: toLotState(fromTable.data as unknown as LotRow, uid) };
+    }
+    if (isNoRow(fromTable.error)) return { ok: true, state: null };
+    return { ok: false, state: null };
   } catch {
-    return null;
+    return { ok: false, state: null };
   }
+}
+
+/** Состояние одного Лота; нет строки/ошибка/не настроено → null. */
+export async function fetchLotState(slug: string, uid: string | null): Promise<LotState | null> {
+  return (await fetchLotStateResult(slug, uid)).state;
+}
+
+/**
+ * Заполнить кнопку покупки данными Лота — контракт с BuyModal (`data-buy-lot*`).
+ * Одно место на витрину и страницу лота: правка формы тут меняет оба экрана.
+ */
+export function fillBuyButton(btn: Element | null, st: LotState): void {
+  if (!(btn instanceof HTMLButtonElement)) return;
+  btn.dataset.buyLot = st.slug;
+  btn.dataset.lotTitle = st.title;
+  // Staged-цена — живая N из каталога; N неизвестна — «…», сервер посчитает сам.
+  btn.dataset.lotPrice = String(st.nextPrice ?? st.price);
+  btn.dataset.lotOwner = st.owner_login ?? '—';
+  if (st.video_url) btn.dataset.lotVideo = st.video_url;
+  else delete btn.dataset.lotVideo;
+  // Свой лот купить нельзя (перекуп у себя бессмыслен): кнопка гаснет.
+  btn.disabled = st.mine;
+  btn.textContent = st.mine
+    ? 'Твой привет'
+    : st.nextPrice !== null
+      ? `Забрать за ${st.nextPrice} 🍺`
+      : 'Забрать за … 🍺';
+  btn.classList.toggle('opacity-50', st.mine);
 }
 
 /**

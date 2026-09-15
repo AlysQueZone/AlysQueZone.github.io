@@ -29,7 +29,7 @@ export function splitTitleEmotes(title: string): TitleSegment[] {
 }
 
 /** Отрисовать заголовок лота в DOM (клиентский рендер витрины и страницы лота). */
-export function renderTitleEmotes(title: string): DocumentFragment {
+function renderTitleEmotes(title: string): DocumentFragment {
   const frag = document.createDocumentFragment();
   for (const segment of splitTitleEmotes(title)) {
     if (segment.type === 'emote') {

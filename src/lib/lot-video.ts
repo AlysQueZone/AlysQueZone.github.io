@@ -10,19 +10,22 @@ export interface VideoSources {
   poster: string;
 }
 
+const WEBM_RE = /\.webm(\?.*)?$/i;
+const MP4_RE = /\.mp4(\?.*)?$/i;
+
 /** Источники видео из `video_url` (webm — канон, mp4/постер — заменой хвоста). */
 export function videoSources(videoUrl: string | null | undefined): VideoSources {
   const webm = videoUrl ?? '';
   // Будущие свои URL без .webm (напр. .mp4 из Storage) — как есть, без битого постера.
-  const isWebm = /\.webm(\?.*)?$/i.test(webm);
-  const isMp4 = /\.mp4(\?.*)?$/i.test(webm);
-  const mp4 = isWebm ? webm.replace(/\.webm(\?.*)?$/i, '.mp4$1') : isMp4 ? webm : '';
-  const poster = isWebm ? webm.replace(/\.webm(\?.*)?$/i, '.webp$1') : '';
+  const isWebm = WEBM_RE.test(webm);
+  const isMp4 = MP4_RE.test(webm);
+  const mp4 = isWebm ? webm.replace(WEBM_RE, '.mp4$1') : isMp4 ? webm : '';
+  const poster = isWebm ? webm.replace(WEBM_RE, '.webp$1') : '';
   return { webm, mp4, poster };
 }
 
 function isWebmUrl(url: string): boolean {
-  return /\.webm(\?.*)?$/i.test(url);
+  return WEBM_RE.test(url);
 }
 
 function playInlineVideo(root: HTMLElement): void {
@@ -76,11 +79,7 @@ function playInlineVideo(root: HTMLElement): void {
  * Заполнить корень видео данными лота (клиентский рендер).
  * Пустой `videoUrl` — корень прячется. Идущее воспроизведение не трогаем.
  */
-export function fillVideo(
-  root: Element | null,
-  videoUrl: string | null | undefined,
-  title: string
-): void {
+export function fillVideo(root: Element | null, videoUrl: string | null | undefined): void {
   if (!(root instanceof HTMLElement)) return;
   if (root.querySelector('video')) return;
   const { webm, mp4, poster } = videoSources(videoUrl);
@@ -93,7 +92,6 @@ export function fillVideo(
     delete root.dataset.videoMp4;
     delete root.dataset.videoPoster;
   }
-  root.dataset.videoTitle = title;
   const img = root.querySelector('[data-lot-video-poster]');
   if (img instanceof HTMLImageElement) {
     if (poster) img.src = poster;

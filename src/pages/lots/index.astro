@@ -47,13 +47,20 @@ import BuyModal from '@/components/BuyModal.astro';
   // «Мои приветы» — только из БД: лоты, где mine (owner_uid == uid сессии).
   // Локальный инвентарь не читаем. Без PUBLIC_SUPABASE_* — честная деградация.
   import { getSupabase, isSupabaseConfigured, getSessionUid } from '@/lib/supabase';
-  import { fetchLotCatalog, subscribeLots, onBought, type LotState } from '@/lib/lots';
+  import {
+    fetchLotCatalogResult,
+    fillBuyButton,
+    subscribeLots,
+    onBought,
+    type LotState,
+  } from '@/lib/lots';
   import { initLotVideos, fillVideo } from '@/lib/lot-video';
   import { setTitleEmotes } from '@/lib/emotes';
 
   const base = import.meta.env.BASE_URL;
   const GUEST_TEXT = 'Войди через Twitch — тут будут твои приветы';
   const EMPTY_TEXT = 'Пока пусто — забери первый привет ниже';
+  const GRID_EMPTY_TEXT = 'Пока лотов нет — скоро появятся';
   const LOADING_TEXT = 'Загружаю лоты…';
   const FAIL_TEXT = 'Лоты не загрузились. Проверь связь и обнови страницу';
 
@@ -126,7 +133,7 @@ import BuyModal from '@/components/BuyModal.astro';
     const link = card.querySelector('[data-lot-link]');
     if (link instanceof HTMLAnchorElement) link.href = lotHref(st.slug);
     setTitleEmotes(card.querySelector('[data-lot-title]'), st.title);
-    fillVideo(card.querySelector('[data-lot-video-root]'), st.video_url, st.title);
+    fillVideo(card.querySelector('[data-lot-video-root]'), st.video_url);
     const ownerEl = card.querySelector('[data-shared-owner]');
     if (ownerEl) ownerEl.textContent = st.owner_login ?? '—';
     const priceEl = card.querySelector('[data-shared-price]');
@@ -134,25 +141,7 @@ import BuyModal from '@/components/BuyModal.astro';
     const badge = card.querySelector('[data-mine-badge]');
     if (badge) badge.classList.toggle('hidden', !st.mine);
     prices.set(st.slug, st.price);
-    const buyBtn = card.querySelector('[data-buy-lot]');
-    if (buyBtn instanceof HTMLButtonElement) {
-      buyBtn.dataset.buyLot = st.slug;
-      buyBtn.dataset.lotTitle = st.title;
-      // Staged-цена кнопки — живая N из каталога; N неизвестна — «…», сервер
-      // всё равно посчитает настоящую.
-      buyBtn.dataset.lotPrice = String(st.nextPrice ?? st.price);
-      buyBtn.dataset.lotOwner = st.owner_login ?? '—';
-      if (st.video_url) buyBtn.dataset.lotVideo = st.video_url;
-      else delete buyBtn.dataset.lotVideo;
-      // Свой лот купить нельзя (перекуп у себя бессмыслен): кнопка гаснет.
-      buyBtn.disabled = st.mine;
-      buyBtn.textContent = st.mine
-        ? 'Твой привет'
-        : st.nextPrice !== null
-          ? `Забрать за ${st.nextPrice} 🍺`
-          : 'Забрать за … 🍺';
-      buyBtn.classList.toggle('opacity-50', st.mine);
-    }
+    fillBuyButton(card.querySelector('[data-buy-lot]'), st);
   }
 
   // slug → узел карточки: reconcile набора (создать/снести/обновить).
@@ -173,35 +162,31 @@ import BuyModal from '@/components/BuyModal.astro';
 
     for (const st of states.values()) {
       if (!Number.isFinite(st.price)) continue;
-      let card = rendered.get(st.slug);
-      if (!card) {
-        const fresh = tpl.content.firstElementChild;
-        if (!(fresh instanceof HTMLElement)) return;
-        card = fresh.cloneNode(true) as HTMLElement;
-        rendered.set(st.slug, card);
-        grid.appendChild(card);
+      const card = rendered.get(st.slug);
+      if (card) {
+        fillCard(card, st);
+        continue;
       }
-      fillCard(card, st);
+      const fresh = tpl.content.firstElementChild;
+      if (!(fresh instanceof HTMLElement)) return;
+      const created = fresh.cloneNode(true) as HTMLElement;
+      rendered.set(st.slug, created);
+      fillCard(created, st);
+      insertSorted(grid, created);
     }
 
-    orderGrid(grid);
     initLotVideos(grid);
   }
 
   // Витрина — от дешёвых к дорогим (новичок первым делом видит доступные лоты).
-  // Перестановка — только когда относительный порядок реально изменился.
-  function orderGrid(grid: HTMLElement): void {
-    const desired = [...rendered.keys()].sort(
-      (a, b) => (prices.get(a) ?? 0) - (prices.get(b) ?? 0)
+  // Новую карточку ставим по цене, уже нарисованные не двигаем: живой ресорт
+  // не делаем, чтобы карточка не уезжала из-под курсора.
+  function insertSorted(grid: HTMLElement, card: HTMLElement): void {
+    const price = prices.get(card.dataset.lotCard ?? '') ?? 0;
+    const before = [...grid.querySelectorAll<HTMLElement>('[data-lot-card]')].find(
+      (node) => node !== card && (prices.get(node.dataset.lotCard ?? '') ?? 0) > price
     );
-    const current = [...grid.querySelectorAll('[data-lot-card]')].map(
-      (n) => (n as HTMLElement).dataset.lotCard ?? ''
-    );
-    if (desired.length === current.length && desired.every((s, i) => s === current[i])) return;
-    for (const slug of desired) {
-      const el = rendered.get(slug);
-      if (el) grid.appendChild(el);
-    }
+    grid.insertBefore(card, before ?? null);
   }
 
   let refreshing = false;
@@ -210,10 +195,10 @@ import BuyModal from '@/components/BuyModal.astro';
     refreshing = true;
     try {
       const uid = await getSessionUid();
-      const catalog = await fetchLotCatalog(uid);
-      reconcile(catalog);
-      setGridNote(catalog.size === 0 ? FAIL_TEXT : null);
-      renderMyGreetings(catalog, uid);
+      const { ok, states } = await fetchLotCatalogResult(uid);
+      reconcile(states);
+      setGridNote(!ok ? FAIL_TEXT : states.size === 0 ? GRID_EMPTY_TEXT : null);
+      renderMyGreetings(states, uid);
     } finally {
       refreshing = false;
     }

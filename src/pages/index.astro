@@ -95,11 +95,17 @@ const base = import.meta.env.BASE_URL;
 <script>
   // Случайные приветы — из живого каталога БД, выбор в браузере (не на билде).
   import { getSessionUid, isSupabaseConfigured } from '@/lib/supabase';
-  import { fetchLotCatalog } from '@/lib/lots';
+  import { fetchLotCatalogResult } from '@/lib/lots';
 
   const slot = document.querySelector('[data-random-lots]');
   const note = document.querySelector('[data-random-state]');
   const PICK = 4;
+
+  function setNote(text: string | null): void {
+    if (!(note instanceof HTMLElement)) return;
+    note.textContent = text ?? '';
+    note.classList.toggle('hidden', text === null);
+  }
 
   function miniCard(title: string, owner: string | null, price: number): HTMLElement {
     const card = document.createElement('article');
@@ -122,15 +128,18 @@ const base = import.meta.env.BASE_URL;
   async function renderRandom(): Promise<void> {
     if (!(slot instanceof HTMLElement)) return;
     const uid = await getSessionUid();
-    const pool = [...(await fetchLotCatalog(uid)).values()];
+    const { ok, states } = await fetchLotCatalogResult(uid);
+    const pool = [...states.values()];
     for (let i = pool.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [pool[i], pool[j]] = [pool[j] as (typeof pool)[number], pool[i] as (typeof pool)[number]];
     }
     const pick = pool.slice(0, PICK);
     slot.replaceChildren(...pick.map((st) => miniCard(st.title, st.owner_login, st.price)));
-    if (note instanceof HTMLElement) note.classList.toggle('hidden', pick.length > 0);
+    if (pick.length > 0) setNote(null);
+    else setNote(ok ? 'Пока пусто — зайди на биржу' : 'Приветы не загрузились — проверь связь');
   }
 
   if (isSupabaseConfigured()) void renderRandom();
+  else setNote('Приветы не загрузились — проверь связь');
 </script>
