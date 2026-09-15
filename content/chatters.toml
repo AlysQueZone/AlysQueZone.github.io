@@ -38,6 +38,7 @@ id = "132281585"
 [[chatters]]
 nick = "1AxeJ"
 login = "1axej"
+aliases = ["Axel", "Alex"]
 id = "876074101"
 
 [[chatters]]
@@ -5433,6 +5434,7 @@ id = "615251791"
 [[chatters]]
 nick = "quevizariks"
 login = "quevizariks"
+aliases = ["Quevizar"]
 id = "511241615"
 
 [[chatters]]

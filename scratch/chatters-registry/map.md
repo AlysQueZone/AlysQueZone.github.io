@@ -17,6 +17,7 @@
 - [Реестр `content/chatters.toml` и синк из чата](issues/02-chatters-file-and-sync.md): 172 ника из VOD `2864275043`; `scripts/chatters_sync.py` + `just chatters-sync` (idempotent по `id`/`login`, `aliases` не трогает).
 - [Правило для агента и указатели](issues/03-agent-rule-and-pointers.md): правило резолва ника — в `docs/agents/chatters.md`, указатель в `AGENTS.md`, шаг в `media-pipeline.md`.
 - [Догрузить реестр со свежих VOD](issues/05-more-vods.md): прогнано 7 VOD, реестр 172 → 1551 ника; нашлись «Брадха», «Салат», «Монах», `nexizzzz`, `arhion24`; `Axel` не найден.
+- [Сверка и починка написания ников в карточках](issues/04-fix-card-nick-spellings.md): 15 заголовков приведены к канонам реестра, 9 алиасов, `seed.sql` пересобран.
 
 ## Not yet specified
 
