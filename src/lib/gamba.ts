@@ -47,6 +47,7 @@ export const GAMBA_SPIN_SOUNDS = [
   'gamba-spin-maknaggetskue.mp3',
   'gamba-spin-otvinta.mp3',
   'gamba-spin-rgg-koleso.mp3',
+  'gamba-spin-belaya-noch.mp3',
   'gamba-bg.mp3',
   'gamba-win-taktak.mp3',
 ] as const;
