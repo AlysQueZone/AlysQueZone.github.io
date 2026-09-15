@@ -67,6 +67,7 @@ export const GAMBA_LOSE_SOUNDS = [
   'm4-scum.mp3',
   'gamba-lose-higan.mp3',
   'gamba-lose-pivka.mp3',
+  'gamba-lose-proigrala-zhopu.mp3',
 ] as const;
 
 export type GambaOutcome = 'miss' | 'return' | 'small' | 'big' | 'jackpot';
