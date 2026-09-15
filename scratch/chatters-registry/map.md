@@ -14,6 +14,7 @@
 ## Decisions so far
 
 - [Идентичность ника и актуальный способ скачать чат VOD](issues/01-nick-identity-and-chat-source.md): канон — display-имя (`nick`), ключ дедупа — `login` (или числовой user id); оба способа скачивания живы, рекомендован `TwitchDownloaderCLI`.
+- [Реестр `content/chatters.toml` и синк из чата](issues/02-chatters-file-and-sync.md): 172 ника из VOD `2864275043`; `scripts/chatters_sync.py` + `just chatters-sync` (idempotent по `id`/`login`, `aliases` не трогает).
 
 ## Not yet specified
 

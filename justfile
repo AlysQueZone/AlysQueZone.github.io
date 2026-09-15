@@ -62,6 +62,11 @@ lots-sync:
 lots-seed:
     python3 scripts/lots_sync.py --write-seed
 
+# Синк ников чатерсов из чата VOD в content/chatters.toml
+# Пример: just chatters-sync --vod 2864275043
+chatters-sync *args:
+    python3 scripts/chatters_sync.py {{args}}
+
 # -------------------------------------
 # Другое
 # -------------------------------------

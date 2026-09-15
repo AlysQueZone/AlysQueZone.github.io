@@ -1,0 +1,866 @@
+# Реестр ников чатерсов alysque — источник правды для написания ников в карточках.
+# Синк: `just chatters-sync --chat <chat.json>` либо `--vod <id>`; новые ники
+# добавляются идемпотентно по login/id. Поле `aliases` скрипт не трогает: агенту
+# можно и нужно дописывать туда варианты написания (кириллица, опечатки), когда
+# он резолвит ник для карточки. `id` — числовой Twitch user id, если источник дал.
+# Порядок записей задаёт скрипт (по login); править руками — только `aliases`.
+
+[[chatters]]
+nick = "0mniuss"
+login = "0mniuss"
+id = "136594296"
+
+[[chatters]]
+nick = "11_alex_1_"
+login = "11_alex_1_"
+id = "994847812"
+
+[[chatters]]
+nick = "3_HOCKA"
+login = "3_hocka"
+id = "983133608"
+
+[[chatters]]
+nick = "4Deli"
+login = "4deli"
+id = "116979297"
+
+[[chatters]]
+nick = "9lost8"
+login = "9lost8"
+id = "92832066"
+
+[[chatters]]
+nick = "afirte"
+login = "afirte"
+id = "904851160"
+
+[[chatters]]
+nick = "agent_vasilya"
+login = "agent_vasilya"
+id = "1075746908"
+
+[[chatters]]
+nick = "AkseLWalkerQuE"
+login = "akselwalkerque"
+id = "94721570"
+
+[[chatters]]
+nick = "amateur_retro"
+login = "amateur_retro"
+id = "462315575"
+
+[[chatters]]
+nick = "andralt452805432"
+login = "andralt452805432"
+id = "1188677980"
+
+[[chatters]]
+nick = "andRushQuE"
+login = "andrushque"
+id = "74202821"
+
+[[chatters]]
+nick = "angelholly"
+login = "angelholly"
+id = "44414189"
+
+[[chatters]]
+nick = "ant1va"
+login = "ant1va"
+id = "29769720"
+
+[[chatters]]
+nick = "Asap_Di"
+login = "asap_di"
+id = "142869046"
+
+[[chatters]]
+nick = "avrora_666"
+login = "avrora_666"
+id = "999730334"
+
+[[chatters]]
+nick = "beeff87"
+login = "beeff87"
+id = "165104702"
+
+[[chatters]]
+nick = "bEnDQuEt"
+login = "bendquet"
+id = "953259129"
+
+[[chatters]]
+nick = "big_br0ther"
+login = "big_br0ther"
+id = "100910302"
+
+[[chatters]]
+nick = "borgoss"
+login = "borgoss"
+id = "459763712"
+
+[[chatters]]
+nick = "buddalabudda"
+login = "buddalabudda"
+id = "111356762"
+
+[[chatters]]
+nick = "Bystrov_Michael"
+login = "bystrov_michael"
+id = "873074823"
+
+[[chatters]]
+nick = "C_R_A_S_H_"
+login = "c_r_a_s_h_"
+id = "82251509"
+
+[[chatters]]
+nick = "Chosxe"
+login = "chosxe"
+id = "51510276"
+
+[[chatters]]
+nick = "chusui_"
+login = "chusui_"
+id = "404912743"
+
+[[chatters]]
+nick = "clark_wren"
+login = "clark_wren"
+id = "766200115"
+
+[[chatters]]
+nick = "coffee_break"
+login = "coffee_break"
+id = "164698871"
+
+[[chatters]]
+nick = "coolbeback"
+login = "coolbeback"
+id = "217519986"
+
+[[chatters]]
+nick = "coolkrok"
+login = "coolkrok"
+id = "1407623941"
+
+[[chatters]]
+nick = "criksader"
+login = "criksader"
+id = "44537739"
+
+[[chatters]]
+nick = "cybeerbullka"
+login = "cybeerbullka"
+id = "147184788"
+
+[[chatters]]
+nick = "Dalamperu"
+login = "dalamperu"
+id = "140191767"
+
+[[chatters]]
+nick = "Danzer"
+login = "danzer"
+id = "85541067"
+
+[[chatters]]
+nick = "dashiswamy"
+login = "dashiswamy"
+id = "1114143174"
+
+[[chatters]]
+nick = "deadmystick"
+login = "deadmystick"
+id = "204517598"
+
+[[chatters]]
+nick = "DemonTekK"
+login = "demontekk"
+id = "41965010"
+
+[[chatters]]
+nick = "Denchique_"
+login = "denchique_"
+id = "94160658"
+
+[[chatters]]
+nick = "densepug"
+login = "densepug"
+id = "466871707"
+
+[[chatters]]
+nick = "DI_Johann"
+login = "di_johann"
+id = "220102314"
+
+[[chatters]]
+nick = "dimk6666"
+login = "dimk6666"
+id = "612819042"
+
+[[chatters]]
+nick = "dmuegorka"
+login = "dmuegorka"
+id = "60810998"
+
+[[chatters]]
+nick = "dobbiks"
+login = "dobbiks"
+id = "235467825"
+
+[[chatters]]
+nick = "doctordumplingwrath"
+login = "doctordumplingwrath"
+id = "1310155731"
+
+[[chatters]]
+nick = "DonBurbonn"
+login = "donburbonn"
+id = "58324068"
+
+[[chatters]]
+nick = "dr_nostradamus"
+login = "dr_nostradamus"
+id = "105473009"
+
+[[chatters]]
+nick = "dridoniks"
+login = "dridoniks"
+id = "450604441"
+
+[[chatters]]
+nick = "DyadyaPog"
+login = "dyadyapog"
+id = "47337460"
+
+[[chatters]]
+nick = "ebujoru"
+login = "ebujoru"
+id = "878990558"
+
+[[chatters]]
+nick = "eugene_n_tonic"
+login = "eugene_n_tonic"
+id = "880686525"
+
+[[chatters]]
+nick = "evilzerg57"
+login = "evilzerg57"
+id = "564087764"
+
+[[chatters]]
+nick = "farrzik"
+login = "farrzik"
+id = "73058664"
+
+[[chatters]]
+nick = "feistyman333"
+login = "feistyman333"
+id = "939142675"
+
+[[chatters]]
+nick = "fkDoesCunoCare"
+login = "fkdoescunocare"
+id = "43672131"
+
+[[chatters]]
+nick = "Flaffy450"
+login = "flaffy450"
+id = "156469089"
+
+[[chatters]]
+nick = "foxindique"
+login = "foxindique"
+id = "270500865"
+
+[[chatters]]
+nick = "Fritzkas"
+login = "fritzkas"
+id = "62372777"
+
+[[chatters]]
+nick = "Fteshhhh"
+login = "fteshhhh"
+id = "173271960"
+
+[[chatters]]
+nick = "Garryet"
+login = "garryet"
+id = "100401583"
+
+[[chatters]]
+nick = "Gedo0"
+login = "gedo0"
+id = "31604080"
+
+[[chatters]]
+nick = "gorohgoroh"
+login = "gorohgoroh"
+id = "86958681"
+
+[[chatters]]
+nick = "Greyson_X"
+login = "greyson_x"
+id = "132888607"
+
+[[chatters]]
+nick = "gRiBoCheQuE"
+login = "gribocheque"
+id = "132794584"
+
+[[chatters]]
+nick = "guiwaiugr"
+login = "guiwaiugr"
+id = "942934330"
+
+[[chatters]]
+nick = "happy_crappie"
+login = "happy_crappie"
+id = "854352395"
+
+[[chatters]]
+nick = "HerrKommandantQuE"
+login = "herrkommandantque"
+id = "1220071262"
+
+[[chatters]]
+nick = "I_Logus_I"
+login = "i_logus_i"
+id = "901948396"
+
+[[chatters]]
+nick = "icLitseist"
+login = "iclitseist"
+id = "62565491"
+
+[[chatters]]
+nick = "ifrat1403"
+login = "ifrat1403"
+id = "794100909"
+
+[[chatters]]
+nick = "imirQuE"
+login = "imirque"
+id = "119393915"
+
+[[chatters]]
+nick = "INexizI"
+login = "inexizi"
+id = "46595468"
+
+[[chatters]]
+nick = "Irenushka13"
+login = "irenushka13"
+id = "103365219"
+
+[[chatters]]
+nick = "kamodator"
+login = "kamodator"
+id = "115024721"
+
+[[chatters]]
+nick = "Kandratnsk"
+login = "kandratnsk"
+id = "23352545"
+
+[[chatters]]
+nick = "Karpret"
+login = "karpret"
+id = "63390982"
+
+[[chatters]]
+nick = "khabaril"
+login = "khabaril"
+id = "436534528"
+
+[[chatters]]
+nick = "Kot3_B_Sallorax"
+login = "kot3_b_sallorax"
+id = "99903162"
+
+[[chatters]]
+nick = "krenovut"
+login = "krenovut"
+id = "441956107"
+
+[[chatters]]
+nick = "KubicLego"
+login = "kubiclego"
+id = "77401332"
+
+[[chatters]]
+nick = "kuri_puri"
+login = "kuri_puri"
+id = "89581766"
+
+[[chatters]]
+nick = "kvakograk"
+login = "kvakograk"
+id = "1516279627"
+
+[[chatters]]
+nick = "las1que"
+login = "las1que"
+id = "491651277"
+
+[[chatters]]
+nick = "lavrentiitormozov"
+login = "lavrentiitormozov"
+id = "1524787736"
+
+[[chatters]]
+nick = "lebedenko1548"
+login = "lebedenko1548"
+id = "138383006"
+
+[[chatters]]
+nick = "lenivet5"
+login = "lenivet5"
+id = "181423492"
+
+[[chatters]]
+nick = "leroockk"
+login = "leroockk"
+id = "796209052"
+
+[[chatters]]
+nick = "lescactus"
+login = "lescactus"
+id = "167777979"
+
+[[chatters]]
+nick = "life__enjoyer"
+login = "life__enjoyer"
+id = "514995700"
+
+[[chatters]]
+nick = "like_a_laika"
+login = "like_a_laika"
+id = "204849751"
+
+[[chatters]]
+nick = "liquid_laugh"
+login = "liquid_laugh"
+id = "167998338"
+
+[[chatters]]
+nick = "log_n"
+login = "log_n"
+id = "82945621"
+
+[[chatters]]
+nick = "lsmilyl"
+login = "lsmilyl"
+id = "51917165"
+
+[[chatters]]
+nick = "Lunara_chan"
+login = "lunara_chan"
+id = "103177600"
+
+[[chatters]]
+nick = "maks_rain"
+login = "maks_rain"
+id = "859007533"
+
+[[chatters]]
+nick = "maksteruser"
+login = "maksteruser"
+id = "73578660"
+
+[[chatters]]
+nick = "MasterusAnton"
+login = "masterusanton"
+id = "88571549"
+
+[[chatters]]
+nick = "melkij_strateg"
+login = "melkij_strateg"
+id = "54988762"
+
+[[chatters]]
+nick = "Mister_DeehloF0Z"
+login = "mister_deehlof0z"
+id = "171060474"
+
+[[chatters]]
+nick = "MoloneyLost"
+login = "moloneylost"
+id = "951149863"
+
+[[chatters]]
+nick = "MornAinu"
+login = "mornainu"
+id = "777003971"
+
+[[chatters]]
+nick = "morred_"
+login = "morred_"
+id = "54913275"
+
+[[chatters]]
+nick = "MrLanzo"
+login = "mrlanzo"
+id = "36807751"
+
+[[chatters]]
+nick = "namsaT"
+login = "namsat"
+id = "208377554"
+
+[[chatters]]
+nick = "Nature_product"
+login = "nature_product"
+id = "49329344"
+
+[[chatters]]
+nick = "neagata_"
+login = "neagata_"
+id = "1239040071"
+
+[[chatters]]
+nick = "NEDDEN"
+login = "nedden"
+id = "45192713"
+
+[[chatters]]
+nick = "NekoPechenii"
+login = "nekopechenii"
+id = "42831903"
+
+[[chatters]]
+nick = "nicemick"
+login = "nicemick"
+id = "451384116"
+
+[[chatters]]
+nick = "NightShadoff"
+login = "nightshadoff"
+id = "79085149"
+
+[[chatters]]
+nick = "nniksen"
+login = "nniksen"
+id = "196660272"
+
+[[chatters]]
+nick = "norbild"
+login = "norbild"
+id = "740175150"
+
+[[chatters]]
+nick = "Norrganon"
+login = "norrganon"
+id = "164085126"
+
+[[chatters]]
+nick = "NXVER_EXISTD"
+login = "nxver_existd"
+id = "1155533470"
+
+[[chatters]]
+nick = "nyanyachos"
+login = "nyanyachos"
+id = "717191830"
+
+[[chatters]]
+nick = "olyacaramel"
+login = "olyacaramel"
+id = "616402552"
+
+[[chatters]]
+nick = "Onghanntto"
+login = "onghanntto"
+id = "137664935"
+
+[[chatters]]
+nick = "oyemiah"
+login = "oyemiah"
+id = "128778643"
+
+[[chatters]]
+nick = "peaced4"
+login = "peaced4"
+id = "1307804919"
+
+[[chatters]]
+nick = "pepeppop_"
+login = "pepeppop_"
+id = "504044123"
+
+[[chatters]]
+nick = "PersonUnkn0wn"
+login = "personunkn0wn"
+id = "66862650"
+
+[[chatters]]
+nick = "philipi4"
+login = "philipi4"
+id = "451387247"
+
+[[chatters]]
+nick = "pilsob"
+login = "pilsob"
+id = "706658593"
+
+[[chatters]]
+nick = "pluhanavt"
+login = "pluhanavt"
+id = "30502821"
+
+[[chatters]]
+nick = "Prampampushkin"
+login = "prampampushkin"
+id = "43539447"
+
+[[chatters]]
+nick = "proffesooor"
+login = "proffesooor"
+id = "865316990"
+
+[[chatters]]
+nick = "Prostver"
+login = "prostver"
+id = "78135956"
+
+[[chatters]]
+nick = "psychoromantic"
+login = "psychoromantic"
+id = "72307202"
+
+[[chatters]]
+nick = "PurpleTie"
+login = "purpletie"
+id = "32388468"
+
+[[chatters]]
+nick = "radar_bear"
+login = "radar_bear"
+id = "1455014575"
+
+[[chatters]]
+nick = "remololpro"
+login = "remololpro"
+id = "65953312"
+
+[[chatters]]
+nick = "Revixit"
+login = "revixit"
+id = "122110062"
+
+[[chatters]]
+nick = "roromQuE"
+login = "roromque"
+id = "148631954"
+
+[[chatters]]
+nick = "s_i_t"
+login = "s_i_t"
+id = "78395432"
+
+[[chatters]]
+nick = "SeeWider"
+login = "seewider"
+id = "108314652"
+
+[[chatters]]
+nick = "ShidouQuE"
+login = "shidouque"
+id = "81801071"
+
+[[chatters]]
+nick = "shlopack"
+login = "shlopack"
+id = "42044323"
+
+[[chatters]]
+nick = "Shpakreban"
+login = "shpakreban"
+id = "40794021"
+
+[[chatters]]
+nick = "SHWERSIX"
+login = "shwersix"
+id = "105580215"
+
+[[chatters]]
+nick = "SmOrcGoel"
+login = "smorcgoel"
+id = "1323857682"
+
+[[chatters]]
+nick = "sobaka22a3"
+login = "sobaka22a3"
+id = "151793274"
+
+[[chatters]]
+nick = "sooblonde"
+login = "sooblonde"
+id = "116041379"
+
+[[chatters]]
+nick = "spiritbanbanban"
+login = "spiritbanbanban"
+id = "1057728601"
+
+[[chatters]]
+nick = "starsun26"
+login = "starsun26"
+id = "40764247"
+
+[[chatters]]
+nick = "StormrageNow"
+login = "stormragenow"
+id = "59223413"
+
+[[chatters]]
+nick = "SvandisQuE"
+login = "svandisque"
+id = "149346125"
+
+[[chatters]]
+nick = "Sveta_Nazarova201"
+login = "sveta_nazarova201"
+id = "95064526"
+
+[[chatters]]
+nick = "Sysl__13"
+login = "sysl__13"
+id = "86799274"
+
+[[chatters]]
+nick = "tehno10g"
+login = "tehno10g"
+id = "57084018"
+
+[[chatters]]
+nick = "templifer"
+login = "templifer"
+id = "636751645"
+
+[[chatters]]
+nick = "TheLongestNicknameOnEarth"
+login = "thelongestnicknameonearth"
+id = "499324876"
+
+[[chatters]]
+nick = "TheSparkWarrior"
+login = "thesparkwarrior"
+id = "107955181"
+
+[[chatters]]
+nick = "tolstiy_sibiryak"
+login = "tolstiy_sibiryak"
+id = "125986763"
+
+[[chatters]]
+nick = "Tom__Mason"
+login = "tom__mason"
+id = "803711440"
+
+[[chatters]]
+nick = "Tory_7"
+login = "tory_7"
+id = "101056506"
+
+[[chatters]]
+nick = "tulen_and_seal"
+login = "tulen_and_seal"
+id = "409888421"
+
+[[chatters]]
+nick = "Undying_Warrior"
+login = "undying_warrior"
+id = "84705734"
+
+[[chatters]]
+nick = "utaupy"
+login = "utaupy"
+id = "46839414"
+
+[[chatters]]
+nick = "uzurpator100"
+login = "uzurpator100"
+id = "717814476"
+
+[[chatters]]
+nick = "vag0da"
+login = "vag0da"
+id = "489562121"
+
+[[chatters]]
+nick = "VandaLQuE"
+login = "vandalque"
+id = "1231377470"
+
+[[chatters]]
+nick = "voiddragon1983"
+login = "voiddragon1983"
+id = "114999894"
+
+[[chatters]]
+nick = "Von_Skinar"
+login = "von_skinar"
+id = "546351050"
+
+[[chatters]]
+nick = "VVOULFAN"
+login = "vvoulfan"
+id = "1126953412"
+
+[[chatters]]
+nick = "Willfray"
+login = "willfray"
+id = "161166967"
+
+[[chatters]]
+nick = "winterrfoxxy"
+login = "winterrfoxxy"
+id = "781043853"
+
+[[chatters]]
+nick = "XAKEP_MEH"
+login = "xakep_meh"
+id = "663868691"
+
+[[chatters]]
+nick = "xKillEvilx"
+login = "xkillevilx"
+id = "50428887"
+
+[[chatters]]
+nick = "YaBoQuE_"
+login = "yaboque_"
+id = "89441018"
+
+[[chatters]]
+nick = "yoshocagi"
+login = "yoshocagi"
+id = "815168665"
+
+[[chatters]]
+nick = "Yurrrch"
+login = "yurrrch"
+id = "44594710"
+
+[[chatters]]
+nick = "Zarckirr"
+login = "zarckirr"
+id = "75235327"
+
+[[chatters]]
+nick = "Zarksiska"
+login = "zarksiska"
+id = "45715590"
+
+[[chatters]]
+nick = "Ziti7o"
+login = "ziti7o"
+id = "1054413869"
+
+[[chatters]]
+nick = "Zloy_Apelsinchik"
+login = "zloy_apelsinchik"
+id = "103061069"
