@@ -84,7 +84,6 @@ export function initOutbidNotice(): void {
     }
   }
 
-  let bellBtn: HTMLElement | null = null;
   let bellCount: HTMLElement | null = null;
   let bellPanel: HTMLElement | null = null;
 
@@ -200,10 +199,8 @@ export function initOutbidNotice(): void {
       if (t && !panel.contains(t)) panel.style.display = 'none';
     });
     actions.insertBefore(btn, actions.firstChild);
-    bellBtn = btn;
     bellCount = count;
     bellPanel = panel;
-    void bellBtn;
     renderBell();
   }
 
@@ -211,7 +208,6 @@ export function initOutbidNotice(): void {
   function removeBell(): void {
     document.getElementById(BELL_ID)?.remove();
     document.getElementById(BELL_PANEL_ID)?.remove();
-    bellBtn = null;
     bellCount = null;
     bellPanel = null;
   }

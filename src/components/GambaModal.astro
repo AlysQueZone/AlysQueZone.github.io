@@ -79,16 +79,13 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
 
 <script>
   import { getSupabase, isSupabaseConfigured, signInWithTwitch } from '@/lib/supabase';
-  import { fetchMyBalance } from '@/lib/balance';
+  import { fetchMyBalance, paintBalance } from '@/lib/balance';
   import {
-    GAMBA_PAYTABLE,
     GAMBA_STAKE,
-    fetchGambaPaytable,
     mapGambaError,
     newGambaAttemptKey,
     spinGambaWithRetry,
     type GambaOutcome,
-    type GambaPayRow,
   } from '@/lib/gamba';
   import { trapFocus, releaseFocus } from '@/lib/modal-focus';
 
@@ -164,7 +161,6 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
   const result = document.getElementById('gamba-result');
   const spinBtn = document.getElementById('gamba-spin');
   const closeBtn = document.getElementById('gamba-close');
-  const paytable = document.getElementById('gamba-paytable');
 
   const GATE_TEXT =
     'В котле меньше сотни — ставка 100 не влезла. Забери Ежедневный вход и возвращайся пойжемать 🙂';
@@ -181,27 +177,6 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
    * идемпотентен, дублей нет), истекает только после показанного исхода.
    */
   let attemptKey: string | null = null;
-
-  /** Плакат из БД (public.gamba_payouts публична); молча — фолбэк GAMBA_PAYTABLE. */
-  function paintPaytable(rows: GambaPayRow[]): void {
-    if (!(paytable instanceof HTMLUListElement)) return;
-    paytable.innerHTML = '';
-    for (const row of rows) {
-      const li = document.createElement('li');
-      li.className = 'border-2 border-milk/60 bg-void px-1 py-1 font-bold';
-      li.textContent = `${row.label} — ${row.chance}`;
-      paytable.appendChild(li);
-    }
-  }
-
-  async function refreshPaytable(): Promise<void> {
-    try {
-      const live = await fetchGambaPaytable();
-      paintPaytable(live ?? GAMBA_PAYTABLE);
-    } catch {
-      paintPaytable(GAMBA_PAYTABLE);
-    }
-  }
 
   let spinning = false;
   let raf = 0;
@@ -381,12 +356,6 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
     }
   }
 
-  function paintBalance(balance: number): void {
-    document.querySelectorAll('[data-wallet-balance]').forEach((el) => {
-      el.textContent = String(balance);
-    });
-  }
-
   /** Докрутка колеса до сегмента присланного сервером исхода. */
   function animateToOutcome(outcome: GambaOutcome): void {
     // У каждого исхода таблицы H свой сегмент — маппинга не нужно.
@@ -464,8 +433,6 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
     trapFocus(modal);
     draw(0);
     preloadPools();
-    // Плакат всегда свежий из БД (фолбэк — зашитая таблица выше).
-    void refreshPaytable();
     // Дружелюбный гейт заранее: при балансе меньше ставки — подсказка
     // про Ежедневный вход, а не ошибка после клика.
     void (async () => {
@@ -531,7 +498,7 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
     // (см. конец animateToOutcome) — при ошибке ключ жив, дублей нет.
     attemptKey ??= newGambaAttemptKey();
     try {
-      const done = await spinGambaWithRetry(attemptKey, { retries: 1 });
+      const done = await spinGambaWithRetry(attemptKey);
       spinOutcome = done.outcome;
       spinBalance = done.balance;
     } catch (err) {

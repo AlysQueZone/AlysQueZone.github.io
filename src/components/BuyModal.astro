@@ -71,6 +71,7 @@ const clapSound = s3Sound('clap.mp3');
   // Локальный кошелёк удалён, фолбэка без настроенного хранилища нет:
   // подтверждать нечему — говорим честно.
   import { boom } from '@/lib/confetti';
+  import { ALYSQUE_CLAP_DARK } from '@/lib/emotes';
   import { trapFocus, releaseFocus } from '@/lib/modal-focus';
   import { fetchLotState, subscribeLots, buyLot, announceBought } from '@/lib/lots';
   import {
@@ -114,9 +115,6 @@ const clapSound = s3Sound('clap.mp3');
   function pauseLabel(left: number): string {
     return `Жди ${left} с`;
   }
-
-  const CLAP_URL =
-    'https://static-cdn.jtvnw.net/emoticons/v2/emotesv2_1075070639054e5d8cacb8a0ef4872d7/default/dark/3.0';
 
   function playClapFallback(): void {
     try {
@@ -217,7 +215,7 @@ const clapSound = s3Sound('clap.mp3');
       videoEl = video;
     } else if (ok) {
       const img = document.createElement('img');
-      img.src = CLAP_URL;
+      img.src = ALYSQUE_CLAP_DARK;
       img.alt = 'alysqueCLAP';
       img.width = 28;
       img.height = 28;

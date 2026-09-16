@@ -12,12 +12,11 @@
 
 import { getSupabase } from './supabase';
 
-/** Стартовый баланс — зеркало серверного дефолта (триггер handle_new_profile). */
-export const DB_START_BALANCE = 1000;
-
-export interface MyBalance {
-  uid: string;
-  balance: number;
+/** Отразить баланс во всех чипах шапки (`data-wallet-balance`). */
+export function paintBalance(balance: number): void {
+  document.querySelectorAll('[data-wallet-balance]').forEach((el) => {
+    el.textContent = String(balance);
+  });
 }
 
 /**

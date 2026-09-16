@@ -24,12 +24,7 @@
     todayUtcDate,
   } from '@/lib/daily';
   import { boom } from '@/lib/confetti';
-
-  function paintBalance(balance: number): void {
-    document.querySelectorAll('[data-wallet-balance]').forEach((el) => {
-      el.textContent = String(balance);
-    });
-  }
+  import { paintBalance } from '@/lib/balance';
 
   /** Окно ежедневного входа: по центру, карточка стиля C, confetti при успехе.
    *  Закрытие: «Ок» / крестик / клик по затемнению / Escape. Без автотаймера,

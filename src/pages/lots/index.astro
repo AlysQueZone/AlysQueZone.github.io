@@ -124,9 +124,6 @@ import BuyModal from '@/components/BuyModal.astro';
     }
   }
 
-  // slug → текущая цена: порядок витрины без парсинга текста.
-  const prices = new Map<string, number>();
-
   /** Заполнить карточку состоянием Лота по data-слотам шаблона. */
   function fillCard(card: HTMLElement, st: LotState): void {
     card.dataset.lotCard = st.slug;
@@ -140,7 +137,6 @@ import BuyModal from '@/components/BuyModal.astro';
     if (priceEl) priceEl.textContent = `${st.price} 🍺`;
     const badge = card.querySelector('[data-mine-badge]');
     if (badge) badge.classList.toggle('hidden', !st.mine);
-    prices.set(st.slug, st.price);
     fillBuyButton(card.querySelector('[data-buy-lot]'), st);
   }
 
@@ -156,7 +152,6 @@ import BuyModal from '@/components/BuyModal.astro';
       if (!states.has(slug)) {
         el.remove();
         rendered.delete(slug);
-        prices.delete(slug);
       }
     }
 
@@ -172,7 +167,7 @@ import BuyModal from '@/components/BuyModal.astro';
       const created = fresh.cloneNode(true) as HTMLElement;
       rendered.set(st.slug, created);
       fillCard(created, st);
-      insertSorted(grid, created);
+      insertSorted(grid, created, states);
     }
 
     initLotVideos(grid);
@@ -181,10 +176,10 @@ import BuyModal from '@/components/BuyModal.astro';
   // Витрина — от дешёвых к дорогим (новичок первым делом видит доступные лоты).
   // Новую карточку ставим по цене, уже нарисованные не двигаем: живой ресорт
   // не делаем, чтобы карточка не уезжала из-под курсора.
-  function insertSorted(grid: HTMLElement, card: HTMLElement): void {
-    const price = prices.get(card.dataset.lotCard ?? '') ?? 0;
+  function insertSorted(grid: HTMLElement, card: HTMLElement, states: Map<string, LotState>): void {
+    const price = states.get(card.dataset.lotCard ?? '')?.price ?? 0;
     const before = [...grid.querySelectorAll<HTMLElement>('[data-lot-card]')].find(
-      (node) => node !== card && (prices.get(node.dataset.lotCard ?? '') ?? 0) > price
+      (node) => node !== card && (states.get(node.dataset.lotCard ?? '')?.price ?? 0) > price
     );
     grid.insertBefore(card, before ?? null);
   }

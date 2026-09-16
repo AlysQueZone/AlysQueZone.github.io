@@ -18,11 +18,9 @@
 import { getSupabase } from './supabase';
 
 /** Фиксированная ставка Гамбы — display-mirror, source of truth — DB (c_stake в spin_gamba). */
-// display-mirror, source of truth — DB
 export const GAMBA_STAKE = 100;
 
 /** Дневной лимит спинов — display-mirror, source of truth — DB (c_daily_limit в spin_gamba). */
-// display-mirror, source of truth — DB
 export const GAMBA_DAILY_LIMIT = 20;
 
 /**
@@ -86,7 +84,6 @@ export interface GambaPayRow {
 /** Плакат до спина: ставка, таблица и шансы — display-mirror, source of truth — DB
  *  (`public.gamba_payouts`, см. fetchGambaPaytable); константа ниже — лишь фолбэк
  *  показа, если конфиг из БД не прочитался. */
-// display-mirror, source of truth — DB
 export const GAMBA_PAYTABLE: GambaPayRow[] = [
   { outcome: 'return', payout: 100, chance: '75%', label: 'возврат 100' },
   { outcome: 'small', payout: 150, chance: '17%', label: '+50' },
@@ -184,22 +181,14 @@ export function newGambaAttemptKey(): string {
   return `gamba-${Date.now()}-${Math.floor(Math.random() * 1e9)}`;
 }
 
-export interface GambaRetryOptions {
-  /** Сколько раз повторить тем же ключом при transport/офлайн-ошибке. */
-  retries?: number;
-}
-
 /**
  * Спин с повтором тем же ключом: transport/офлайн-ошибка (исход неизвестен) —
  * ещё попытка с ТЕМ ЖЕ ключом (сервер вернёт уже записанное либо запишет
  * заново без дубля). Бизнес-ошибки (insufficient-funds/rate-limit/
  * unauthenticated) не ретраятся — бросаются сразу.
  */
-export async function spinGambaWithRetry(
-  idempotencyKey: string,
-  opts?: GambaRetryOptions
-): Promise<GambaSpinResult> {
-  const retries = Math.max(0, opts?.retries ?? 1);
+export async function spinGambaWithRetry(idempotencyKey: string): Promise<GambaSpinResult> {
+  const retries = 1;
   let lastErr: unknown = null;
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
