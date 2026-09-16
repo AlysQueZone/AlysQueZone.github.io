@@ -9,6 +9,7 @@
 - Витрина и страницы лотов — клиентская проекция БД (`docs/adr/0002`): контент публикует `just lots-sync` без деплоя; билд без запроса к БД, но требует `PUBLIC_SUPABASE_*`.
 - Математика биржи — из одних рук: меняешь механику — обнови витрину и `CONTEXT.md`.
 - Цвет/визуальный стиль — один источник: палитра D1 в `design-system/alysquezone/MASTER.md`, токены — `@theme` в `src/styles/global.css`; hex в коде не хардкодим.
+- UI/UX-скиллы (`.opencode/`) в гите нет: свежий клон — `npx uipro init --ai opencode`, обновление — `npx uipro update`.
 
 ## Указатели
 

@@ -38,7 +38,8 @@
     "supabase": "^2.116.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.7.3",
-    "typescript-eslint": "^8.70.0"
+    "typescript-eslint": "^8.70.0",
+    "ui-ux-pro-max-cli": "^2.15.0"
   },
   "lint-staged": {
     "*.{js,mjs,cjs,ts,mts,cts,astro}": [

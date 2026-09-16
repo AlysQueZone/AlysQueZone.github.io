@@ -23,6 +23,7 @@ const clapSound = s3Sound('clap.mp3');
   role="dialog"
   aria-modal="true"
   aria-labelledby="buy-modal-title"
+  tabindex="-1"
 >
   <div class="card-pixel w-full max-w-sm p-5">
     <div class="flex items-center gap-3">
@@ -70,6 +71,7 @@ const clapSound = s3Sound('clap.mp3');
   // Локальный кошелёк удалён, фолбэка без настроенного хранилища нет:
   // подтверждать нечему — говорим честно.
   import { boom } from '@/lib/confetti';
+  import { trapFocus, releaseFocus } from '@/lib/modal-focus';
   import { fetchLotState, subscribeLots, buyLot, announceBought } from '@/lib/lots';
   import {
     getSupabase,
@@ -378,6 +380,7 @@ const clapSound = s3Sound('clap.mp3');
     restoreBuyButton();
     modal.classList.remove('hidden');
     modal.classList.add('flex');
+    trapFocus(modal);
     // Живые проекции: пауза (моя последняя покупка этого лота) + цена (N из БД).
     const lotId = pending.id;
     try {
@@ -399,6 +402,7 @@ const clapSound = s3Sound('clap.mp3');
     if (!modal) return;
     modal.classList.add('hidden');
     modal.classList.remove('flex');
+    releaseFocus(modal);
   }
 
   document.addEventListener('click', async (e) => {

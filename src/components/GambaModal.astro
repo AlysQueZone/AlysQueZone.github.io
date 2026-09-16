@@ -36,6 +36,7 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
   role="dialog"
   aria-modal="true"
   aria-labelledby="gamba-title"
+  tabindex="-1"
 >
   <div class="card-pixel w-full max-w-md p-5 text-center">
     <h3 id="gamba-title" class="font-display text-xs leading-relaxed uppercase">
@@ -89,6 +90,7 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
     type GambaOutcome,
     type GambaPayRow,
   } from '@/lib/gamba';
+  import { trapFocus, releaseFocus } from '@/lib/modal-focus';
 
   /** Токены палитры (design-system/alysquezone/MASTER.md) — canvas их не видит,
       поэтому читаем значения из :root один раз. */
@@ -459,6 +461,7 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
     if (result) result.textContent = '';
     modal.classList.remove('hidden');
     modal.classList.add('flex');
+    trapFocus(modal);
     draw(0);
     preloadPools();
     // Плакат всегда свежий из БД (фолбэк — зашитая таблица выше).
@@ -487,6 +490,7 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
     if (!modal) return;
     modal.classList.add('hidden');
     modal.classList.remove('flex');
+    releaseFocus(modal);
     setBusy(false);
   }
 
