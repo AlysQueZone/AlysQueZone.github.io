@@ -1,9 +1,16 @@
-// Эмоуты канала: alysqueCLAP для звука покупки без видео (BuyModal) и гамбы.
+// Эмоуты канала: alysqueCLAP для звука покупки без видео (BuyModal) и гамбы,
+// alysqueWAUW — вывеска лота в hero.
 // Привязка «эмоут карточки лота» удалена: все лоты теперь видео-мемы.
 // Токены в заголовках лотов (напр. o7) рисуются 7TV-эмоутом канала.
 
-export const ALYSQUE_CLAP_DARK =
-  'https://static-cdn.jtvnw.net/emoticons/v2/emotesv2_1075070639054e5d8cacb8a0ef4872d7/default/dark/3.0';
+/** Нативные эмоуты Twitch канала: хотлинк с static-cdn.jtvnw.net (dark/3.0). */
+const twitch = (id: string, variant = 'dark'): string =>
+  `https://static-cdn.jtvnw.net/emoticons/v2/${id}/default/${variant}/3.0`;
+
+export const ALYSQUE_CLAP_DARK = twitch('emotesv2_1075070639054e5d8cacb8a0ef4872d7');
+
+/** alysqueWAUW (ID сверен по агрегатору эмоутов канала). */
+export const ALYSQUE_WAUW = twitch('305551534');
 
 const cdn = (id: string): string => `https://cdn.7tv.app/emote/${id}/2x.webp`;
 

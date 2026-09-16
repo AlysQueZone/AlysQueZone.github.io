@@ -43,7 +43,7 @@
 | `--color-ember-deep` | `#A34400` | тёплый акцент как **текст** на светлом           |
 | `--color-blush`      | `#FF00BC` | хот-пинк — официальный цвет чата канала в Twitch |
 | `--color-blush-deep` | `#C4008C` | хот-пинк как **текст** на светлом                |
-| `--color-melon`      | `#C21D3B` | тёмный красный (ошибки, бейджи, стрелка колеса)  |
+| `--color-melon`      | `#C21D3B` | тёмный красный (ошибки: текст и рамка)           |
 | `--color-detail`     | `#92400E` | мелкие детали                                    |
 | `--color-twitch`     | `#9146FF` | бренд-фиолетовый Twitch (кнопка входа)           |
 
@@ -81,7 +81,7 @@ Muted-текст: `text-mist` (без opacity-модификатора). `text-m
 | `.chip-arcade`        | тот же бордер/радиус/высота и смещение тени 4px, но тень светлая (`milk` 30%) | — (статичная табличка: баланс, ник; курсор обычный, hover/press нет) |
 | `.btn-arcade-primary` | фон `stream`, текст `cream`                                                   | hover фон `ctahover`                                                 |
 | `.btn-arcade-ghost`   | прозрачный, текст `milk`                                                      | hover фон `milk` 7%                                                  |
-| `.badge-pixel`        | `font-display`, 9px                                                           | —                                                                    |
+| `.badge-pixel`        | `font-display`, 9px; вывеска — фон `stream`, текст `cream`                    | —                                                                    |
 | `.marquee-track`      | бегущая строка                                                                | 45с/круг, off при `prefers-reduced-motion`                           |
 
 ## Анти-паттерны
