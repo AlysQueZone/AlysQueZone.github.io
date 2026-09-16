@@ -25,6 +25,7 @@
   } from '@/lib/daily';
   import { boom } from '@/lib/confetti';
   import { paintBalance } from '@/lib/balance';
+  import { trapFocus, releaseFocus } from '@/lib/modal-focus';
 
   /** Окно ежедневного входа: по центру, карточка стиля C, confetti при успехе.
    *  Закрытие: «Ок» / крестик / клик по затемнению / Escape. Без автотаймера,
@@ -49,7 +50,8 @@
     const cross = document.createElement('button');
     cross.type = 'button';
     cross.setAttribute('aria-label', 'Закрыть');
-    cross.className = 'btn-arcade btn-arcade-ghost shrink-0 px-3 py-1 text-sm';
+    cross.className =
+      'btn-arcade btn-arcade-ghost grid min-h-11 min-w-11 shrink-0 place-items-center px-3 py-1 text-sm';
     cross.textContent = '✕';
     headRow.append(title, cross);
     const body = document.createElement('p');
@@ -65,6 +67,7 @@
     function detach(): void {
       document.removeEventListener('click', onOutside, true);
       document.removeEventListener('keydown', onKey);
+      releaseFocus(overlay);
       overlay.remove();
     }
     function onOutside(e: MouseEvent): void {
@@ -84,6 +87,7 @@
       }
     }, 0);
     if (withConfetti) boom();
+    trapFocus(overlay);
     ok.focus();
   }
 

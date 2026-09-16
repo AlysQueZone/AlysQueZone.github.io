@@ -9,14 +9,17 @@ import LotVideo from './LotVideo.astro';
 const base = import.meta.env.BASE_URL;
 ---
 
-<article data-lot-card class="card-pixel flex flex-col gap-2 p-4 transition hover:-translate-y-0.5">
+<article
+  data-lot-card
+  class="card-pixel flex flex-col gap-2 p-4 transition hover:-translate-y-0.5 motion-reduce:hover:translate-y-0"
+>
   <h3 class="text-base font-extrabold">
     <a data-lot-link href={`${base}lots/`} class="hover:text-ember">
       <span data-lot-title></span>
     </a>
   </h3>
   <LotVideo videoUrl={null} title="" />
-  <p class="text-sm text-mist/70">
+  <p class="text-sm text-mist">
     владелец: <span data-shared-owner>—</span>{' '}
     <span data-mine-badge class="hidden font-bold text-pivko">
       {' '}
@@ -29,7 +32,7 @@ const base = import.meta.env.BASE_URL;
   <div class="mt-auto pt-2">
     <button
       type="button"
-      class="btn-arcade btn-arcade-primary px-4 py-2 text-sm"
+      class="btn-arcade btn-arcade-primary px-4 py-3 text-sm"
       data-buy-lot
       disabled
     >

@@ -7,13 +7,16 @@ import BuyModal from '@/components/BuyModal.astro';
 // (см. docs/adr/0002). Шаблон карточки — единственный источник разметки.
 ---
 
-<BaseLayout title="AlysQueZone — БИРЖА ПРИВЕТОВ">
+<BaseLayout
+  title="AlysQueZone — БИРЖА ПРИВЕТОВ"
+  description="Все лоты биржи приветов alysque: цены, владельцы и покупка за Пивкойны."
+>
   <h1 class="font-display text-sm leading-loose uppercase sm:text-lg sm:leading-loose">
     Биржа приветов.
     <br />
     <span class="text-ember">Стрим включился, а ты?</span>
   </h1>
-  <p class="mt-3 text-mist/80">Выбирай лот, жми «купить», кайфуем жоско + мощно. Жду тебя 🙂🙂🙂</p>
+  <p class="mt-3 text-mist">Выбирай лот, жми «купить», кайфуем жоско + мощно. Жду тебя 🙂🙂🙂</p>
 
   <section aria-label="Мои приветы" class="mt-8">
     <h2 class="font-display text-xs uppercase">
@@ -27,7 +30,7 @@ import BuyModal from '@/components/BuyModal.astro';
 
   <section aria-label="Все лоты" class="mt-8">
     <h2 class="font-display text-xs uppercase">Все лоты</h2>
-    <p data-lots-state class="mt-3 text-sm font-bold text-mist/60">
+    <p data-lots-state class="mt-3 text-sm font-bold text-mist">
       Загружаю лоты…
     </p>
     <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3" data-lot-grid></div>
@@ -79,7 +82,7 @@ import BuyModal from '@/components/BuyModal.astro';
     if (!slot) return;
     slot.innerHTML = '';
     const p = document.createElement('p');
-    p.className = 'text-sm font-bold text-mist/60';
+    p.className = 'text-sm font-bold text-mist';
     p.textContent = text;
     slot.appendChild(p);
   }

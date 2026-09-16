@@ -19,7 +19,7 @@ const base = import.meta.env.BASE_URL;
     <div class="mt-4 w-full max-w-md">
       <LotVideo videoUrl={null} title="" />
     </div>
-    <p class="mt-2 text-sm text-mist/70">
+    <p class="mt-2 text-sm text-mist">
       владелец:{' '}
       <b data-lot-owner data-shared-owner class="text-mist">
         {' '}
@@ -47,17 +47,17 @@ const base = import.meta.env.BASE_URL;
     data-lot-history
   >
     <h2 class="font-display text-xs uppercase">История перепродаж</h2>
-    <p data-history-empty class="mt-3 text-sm font-bold text-mist/60">
+    <p data-history-empty class="mt-3 text-sm font-bold text-mist">
       Пока никто не забирал — стань первым
     </p>
     <ul data-history-list class="mt-3 flex flex-col gap-2 text-sm font-bold"></ul>
   </section>
 
-  <p data-lot-missing class="card-pixel mt-4 hidden p-5 text-sm font-bold text-mist/60 sm:p-8">
+  <p data-lot-missing class="card-pixel mt-4 hidden p-5 text-sm font-bold text-mist sm:p-8">
     Такого лота нет — возможно, привет уже увёл другой чатерс. Вернись на биржу.
   </p>
 
-  <p data-lot-error class="card-pixel mt-4 hidden p-5 text-sm font-bold text-mist/60 sm:p-8">
+  <p data-lot-error class="card-pixel mt-4 hidden p-5 text-sm font-bold text-mist sm:p-8">
     Не получилось загрузить лот — проверь связь и обнови страницу.
   </p>
 

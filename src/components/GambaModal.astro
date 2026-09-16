@@ -43,15 +43,22 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
       🎰 Гамба на пивкойны
     </h3>
     <div class="relative mx-auto mt-3 h-72 w-72 max-w-full">
-      <canvas id="gamba-wheel" width="560" height="560" class="h-72 w-72 max-w-full"></canvas>
+      <!-- Колесо декоративно: исход объявляет #gamba-result (role=status). -->
+      <canvas
+        id="gamba-wheel"
+        width="560"
+        height="560"
+        class="h-72 w-72 max-w-full"
+        aria-hidden="true"
+      ></canvas>
       <div
         aria-hidden="true"
-        class="absolute top-0 left-1/2 -translate-x-1/2 border-x-12 border-t-20 border-x-transparent border-t-melon"
+        class="absolute top-0 left-1/2 -translate-x-1/2 border-x-12 border-t-20 border-x-transparent border-t-milk"
       ></div>
     </div>
     <p id="gamba-result" class="mt-3 min-h-6 text-sm font-black" role="status"></p>
     <div class="mt-3 flex flex-wrap justify-center gap-3">
-      <button id="gamba-spin" type="button" class="btn-arcade btn-arcade-primary px-6 py-2 text-sm">
+      <button id="gamba-spin" type="button" class="btn-arcade btn-arcade-primary px-6 py-3 text-sm">
         Крутить за 100
         <img
           src={GAMBA_URL}
@@ -66,12 +73,12 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
       <button
         id="gamba-close"
         type="button"
-        class="btn-arcade btn-arcade-ghost px-4 py-2 text-sm text-mist"
+        class="btn-arcade btn-arcade-ghost px-4 py-3 text-sm text-mist"
       >
         Не, пойду на стрим
       </button>
     </div>
-    <p class="mt-2 text-xs font-bold text-mist/60">
+    <p class="mt-2 text-xs font-bold text-mist">
       {GAMBA_DAILY_LIMIT} счастливых спинов в день · минимум — при своих 🙂
     </p>
   </div>

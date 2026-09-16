@@ -22,7 +22,10 @@
   --color-ctahover: #9e145f;
   /* Тёплые акценты */
   --color-ember: #ff9e2c;
-  --color-melon: #ff4d6d;
+  /* Тёмный тёплый красный: #FF4D6D на светлом давал 3.2:1 (плашка) и
+     2.9:1 (текст) — ниже AA. Затемнён сам токен, поэтому bg-melon +
+     text-white читается (5.9:1), рамки/стрелка — как UI-граница (≥3:1). */
+  --color-melon: #c21d3b;
   /* Хот-пинк — официальный цвет чата канала в Twitch (якорь D1) */
   --color-blush: #ff00bc;
   /* Детали D1 */
@@ -32,14 +35,14 @@
   --color-terra: #9a3412;
   --color-legend: #b3127a;
   --color-cream: #fffbea;
-  /* Пивное золото, затемнено для контраста на светлом (4.6:1 на cream).
-     Бейджи bg-pivko + text-black читаются (4.3:1). */
-  --color-pivko: #8a6d00;
+  /* Пивное золото, затемнено для контраста: на панели 5.0:1, на void 5.5:1.
+     В коде только как текст (bg-pivko не используется). */
+  --color-pivko: #7a5f00;
   /* Бренд-фиолетовый Twitch (кнопка входа) */
   --color-twitch: #9146ff;
   /* Тёмные (текстовые) варианты акцентов: подложки/бейджи остаются яркими,
      а text-ember/text-blush на светлом берут эти значения. */
-  --color-ember-deep: #b34a00;
+  --color-ember-deep: #a34400;
   --color-blush-deep: #c4008c;
 }
 
@@ -81,6 +84,13 @@
 }
 .text-blush {
   color: var(--color-blush-deep);
+}
+
+/* Инфо-плашка снизу — fixed и перекрывает конец страницы, пока её не закрыли.
+   Скрипт ставит data-plaska на <html>; пока флаг есть, контенту даём воздух
+   снизу (unlayered — иначе utility py-8 из <main> перебьёт). */
+html[data-plaska='on'] main {
+  padding-bottom: 7.5rem;
 }
 
 /* Gamba-стиль C: аркадные кнопки/карточки/бейджи + анимации.
@@ -192,6 +202,15 @@
     to {
       transform: translateX(-50%);
     }
+  }
+
+  /* Вечные анимации (бегущий лог, мигание) должны уметь останавливаться:
+     под курсором и на клавиатурном фокусе замирают — WCAG 2.2.2.
+     Для «совсем не анимировать» есть prefers-reduced-motion ниже. */
+  .marquee:hover .marquee-track,
+  .animate-blink:hover,
+  .animate-blink:focus-visible {
+    animation-play-state: paused;
   }
 
   @media (prefers-reduced-motion: reduce) {

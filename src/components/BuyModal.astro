@@ -44,14 +44,14 @@ const clapSound = s3Sound('clap.mp3');
       <button
         id="buy-modal-yes"
         type="button"
-        class="btn-arcade btn-arcade-primary px-4 py-2 text-sm"
+        class="btn-arcade btn-arcade-primary px-4 py-3 text-sm"
       >
         Да, забираю
       </button>
       <button
         id="buy-modal-no"
         type="button"
-        class="btn-arcade btn-arcade-ghost px-4 py-2 text-sm text-mist"
+        class="btn-arcade btn-arcade-ghost px-4 py-3 text-sm text-mist"
       >
         Не, пойду на стрим
       </button>
@@ -61,7 +61,7 @@ const clapSound = s3Sound('clap.mp3');
 
 <div
   id="buy-notice"
-  class="card-pixel fixed bottom-16 left-1/2 z-50 hidden max-w-[calc(100vw-2rem)] -translate-x-1/2 px-8 py-4 text-center text-xl font-black whitespace-nowrap"
+  class="card-pixel fixed bottom-16 left-1/2 z-50 hidden max-w-[calc(100vw-2rem)] -translate-x-1/2 px-8 py-4 text-center text-xl font-black break-words"
   role="status"
 ></div>
 
@@ -182,8 +182,6 @@ const clapSound = s3Sound('clap.mp3');
     let videoEl: HTMLVideoElement | null = null;
     // Сброс варианта: текстовый — плашка снизу, с видео — большое окно по центру.
     notice.classList.remove(
-      'whitespace-nowrap',
-      'whitespace-normal',
       'max-w-lg',
       'flex-col',
       'items-start',
@@ -201,7 +199,6 @@ const clapSound = s3Sound('clap.mp3');
       // `fixed` (не `relative`) — иначе центрирование ломается.
       notice.classList.remove('bottom-16');
       notice.classList.add(
-        'whitespace-normal',
         'max-w-lg',
         'flex-col',
         'items-start',
@@ -218,7 +215,8 @@ const clapSound = s3Sound('clap.mp3');
       const close = document.createElement('button');
       close.type = 'button';
       close.setAttribute('aria-label', 'Закрыть');
-      close.className = 'btn-arcade btn-arcade-ghost shrink-0 px-3 py-1 text-sm';
+      close.className =
+        'btn-arcade btn-arcade-ghost grid min-h-11 min-w-11 shrink-0 place-items-center px-3 py-1 text-sm';
       close.textContent = '✕';
       close.addEventListener('click', () => dismissNotice());
       row.append(span, close);

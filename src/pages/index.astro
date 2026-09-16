@@ -19,7 +19,7 @@ const base = import.meta.env.BASE_URL;
           <br />
           Стрим включился, <span class="text-ember">а ты?</span>
         </h1>
-        <p class="mt-4 max-w-xl text-base text-mist/80 sm:text-lg">
+        <p class="mt-4 max-w-xl text-base text-mist sm:text-lg">
           Привет стримера — это ценность. Выбирай лот, жми «купить» и кайфуем жоско + мощно. Жду
           тебя 🙂🙂🙂
         </p>
@@ -27,8 +27,10 @@ const base = import.meta.env.BASE_URL;
           <a href={`${base}lots/`} class="btn-arcade btn-arcade-primary px-6 py-3">
             ▶ К бирже
           </a>
-          <span class="btn-arcade btn-arcade-ghost px-6 py-3 text-mist/70">+1000 на старте</span>
-          <span class="btn-arcade btn-arcade-ghost px-6 py-3 text-mist/70">
+          <span class="border-[3px] border-milk/50 bg-void/70 px-6 py-3 text-sm font-bold text-mist">
+            +1000 на старте
+          </span>
+          <span class="border-[3px] border-milk/50 bg-void/70 px-6 py-3 text-sm font-bold text-mist">
             Ежедневный вход: до 500🍺
           </span>
           <button type="button" data-rules-button class="btn-arcade btn-arcade-ghost px-6 py-3">
@@ -54,17 +56,17 @@ const base = import.meta.env.BASE_URL;
       <li class="card-pixel p-5">
         <p class="font-display text-[10px] text-stream">01</p>
         <p class="mt-2 font-black uppercase">Выбираешь привет</p>
-        <p class="mt-1 text-sm text-mist/70">Случайные лоты ниже — бери, пока чат не разобрал.</p>
+        <p class="mt-1 text-sm text-mist">Случайные лоты ниже — бери, пока чат не разобрал.</p>
       </li>
       <li class="card-pixel p-5">
         <p class="font-display text-[10px] text-ember">02</p>
         <p class="mt-2 font-black uppercase">Жмёшь «купить за Пивкойны»</p>
-        <p class="mt-1 text-sm text-mist/70">Баланс в шапке, старт — 1000 Пивкойнов.</p>
+        <p class="mt-1 text-sm text-mist">Баланс в шапке, старт — 1000 Пивкойнов.</p>
       </li>
       <li class="card-pixel p-5">
         <p class="font-display text-[10px] text-pivko">03</p>
         <p class="mt-2 font-black uppercase">Привет твой</p>
-        <p class="mt-1 text-sm text-mist/70">Чат в шоке, догон чатика обеспечен. Пойжем жоско!</p>
+        <p class="mt-1 text-sm text-mist">Чат в шоке, догон чатика обеспечен. Пойжем жоско!</p>
       </li>
     </ol>
   </section>
@@ -78,12 +80,12 @@ const base = import.meta.env.BASE_URL;
       </a>
     </div>
     <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4" data-random-lots></div>
-    <p data-random-state class="mt-3 text-sm font-bold text-mist/60">
+    <p data-random-state class="mt-3 text-sm font-bold text-mist">
       Загружаю приветы…
     </p>
     <div class="card-pixel card-pixel-accent mt-8 p-6 text-center sm:p-8">
       <p class="font-display text-xs uppercase sm:text-sm">Готов забрать свой привет?</p>
-      <p class="mt-3 text-sm text-mist/70">Жду тебя 🙂🙂🙂 Пойжем жоско на стрим.</p>
+      <p class="mt-3 text-sm text-mist">Жду тебя 🙂🙂🙂 Пойжем жоско на стрим.</p>
       <a href={`${base}lots/`} class="btn-arcade btn-arcade-primary mt-4 px-8 py-3">
         ▶ На биржу
       </a>
@@ -107,15 +109,22 @@ const base = import.meta.env.BASE_URL;
     note.classList.toggle('hidden', text === null);
   }
 
-  function miniCard(title: string, owner: string | null, price: number): HTMLElement {
+  function miniCard(slug: string, title: string, owner: string | null, price: number): HTMLElement {
     const card = document.createElement('article');
-    card.className = 'card-pixel flex min-w-0 flex-col p-5 transition hover:-translate-y-0.5';
+    card.className =
+      'card-pixel flex min-w-0 flex-col p-5 transition hover:-translate-y-0.5 motion-reduce:hover:translate-y-0';
     const h = document.createElement('h3');
     h.className = 'mt-3 font-extrabold break-words';
-    h.textContent = title;
+    // Карточка ведёт на страницу лота, как карточки витрины: иначе случайный
+    // привет — тупик, открыть его нечем.
+    const a = document.createElement('a');
+    a.href = `${import.meta.env.BASE_URL}lot/?id=${encodeURIComponent(slug)}`;
+    a.className = 'hover:text-ember';
+    a.textContent = title;
+    h.appendChild(a);
     card.appendChild(h);
     const ownerP = document.createElement('p');
-    ownerP.className = 'mt-1 truncate text-sm text-mist/60';
+    ownerP.className = 'mt-1 truncate text-sm text-mist';
     ownerP.textContent = `владелец: ${owner ?? '—'}`;
     card.appendChild(ownerP);
     const priceP = document.createElement('p');
@@ -135,7 +144,9 @@ const base = import.meta.env.BASE_URL;
       [pool[i], pool[j]] = [pool[j] as (typeof pool)[number], pool[i] as (typeof pool)[number]];
     }
     const pick = pool.slice(0, PICK);
-    slot.replaceChildren(...pick.map((st) => miniCard(st.title, st.owner_login, st.price)));
+    slot.replaceChildren(
+      ...pick.map((st) => miniCard(st.slug, st.title, st.owner_login, st.price))
+    );
     if (pick.length > 0) setNote(null);
     else setNote(ok ? 'Пока пусто — зайди на биржу' : 'Приветы не загрузились — проверь связь');
   }

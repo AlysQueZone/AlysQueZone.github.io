@@ -20,9 +20,13 @@ import { assertSupabaseConfigured } from '@/lib/supabase';
 
 interface Props {
   title?: string;
+  description?: string;
 }
 
-const { title = 'AlysQueZone — БИРЖА ПРИВЕТОВ' } = Astro.props;
+const {
+  title = 'AlysQueZone — БИРЖА ПРИВЕТОВ',
+  description = 'Шуточная биржа приветов Twitch-канала alysque: выбирай привет, забирай за Пивкойны и качай лот в гамбе.',
+} = Astro.props;
 const base = import.meta.env.BASE_URL;
 
 // Билд-гейт: без PUBLIC_SUPABASE_* сайт нерабочий (витрина — проекция БД).
@@ -36,8 +40,25 @@ assertSupabaseConfigured();
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href={`${base}favicon.svg`} />
     <title>{title}</title>
+    <!-- Превью для чата: ссылку кидают в Twitch, без OG она выглядит пустой. -->
+    <meta name="description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="AlysQueZone" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={new URL(Astro.url.pathname, Astro.site ?? '')} />
+    <meta property="og:image" content={new URL(`${base}bg/sunflowers.webp`, Astro.site ?? '')} />
+    <meta name="twitter:card" content="summary_large_image" />
   </head>
   <body class="bg-void text-milk min-h-screen antialiased">
+    <!-- Skip-link: шапка липкая и кнопок в ней много — с клавиатуры к контенту
+         можно прыгнуть сразу. Виден только на фокусе. -->
+    <a
+      href={`${base}#main`}
+      class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[60] focus:border-[3px] focus:border-milk focus:bg-panel focus:px-4 focus:py-2 focus:font-bold"
+    >
+      К содержимому
+    </a>
     <!-- Фон-арт F1 (тикет 37): широкий webp cover center + кремовая вуаль 0.88, контент поверх. -->
     <div
       aria-hidden="true"
@@ -54,7 +75,7 @@ assertSupabaseConfigured();
           <button
             type="button"
             data-gamba-button
-            class="btn-arcade btn-arcade-ghost animate-blink px-4 py-2 text-xs"
+            class="btn-arcade btn-arcade-ghost animate-blink px-4 py-3 text-xs"
           >
             🎰 гамба на пивкойны
           </button>
@@ -64,7 +85,7 @@ assertSupabaseConfigured();
           >
             <span class="text-melon">◉</span>
             <span data-wallet-balance>—</span>
-            <span class="text-mist/70">Пивкойнов</span>
+            <span class="text-mist">Пивкойнов</span>
           </div>
           <!-- Ежедневный вход (тикет 13): автовыдача без кнопок — только всплывающее уведомление о факте. -->
           <DailyLogin />
@@ -89,7 +110,7 @@ assertSupabaseConfigured();
         </p>
       </div>
     </header>
-    <main class="mx-auto max-w-6xl px-4 py-8">
+    <main id="main" class="mx-auto max-w-6xl px-4 py-8">
       <slot />
     </main>
     <!-- Гамба-рулетка (тикет 32): кнопка в шапке открывает модалку-колесо. -->
@@ -97,7 +118,7 @@ assertSupabaseConfigured();
     <!-- Инфо-плашка: звук + VPN, снизу на всех страницах, только крестик, память в localStorage. -->
     <div
       id="info-plaska"
-      class="fixed inset-x-0 bottom-0 z-50 hidden border-t-4 border-milk bg-bar"
+      class="fixed inset-x-0 bottom-0 z-50 hidden border-t-4 border-milk bg-bar pb-[env(safe-area-inset-bottom)]"
       role="note"
     >
       <div class="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
@@ -110,7 +131,7 @@ assertSupabaseConfigured();
           type="button"
           id="info-plaska-close"
           aria-label="Закрыть подсказку"
-          class="btn-arcade btn-arcade-ghost shrink-0 px-3 py-1 text-sm"
+          class="btn-arcade btn-arcade-ghost grid min-h-11 min-w-11 shrink-0 place-items-center px-3 py-1 text-sm"
         >
           ✕
         </button>
@@ -123,12 +144,15 @@ assertSupabaseConfigured();
       try {
         if (plaska && !localStorage.getItem(PLASKA_KEY)) {
           plaska.classList.remove('hidden');
+          document.documentElement.dataset.plaska = 'on';
         }
       } catch {
         plaska?.classList.remove('hidden');
+        document.documentElement.dataset.plaska = 'on';
       }
       plaskaClose?.addEventListener('click', () => {
         plaska?.classList.add('hidden');
+        delete document.documentElement.dataset.plaska;
         try {
           localStorage.setItem(PLASKA_KEY, '1');
         } catch {

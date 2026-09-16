@@ -28,7 +28,7 @@ import { GAMBA_DAILY_LIMIT, GAMBA_PAYTABLE } from '@/lib/gamba';
         type="button"
         data-rules-close
         aria-label="Закрыть правила"
-        class="btn-arcade btn-arcade-ghost shrink-0 px-3 py-1 text-sm"
+        class="btn-arcade btn-arcade-ghost grid min-h-11 min-w-11 shrink-0 place-items-center px-3 py-1 text-sm"
       >
         ✕
       </button>
@@ -36,14 +36,14 @@ import { GAMBA_DAILY_LIMIT, GAMBA_PAYTABLE } from '@/lib/gamba';
     <ul class="mt-4 flex flex-col gap-4 text-sm font-bold">
       <li>
         <p class="font-display text-[10px] uppercase text-ember">Комиссия биржи 7%</p>
-        <p class="mt-1 text-mist/80">
+        <p class="mt-1 text-mist">
           Платит продавец из выручки (округление вверх, минимум 1), комиссия сгорает. Покупатель
           платит ровно цену кнопки — без сюрпризов.
         </p>
       </li>
       <li>
         <p class="font-display text-[10px] uppercase text-stream">Рост цены</p>
-        <p class="mt-1 text-mist/80">
+        <p class="mt-1 text-mist">
           Первые 15 покупок лота поднимают цену на +10% (вверх, минимум +1), дальше — ровно на +1.
           Разгоняй первым — топы не улетают.
         </p>
@@ -52,7 +52,7 @@ import { GAMBA_DAILY_LIMIT, GAMBA_PAYTABLE } from '@/lib/gamba';
         <p class="font-display text-[10px] uppercase text-pivko">
           Гамба · ставка 100 · {GAMBA_DAILY_LIMIT} спинов в день
         </p>
-        <ul data-rules-gamba class="mt-1 flex flex-col gap-1 text-mist/80">
+        <ul data-rules-gamba class="mt-1 flex flex-col gap-1 text-mist">
           {GAMBA_PAYTABLE.map((row) => (
             <li class="border-2 border-milk/60 bg-void px-2 py-1">
               {row.label} — {row.chance}
@@ -62,7 +62,7 @@ import { GAMBA_DAILY_LIMIT, GAMBA_PAYTABLE } from '@/lib/gamba';
       </li>
       <li>
         <p class="font-display text-[10px] uppercase text-pivko">Ежедневный вход</p>
-        <p class="mt-1 text-mist/80">
+        <p class="mt-1 text-mist">
           Дни 1–3: 200 / 200 / 250. Дальше: 150 / 200 / 250 / 500 (7-й день), затем цикл заново.
           Старт — 1000. Пропуск streak не сбрасывает.
         </p>
@@ -71,7 +71,7 @@ import { GAMBA_DAILY_LIMIT, GAMBA_PAYTABLE } from '@/lib/gamba';
     <button
       type="button"
       data-rules-close
-      class="btn-arcade btn-arcade-primary mt-5 w-full px-4 py-2 text-sm"
+      class="btn-arcade btn-arcade-primary mt-5 w-full px-4 py-3 text-sm"
     >
       Понятно
     </button>
