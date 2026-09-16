@@ -161,9 +161,10 @@ html[data-plaska='on'] main {
     background-color: color-mix(in srgb, var(--color-milk) 7%, transparent);
   }
 
-  /* Статичная табличка: геометрия .btn-arcade (рамка, радиус, высота, шрифт),
-     но без тени, hover/press и с обычным курсором. Тень = «можно нажать»,
-     поэтому показания баланса и ника остаются плоскими. */
+  /* Статичная табличка: геометрия .btn-arcade (рамка, радиус, высота, шрифт,
+     смещение тени 4px — поэтому нижний край встаёт в линию с кнопками), но
+     тень светлая, нет hover/press и курсор обычный. Отличие от кнопки — вес
+     тени и отсутствие отклика, а не её отсутствие. */
   .chip-arcade {
     display: inline-flex;
     align-items: center;
@@ -171,6 +172,7 @@ html[data-plaska='on'] main {
     min-height: 2.75rem;
     border: 3px solid var(--color-milk);
     border-radius: 4px;
+    box-shadow: 4px 4px 0 color-mix(in srgb, var(--color-milk) 30%, transparent);
     font-weight: 900;
     cursor: default;
   }

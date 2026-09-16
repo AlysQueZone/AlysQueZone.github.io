@@ -73,16 +73,16 @@ Muted-текст: `text-mist` (без opacity-модификатора). `text-m
 
 ## Компоненты (`src/styles/global.css`)
 
-| Класс                 | Из чего собран                                                          | Состояния                                                          |
-| --------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `.card-pixel`         | `panel` + бордер `milk` + тень `milk` 6px                               | —                                                                  |
-| `.card-pixel-accent`  | тень `legend`                                                           | —                                                                  |
-| `.btn-arcade`         | бордер `milk` + тень `milk` 4px, uppercase; `inline-flex`, высота ≥44px | hover −1px и тень 5px, active +3px и тень 1px, disabled opacity .5 |
-| `.chip-arcade`        | тот же бордер/радиус/высота, **без тени**, `cursor: default`            | — (статичная табличка: баланс, ник)                                |
-| `.btn-arcade-primary` | фон `stream`, текст `cream`                                             | hover фон `ctahover`                                               |
-| `.btn-arcade-ghost`   | прозрачный, текст `milk`                                                | hover фон `milk` 7%                                                |
-| `.badge-pixel`        | `font-display`, 9px                                                     | —                                                                  |
-| `.marquee-track`      | бегущая строка                                                          | 45с/круг, off при `prefers-reduced-motion`                         |
+| Класс                 | Из чего собран                                                                | Состояния                                                            |
+| --------------------- | ----------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `.card-pixel`         | `panel` + бордер `milk` + тень `milk` 6px                                     | —                                                                    |
+| `.card-pixel-accent`  | тень `legend`                                                                 | —                                                                    |
+| `.btn-arcade`         | бордер `milk` + тень `milk` 4px, uppercase; `inline-flex`, высота ≥44px       | hover −1px и тень 5px, active +3px и тень 1px, disabled opacity .5   |
+| `.chip-arcade`        | тот же бордер/радиус/высота и смещение тени 4px, но тень светлая (`milk` 30%) | — (статичная табличка: баланс, ник; курсор обычный, hover/press нет) |
+| `.btn-arcade-primary` | фон `stream`, текст `cream`                                                   | hover фон `ctahover`                                                 |
+| `.btn-arcade-ghost`   | прозрачный, текст `milk`                                                      | hover фон `milk` 7%                                                  |
+| `.badge-pixel`        | `font-display`, 9px                                                           | —                                                                    |
+| `.marquee-track`      | бегущая строка                                                                | 45с/круг, off при `prefers-reduced-motion`                           |
 
 ## Анти-паттерны
 
