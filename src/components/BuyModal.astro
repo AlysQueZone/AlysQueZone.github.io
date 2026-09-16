@@ -215,8 +215,7 @@ const clapSound = s3Sound('clap.mp3');
       const close = document.createElement('button');
       close.type = 'button';
       close.setAttribute('aria-label', 'Закрыть');
-      close.className =
-        'btn-arcade btn-arcade-ghost grid min-h-11 min-w-11 shrink-0 place-items-center px-3 py-1 text-sm';
+      close.className = 'btn-arcade btn-arcade-ghost min-w-11 shrink-0 px-3 py-1 text-sm';
       close.textContent = '✕';
       close.addEventListener('click', () => dismissNotice());
       row.append(span, close);

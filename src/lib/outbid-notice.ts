@@ -147,10 +147,10 @@ export function initOutbidNotice(): void {
     btn.type = 'button';
     btn.title = 'Перекупы твоих лотов';
     // Колокол стиля C: аркадная кнопка-призрак + счётчик-пиксель.
-    btn.className = 'btn-arcade btn-arcade-ghost';
+    // Геометрию (высота 44px, паддинги) задаёт .btn-arcade — как у соседей
+    // в шапке; здесь только кегль глифа (text-base) и якорь для счётчика.
+    btn.className = 'btn-arcade btn-arcade-ghost px-3 text-base';
     btn.style.position = 'relative';
-    btn.style.fontSize = '16px';
-    btn.style.padding = '4px 12px';
     btn.textContent = '🔔';
     const count = document.createElement('span');
     count.id = BELL_COUNT_ID;

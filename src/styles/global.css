@@ -109,7 +109,13 @@ html[data-plaska='on'] main {
   }
 
   .btn-arcade {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    /* 44px — общая высота кнопок: в шапке кегли и паддинги разные,
+       а снаружи они должны стоять в одну линию. */
+    min-height: 2.75rem;
     border: 3px solid var(--color-milk);
     box-shadow: 4px 4px 0 var(--color-milk);
     border-radius: 4px;
@@ -153,6 +159,20 @@ html[data-plaska='on'] main {
 
   .btn-arcade-ghost:hover {
     background-color: color-mix(in srgb, var(--color-milk) 7%, transparent);
+  }
+
+  /* Статичная табличка: геометрия .btn-arcade (рамка, радиус, высота, шрифт),
+     но без тени, hover/press и с обычным курсором. Тень = «можно нажать»,
+     поэтому показания баланса и ника остаются плоскими. */
+  .chip-arcade {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    border: 3px solid var(--color-milk);
+    border-radius: 4px;
+    font-weight: 900;
+    cursor: default;
   }
 
   /* Пиксельный бейдж: только короткие слова, кегль ≤11px. */
