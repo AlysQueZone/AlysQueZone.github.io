@@ -42,14 +42,16 @@ const LOSE_POOL = GAMBA_LOSE_SOUNDS.map((f) => s3Sound(f)).join(',');
       id="gamba-title"
       class="font-display flex items-center justify-center gap-2 text-xs leading-relaxed uppercase"
     >
-      <!-- Эмоут декоративный: заголовок текстом говорит то же самое. -->
+      <!-- Эмоут декоративный: заголовок текстом говорит то же самое.
+           -my-1 держит внешнюю высоту в строке заголовка: эмоут крупнее
+           (24px), а h3 не растёт. -->
       <img
         src={GAMBA_EMOTE_URL}
         alt=""
-        width="16"
-        height="16"
+        width="24"
+        height="24"
         loading="eager"
-        class="h-4 w-4 shrink-0 object-contain"
+        class="h-6 w-6 -my-1 shrink-0 object-contain"
       />
       Гамба на пивкойны
     </h3>

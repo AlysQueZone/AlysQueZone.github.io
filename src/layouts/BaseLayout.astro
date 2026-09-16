@@ -80,14 +80,16 @@ assertSupabaseConfigured();
             data-gamba-button
             class="btn-arcade btn-arcade-ghost animate-blink px-4 py-2 text-sm"
           >
-            <!-- Эмоут декоративный: текстом рядом сказано то же самое. -->
+            <!-- Эмоут декоративный: текстом рядом сказано то же самое.
+                 -my-1 держит внешнюю высоту в строке текста: эмоут крупнее
+                 (28px), а кнопка остаётся 44px. -->
             <img
               src={GAMBA_EMOTE_URL}
               alt=""
-              width="20"
-              height="20"
+              width="28"
+              height="28"
               loading="eager"
-              class="h-5 w-5 object-contain"
+              class="h-7 w-7 -my-1 object-contain"
             />
             гамба на пивкойны
           </button>
