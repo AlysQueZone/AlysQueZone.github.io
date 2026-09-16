@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
+import { ALYSQUE_THINK } from '@/lib/emotes';
 
 const base = import.meta.env.BASE_URL;
 ---
@@ -9,9 +10,16 @@ const base = import.meta.env.BASE_URL;
     <p class="font-display animate-blink text-4xl text-melon" aria-hidden="true">
       GAME OVER
     </p>
-    <p class="mt-4 text-7xl" aria-hidden="true">
-      🧳
-    </p>
+    <div class="mt-4 flex justify-center">
+      <img
+        src={ALYSQUE_THINK}
+        alt=""
+        width="72"
+        height="72"
+        loading="eager"
+        class="h-[72px] w-[72px] object-contain"
+      />
+    </div>
     <h1 class="font-display mt-4 text-sm leading-loose uppercase">404. Привет не найден</h1>
     <p class="mt-4 text-mist">
       Стрим включился, а ты? Такой страницы нет — видимо, привет увернулся как Gedo0. Пойжем жоско

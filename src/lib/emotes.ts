@@ -12,6 +12,9 @@ export const ALYSQUE_CLAP_DARK = twitch('emotesv2_1075070639054e5d8cacb8a0ef4872
 /** alysqueWAUW (ID сверен по агрегатору эмоутов канала). */
 export const ALYSQUE_WAUW = twitch('305551534');
 
+/** alysqueTHINK — «привет не найден» на 404 (ID сверен там же). */
+export const ALYSQUE_THINK = twitch('emotesv2_f5b1c81e684c476794b32d1efbc9b603');
+
 const cdn = (id: string): string => `https://cdn.7tv.app/emote/${id}/2x.webp`;
 
 /** 7TV-эмоут GAMBA канала (ID проверен 2026-09-09 через 7TV API сета):
