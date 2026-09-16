@@ -226,8 +226,8 @@ const clapSound = s3Sound('clap.mp3');
     } else {
       notice.classList.remove('flex', 'items-center');
     }
-    notice.classList.remove('hidden', 'border-rind', 'border-melon');
-    notice.classList.add(ok ? 'border-rind' : 'border-melon');
+    notice.classList.remove('hidden', 'border-pivko', 'border-melon');
+    notice.classList.add(ok ? 'border-pivko' : 'border-melon');
     window.clearTimeout(noticeTimer);
     // С видео окно не прячем через 2.6с — его закроет 'ended' (+2.5с); 30с — страховка.
     const ttl = videoEl ? 30000 : 2600;
