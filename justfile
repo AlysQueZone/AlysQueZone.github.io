@@ -68,6 +68,23 @@ chatters-sync *args:
     python3 scripts/chatters_sync.py {{args}}
 
 # -------------------------------------
+# Релиз
+# -------------------------------------
+
+# Push/deploy идут от аккаунта-владельца AlysQueZone (у активного может не
+# быть прав); прежний активный аккаунт возвращается в конце даже при ошибке.
+
+# Релиз: push main (миграции Supabase) + deploy gh-pages
+release:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    prev=$(gh api user --jq .login)
+    trap 'gh auth switch --user "$prev" >/dev/null 2>&1 || true' EXIT
+    gh auth switch --user AlysQueZone
+    git push origin main
+    npm run deploy
+
+# -------------------------------------
 # Другое
 # -------------------------------------
 
