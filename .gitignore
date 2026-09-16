@@ -7,3 +7,6 @@ dist/
 __pycache__/
 *.pyc
 privets
+images
+.opencode
+
