@@ -50,7 +50,10 @@ function renderTitleEmotes(title: string): DocumentFragment {
       img.alt = segment.name;
       img.title = segment.name;
       img.loading = 'lazy';
-      img.className = 'inline-block h-[1.1em] w-auto align-[-0.15em]';
+      // Крупнее текста, но -my-[0.2em] (по 0.2em сверху/снизу) держит margin-box
+      // равным прежним 1.1em — строка не растёт, растёт только рисунок (симметрично,
+      // центр не смещается). См. c77eafb про тот же приём для GAMBA-эмоута.
+      img.className = 'inline-block h-[1.5em] w-auto -my-[0.2em] align-[-0.15em]';
       frag.appendChild(img);
     } else {
       frag.appendChild(document.createTextNode(segment.value));
