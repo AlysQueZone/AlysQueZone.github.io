@@ -154,8 +154,14 @@ export async function fetchLotState(slug: string, uid: string | null): Promise<L
 /**
  * Заполнить кнопку покупки данными Лота — контракт с BuyModal (`data-buy-lot*`).
  * Одно место на витрину и страницу лота: правка формы тут меняет оба экрана.
+ * `balance` — зеркало серверного гейта: N известна и баланс меньше — кнопка
+ * гаснет с честной надписью (истину всё равно считает сервер).
  */
-export function fillBuyButton(btn: Element | null, st: LotState): void {
+export function fillBuyButton(
+  btn: Element | null,
+  st: LotState,
+  balance: number | null = null
+): void {
   if (!(btn instanceof HTMLButtonElement)) return;
   btn.dataset.buyLot = st.slug;
   btn.dataset.lotTitle = st.title;
@@ -164,14 +170,19 @@ export function fillBuyButton(btn: Element | null, st: LotState): void {
   btn.dataset.lotOwner = st.owner_login ?? '—';
   if (st.video_url) btn.dataset.lotVideo = st.video_url;
   else delete btn.dataset.lotVideo;
-  // Свой лот купить нельзя (перекуп у себя бессмыслен): кнопка гаснет.
-  btn.disabled = st.mine;
+  // Свой лот купить нельзя (перекуп у себя бессмыслен) — кнопка гаснет.
+  // N неизвестна — не гасим по балансу: сравнить не с чем, решает сервер.
+  const short = st.nextPrice !== null && balance !== null && balance < st.nextPrice;
+  const off = st.mine || short;
+  btn.disabled = off;
   btn.textContent = st.mine
     ? 'Твой привет'
-    : st.nextPrice !== null
-      ? `Забрать за ${st.nextPrice} 🍺`
-      : 'Забрать за … 🍺';
-  btn.classList.toggle('opacity-50', st.mine);
+    : short
+      ? 'Не хватает Пивкойнов'
+      : st.nextPrice !== null
+        ? `Забрать за ${st.nextPrice} 🍺`
+        : 'Забрать за … 🍺';
+  btn.classList.toggle('opacity-50', off);
 }
 
 /**

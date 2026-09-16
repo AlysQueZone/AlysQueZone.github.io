@@ -74,6 +74,7 @@ const clapSound = s3Sound('clap.mp3');
   import { ALYSQUE_CLAP_DARK } from '@/lib/emotes';
   import { trapFocus, releaseFocus } from '@/lib/modal-focus';
   import { fetchLotState, subscribeLots, buyLot, announceBought } from '@/lib/lots';
+  import { fetchMyBalance, onBalance } from '@/lib/balance';
   import {
     getSupabase,
     isSupabaseConfigured,
@@ -102,6 +103,9 @@ const clapSound = s3Sound('clap.mp3');
   let limitHit = false;
   /** Живая подписка на лот открытой модалки (пауза + цена, снимается при закрытии). */
   let lotUnsub: (() => void) | null = null;
+  /** Баланс — зеркало серверного гейта; `busy` — транзитное «идёт покупка». */
+  let balance: number | null = null;
+  let busy = false;
 
   // display-mirror, source of truth — DB (c_cooldown/c_max_per_window/c_window в enforce_purchase_rules).
   const PAUSE_SEC = 30;
@@ -156,9 +160,25 @@ const clapSound = s3Sound('clap.mp3');
     announceBought({ id: entry.id, price: entry.price });
   }
 
+  /** Прервать/скрыть уведомление: остановить видео, снять таймер, спрятать. */
+  function dismissNotice(): void {
+    if (!notice) return;
+    window.clearTimeout(noticeTimer);
+    const video = notice.querySelector('video');
+    if (video) {
+      try {
+        video.pause();
+      } catch {
+        // видео уже остановлено — не мешаем закрытию
+      }
+    }
+    notice.classList.add('hidden');
+  }
+
   function showNotice(text: string, ok: boolean, videoUrl?: string): void {
     if (!notice) return;
     notice.innerHTML = '';
+    delete notice.dataset.video;
     let videoEl: HTMLVideoElement | null = null;
     // Сброс варианта: текстовый — плашка снизу, с видео — большое окно по центру.
     notice.classList.remove(
@@ -171,7 +191,8 @@ const clapSound = s3Sound('clap.mp3');
       'text-base',
       'text-lg',
       'top-1/2',
-      '-translate-y-1/2'
+      '-translate-y-1/2',
+      'relative'
     );
     notice.classList.add('bottom-16');
     const span = document.createElement('span');
@@ -188,8 +209,18 @@ const clapSound = s3Sound('clap.mp3');
         'gap-2',
         'text-lg',
         'top-1/2',
-        '-translate-y-1/2'
+        '-translate-y-1/2',
+        'relative'
       );
+      // Метка для клика-вне: прерывать можно только воспроизведение.
+      notice.dataset.video = '1';
+      const close = document.createElement('button');
+      close.type = 'button';
+      close.setAttribute('aria-label', 'Закрыть');
+      close.className = 'btn-arcade btn-arcade-ghost absolute -top-3 -right-3 px-2 py-0.5 text-sm';
+      close.textContent = '✕';
+      close.addEventListener('click', () => dismissNotice());
+      notice.appendChild(close);
       const video = document.createElement('video');
       video.src = videoUrl;
       video.controls = true;
@@ -206,12 +237,9 @@ const clapSound = s3Sound('clap.mp3');
         playClapFallback();
       }
       video.addEventListener('error', () => playClapFallback());
-      // Окно живёт до конца видео и прячется сразу; 30с — страховка,
+      // Окно живёт до конца видео (или до крестика/клика-вне); 30с — страховка,
       // если 'ended' не выстрелит.
-      video.addEventListener('ended', () => {
-        window.clearTimeout(noticeTimer);
-        notice.classList.add('hidden');
-      });
+      video.addEventListener('ended', () => dismissNotice());
       videoEl = video;
     } else if (ok) {
       const img = document.createElement('img');
@@ -234,9 +262,33 @@ const clapSound = s3Sound('clap.mp3');
     noticeTimer = window.setTimeout(() => notice.classList.add('hidden'), ttl);
   }
 
-  function setBusy(busy: boolean): void {
-    if (yesBtn instanceof HTMLButtonElement) yesBtn.disabled = busy;
-    if (noBtn instanceof HTMLButtonElement) noBtn.disabled = busy;
+  /** Единая точка правды для кнопки: транзит/лимит/пауза/нехватка/цена.
+   *  Раньше метка ставилась в четырёх местах — рассинхрон ловился глазами. */
+  function renderBuyButton(): void {
+    if (!(yesBtn instanceof HTMLButtonElement)) return;
+    // Транзитные состояния владеют кнопкой: метку ставит вызвавший.
+    if (busy) return;
+    if (limitHit) {
+      yesBtn.disabled = true;
+      yesBtn.textContent = LIMIT_LABEL;
+      return;
+    }
+    if (pauseLeft > 0) {
+      yesBtn.disabled = true;
+      yesBtn.textContent = pauseLabel(pauseLeft);
+      return;
+    }
+    const price = pending?.price ?? 0;
+    const short = balance !== null && balance < price;
+    yesBtn.disabled = short;
+    yesBtn.textContent = short ? 'Не хватает Пивкойнов' : pending ? buyLabel(price) : 'Забрать';
+  }
+
+  function setBusy(value: boolean): void {
+    busy = value;
+    if (yesBtn instanceof HTMLButtonElement) yesBtn.disabled = value;
+    if (noBtn instanceof HTMLButtonElement) noBtn.disabled = value;
+    renderBuyButton();
   }
 
   /** Возвращает кнопку в свободное состояние (цена pending, без таймера). */
@@ -245,9 +297,6 @@ const clapSound = s3Sound('clap.mp3');
     pauseLeft = 0;
     limitHit = false;
     setBusy(false);
-    if (yesBtn instanceof HTMLButtonElement) {
-      yesBtn.textContent = pending ? buyLabel(pending.price) : 'Забрать';
-    }
   }
 
   /** Пауза видна честно: живой отсчёт на кнопке + «Подожди N с» в уведомлении. */
@@ -255,10 +304,10 @@ const clapSound = s3Sound('clap.mp3');
     if (!(yesBtn instanceof HTMLButtonElement)) return;
     window.clearInterval(pauseTimer);
     limitHit = false;
+    busy = false;
     let left = sec > 0 ? sec : PAUSE_SEC;
     pauseLeft = left;
-    setBusy(true);
-    yesBtn.textContent = pauseLabel(left);
+    renderBuyButton();
     showNotice(`Подожди ${left} с — этот лот можно забрать повторно через ${left} с.`, false);
     pauseTimer = window.setInterval(() => {
       left -= 1;
@@ -273,7 +322,7 @@ const clapSound = s3Sound('clap.mp3');
         const id = pending?.id;
         if (id) void refreshPriceProjection(id);
       } else {
-        yesBtn.textContent = pauseLabel(left);
+        renderBuyButton();
       }
     }, 1000);
   }
@@ -284,8 +333,8 @@ const clapSound = s3Sound('clap.mp3');
     window.clearInterval(pauseTimer);
     pauseLeft = 0;
     limitHit = true;
-    setBusy(true);
-    yesBtn.textContent = LIMIT_LABEL;
+    busy = false;
+    renderBuyButton();
   }
 
   function stopLotProjection(): void {
@@ -347,7 +396,7 @@ const clapSound = s3Sound('clap.mp3');
         if (modalText) {
           modalText.textContent = `Потратить … Пивкойнов? Владелец: ${pending.owner}`;
         }
-        if (yesBtn instanceof HTMLButtonElement && !yesBtn.disabled) {
+        if (yesBtn instanceof HTMLButtonElement && !busy && !limitHit && pauseLeft <= 0) {
           yesBtn.textContent = 'Забрать за … 🍺';
         }
         return;
@@ -362,9 +411,7 @@ const clapSound = s3Sound('clap.mp3');
       if (modalText) {
         modalText.textContent = `Потратить ${next} Пивкойнов? Владелец: ${pending.owner}`;
       }
-      if (yesBtn instanceof HTMLButtonElement && !yesBtn.disabled) {
-        yesBtn.textContent = buyLabel(next);
-      }
+      renderBuyButton();
     } catch {
       // проекция — best effort, правда придёт с сервера
     }
@@ -379,6 +426,11 @@ const clapSound = s3Sound('clap.mp3');
     modal.classList.remove('hidden');
     modal.classList.add('flex');
     trapFocus(modal);
+    // Баланс — зеркало серверного гейта: не хватает — «Да, забираю» гаснет.
+    void (async () => {
+      balance = await fetchMyBalance();
+      renderBuyButton();
+    })();
     // Живые проекции: пауза (моя последняя покупка этого лота) + цена (N из БД).
     const lotId = pending.id;
     try {
@@ -533,8 +585,23 @@ const clapSound = s3Sound('clap.mp3');
   modal?.addEventListener('click', (e) => {
     if (e.target === modal) closeModal();
   });
+  // Живой баланс из BaseLayout: не хватает — кнопка гаснет/оттаивает.
+  onBalance((value) => {
+    balance = value;
+    renderBuyButton();
+  });
+  // Клик-вне окна воспроизведения — прервать мем. Крестик внутри — свой обработчик.
+  document.addEventListener('click', (e) => {
+    if (!notice || notice.dataset.video !== '1' || notice.classList.contains('hidden')) return;
+    const target = e.target as Node | null;
+    if (target && notice.contains(target)) return;
+    dismissNotice();
+  });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeModal();
+    if (e.key === 'Escape') {
+      closeModal();
+      dismissNotice();
+    }
   });
 
   // Возврат из логина (тикет 09): Чатерс залогинен — переоткрыть модалку того же Лота.

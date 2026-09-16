@@ -17,6 +17,24 @@ export function paintBalance(balance: number): void {
   document.querySelectorAll('[data-wallet-balance]').forEach((el) => {
     el.textContent = String(balance);
   });
+  announceBalance(balance);
+}
+
+/** Общий поток баланса: единственная подписка BaseLayout транслирует значение
+ *  остальным (витрина/страница лота/модалка), чтобы не плодить Supabase-каналы
+ *  на один topic. Баланс — зеркало гейта, истина всё равно на сервере. */
+export function announceBalance(balance: number): void {
+  window.dispatchEvent(new CustomEvent('alysque:balance', { detail: balance }));
+}
+
+/** Подписка на живой баланс (событие `announceBalance`). Возвращает отписку. */
+export function onBalance(cb: (balance: number) => void): () => void {
+  const handler = (e: Event): void => {
+    const value = (e as CustomEvent<unknown>).detail;
+    if (typeof value === 'number' && Number.isFinite(value)) cb(value);
+  };
+  window.addEventListener('alysque:balance', handler);
+  return () => window.removeEventListener('alysque:balance', handler);
 }
 
 /**
@@ -62,7 +80,10 @@ export function subscribeMyBalance(uid: string, onBalance: (balance: number) => 
         (payload) => {
           const row = (payload.new ?? {}) as Record<string, unknown>;
           const balance = Number(row['balance']);
-          if (Number.isFinite(balance) && balance >= 0) onBalance(balance);
+          if (Number.isFinite(balance) && balance >= 0) {
+            onBalance(balance);
+            announceBalance(balance);
+          }
         }
       )
       .subscribe();

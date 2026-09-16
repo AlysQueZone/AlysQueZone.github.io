@@ -54,6 +54,7 @@ import BuyModal from '@/components/BuyModal.astro';
     onBought,
     type LotState,
   } from '@/lib/lots';
+  import { fetchMyBalance, onBalance } from '@/lib/balance';
   import { initLotVideos, fillVideo } from '@/lib/lot-video';
   import { setTitleEmotes } from '@/lib/emotes';
 
@@ -63,6 +64,9 @@ import BuyModal from '@/components/BuyModal.astro';
   const GRID_EMPTY_TEXT = 'Пока лотов нет — скоро появятся';
   const LOADING_TEXT = 'Загружаю лоты…';
   const FAIL_TEXT = 'Лоты не загрузились. Проверь связь и обнови страницу';
+  /** Баланс — зеркало гейта: не хватает — кнопки гаснут. */
+  let myBalance: number | null = null;
+  let lastStates: Map<string, LotState> = new Map();
 
   function lotHref(slug: string): string {
     return `${base}lot/?id=${encodeURIComponent(slug)}`;
@@ -116,10 +120,6 @@ import BuyModal from '@/components/BuyModal.astro';
       priceSpan.className = 'text-pivko';
       priceSpan.textContent = ` ${price} 🍺`;
       row.appendChild(priceSpan);
-      const badge = document.createElement('span');
-      badge.className = 'text-pivko';
-      badge.textContent = ' · ТВОЙ';
-      row.appendChild(badge);
       slot.appendChild(row);
     }
   }
@@ -137,7 +137,7 @@ import BuyModal from '@/components/BuyModal.astro';
     if (priceEl) priceEl.textContent = `${st.price} 🍺`;
     const badge = card.querySelector('[data-mine-badge]');
     if (badge) badge.classList.toggle('hidden', !st.mine);
-    fillBuyButton(card.querySelector('[data-buy-lot]'), st);
+    fillBuyButton(card.querySelector('[data-buy-lot]'), st, myBalance);
   }
 
   // slug → узел карточки: reconcile набора (создать/снести/обновить).
@@ -190,7 +190,9 @@ import BuyModal from '@/components/BuyModal.astro';
     refreshing = true;
     try {
       const uid = await getSessionUid();
+      myBalance = await fetchMyBalance();
       const { ok, states } = await fetchLotCatalogResult(uid);
+      lastStates = states;
       reconcile(states);
       setGridNote(!ok ? FAIL_TEXT : states.size === 0 ? GRID_EMPTY_TEXT : null);
       renderMyGreetings(states, uid);
@@ -216,4 +218,13 @@ import BuyModal from '@/components/BuyModal.astro';
     setGridNote(FAIL_TEXT);
     showMyNote(GUEST_TEXT, 0);
   }
+
+  // Баланс пришёл из BaseLayout — перекрасить кнопки, не перезапрашивая каталог.
+  onBalance((value) => {
+    myBalance = value;
+    for (const [slug, el] of rendered) {
+      const st = lastStates.get(slug);
+      if (st) fillCard(el, st);
+    }
+  });
 </script>
