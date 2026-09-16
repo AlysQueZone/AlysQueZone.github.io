@@ -144,7 +144,8 @@ const base = import.meta.env.BASE_URL;
     for (const h of entries) {
       const li = document.createElement('li');
       li.setAttribute('data-shared-entry', 'true');
-      li.className = 'border-2 border-stream bg-void px-3 py-2 shadow-[3px_3px_0_rgb(66_32_6/0.9)]';
+      li.className =
+        'border-2 border-stream bg-void px-3 py-2 shadow-[3px_3px_0_var(--color-milk)]';
       const mine = uid !== null && h.buyer_uid !== '' && h.buyer_uid === uid;
       li.textContent = `${h.from} → ${h.to} · ${h.price} 🍺${mine ? ' · ТВОЙ' : ''}`;
       frag.appendChild(li);

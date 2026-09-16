@@ -106,7 +106,7 @@ import BuyModal from '@/components/BuyModal.astro';
       const price = Number.isFinite(s.price) ? s.price : 0;
       const row = document.createElement('div');
       row.className =
-        'border-2 border-milk bg-panel px-3 py-2 text-sm shadow-[3px_3px_0_rgb(66_32_6/0.9)]';
+        'border-2 border-milk bg-panel px-3 py-2 text-sm shadow-[3px_3px_0_var(--color-milk)]';
       const link = document.createElement('a');
       link.href = lotHref(s.slug);
       link.className = 'font-bold hover:underline';

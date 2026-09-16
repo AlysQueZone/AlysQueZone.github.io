@@ -90,6 +90,13 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
     type GambaPayRow,
   } from '@/lib/gamba';
 
+  /** Токены палитры (design-system/alysquezone/MASTER.md) — canvas их не видит,
+      поэтому читаем значения из :root один раз. */
+  const cssVar = (name: string): string =>
+    getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const INK = cssVar('--color-milk');
+  const CREAM = cssVar('--color-cream');
+
   // 12 сегментов — визуальная аппроксимация таблицы I (тикет 08)
   // (9 возвратов / 1 мелкий / 1 крупный / 1 джекпот ≈ веса 75/17/7/1 —
   // возврат ровно 75% как в паспорте; мелочь занижена, джекпот визуально
@@ -97,14 +104,14 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
   // в плакате/правилах);
   // точные веса живут в БД и плакате, исход решает сервер — колесо лишь
   // докручивается до сегмента присланного типа. Мимо нет вовсе (тикет 08).
-  // Цвета по нарастанию выигрыша: возврат — жёлтый, +50 — оранжевый,
-  // +150 — красный, x10 — маджента.
+  // Цвета по нарастанию выигрыша: возврат — жёлтый, +50 — оранжевый (ember),
+  // +150 — красный, x10 — маджента (blush). R/B — только колесо, вне палитры.
   type WheelSegment = { label: string; outcome: GambaOutcome; color: string };
   const SEGMENT_SPECS: Record<string, WheelSegment> = {
     R: { label: 'возврат', outcome: 'return', color: '#FFD93C' },
-    S: { label: '+50', outcome: 'small', color: '#FF9E2C' },
+    S: { label: '+50', outcome: 'small', color: cssVar('--color-ember') },
     B: { label: '+150', outcome: 'big', color: '#FF5A3C' },
-    J: { label: 'x10', outcome: 'jackpot', color: '#FF00BC' },
+    J: { label: 'x10', outcome: 'jackpot', color: cssVar('--color-blush') },
   };
   const WHEEL_PATTERN = 'RSRRBRRJRRRR';
   // Инвариант рядом с паттерном: 12 сегментов 9/1/1/1 (R/S/B/J) —
@@ -218,14 +225,14 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
       ctx.closePath();
       ctx.fillStyle = s.color;
       ctx.fill();
-      ctx.strokeStyle = '#422006';
+      ctx.strokeStyle = INK;
       ctx.lineWidth = 3;
       ctx.stroke();
       ctx.save();
       ctx.rotate(i * SEG + SEG / 2);
       ctx.textAlign = 'right';
       // Тёмный текст — на жёлтом возврате, белый — дальше по нарастанию.
-      ctx.fillStyle = s.outcome === 'return' ? '#422006' : '#FFFBEA';
+      ctx.fillStyle = s.outcome === 'return' ? INK : CREAM;
       // Пиксельные подписи сегментов (стиль C); без загруженного шрифта —
       // честный monospace-фолбэк.
       ctx.font = `400 ${s.outcome === 'jackpot' ? 20 : 22}px "Press Start 2P", monospace`;
@@ -234,7 +241,7 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
     }
     ctx.beginPath();
     ctx.arc(0, 0, 34, 0, Math.PI * 2);
-    ctx.fillStyle = '#422006';
+    ctx.fillStyle = INK;
     ctx.fill();
     ctx.restore();
   }

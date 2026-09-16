@@ -124,7 +124,7 @@ export function initOutbidNotice(): void {
     }
     for (const ev of history) {
       const item = document.createElement('div');
-      item.style.borderTop = '3px solid #422006';
+      item.style.borderTop = '3px solid var(--color-milk)';
       item.style.padding = '8px 0';
       item.style.fontSize = '13px';
       item.style.fontWeight = '700';
@@ -159,9 +159,9 @@ export function initOutbidNotice(): void {
     count.style.position = 'absolute';
     count.style.top = '-10px';
     count.style.right = '-10px';
-    count.style.background = '#c2187b';
-    count.style.color = '#fff';
-    count.style.border = '2px solid #422006';
+    count.style.background = 'var(--color-stream)';
+    count.style.color = 'var(--color-cream)';
+    count.style.border = '2px solid var(--color-milk)';
     count.style.fontSize = '11px';
     count.style.fontWeight = '900';
     count.style.padding = '0 6px';

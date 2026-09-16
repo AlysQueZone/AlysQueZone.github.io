@@ -4,7 +4,9 @@ import eslintPluginAstro from 'eslint-plugin-astro';
 import prettier from 'eslint-config-prettier';
 
 export default [
-  { ignores: ['dist/**', '.astro/**', 'node_modules/**', 'public/**'] },
+  {
+    ignores: ['dist/**', '.astro/**', 'node_modules/**', 'public/**', '.opencode/**', '.agents/**'],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   ...eslintPluginAstro.configs.recommended,

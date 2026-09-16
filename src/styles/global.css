@@ -37,6 +37,12 @@
   --color-pivko: #8a6d00;
   /* Арбузная корка, затемнена для читаемости text-rind на светлом */
   --color-rind: #15803d;
+  /* Бренд-фиолетовый Twitch (кнопка входа) */
+  --color-twitch: #9146ff;
+  /* Тёмные (текстовые) варианты акцентов: подложки/бейджи остаются яркими,
+     а text-ember/text-blush на светлом берут эти значения. */
+  --color-ember-deep: #b34a00;
+  --color-blush-deep: #c4008c;
 }
 
 @layer base {
@@ -58,25 +64,25 @@
 
   ::selection {
     background: var(--color-blush);
-    color: #fff;
+    color: var(--color-cream);
   }
 
   :focus-visible {
     outline: 3px solid var(--color-blush);
     outline-offset: 2px;
   }
+}
 
-  /* Контраст текста акцентными цветами на светлом фоне.
-     Сами токены остаются яркими (бейджи/подложки), а текст темнеет. */
-  .text-ember {
-    color: #b34a00;
-  }
-  .hover\:text-ember:hover {
-    color: #b34a00;
-  }
-  .text-blush {
-    color: #c4008c;
-  }
+/* Контраст текста акцентными цветами на светлом фоне.
+   Сами токены остаются яркими (бейджи/подложки), а текст темнеет.
+   Вне @layer: utilities Tailwind (в т.ч. .text-ember/.text-blush из @theme)
+   идут последними в каскаде и перебили бы base — unlayered всегда выше слоёв. */
+.text-ember,
+.hover\:text-ember:hover {
+  color: var(--color-ember-deep);
+}
+.text-blush {
+  color: var(--color-blush-deep);
 }
 
 /* Gamba-стиль C: аркадные кнопки/карточки/бейджи + анимации.
@@ -86,7 +92,7 @@
   .card-pixel {
     background-color: var(--color-panel);
     border: 3px solid var(--color-milk);
-    box-shadow: 6px 6px 0 rgb(66 32 6 / 0.9);
+    box-shadow: 6px 6px 0 var(--color-milk);
     border-radius: 4px;
   }
 
@@ -97,7 +103,7 @@
   .btn-arcade {
     display: inline-block;
     border: 3px solid var(--color-milk);
-    box-shadow: 4px 4px 0 rgb(66 32 6 / 0.9);
+    box-shadow: 4px 4px 0 var(--color-milk);
     border-radius: 4px;
     font-weight: 900;
     text-transform: uppercase;
@@ -109,12 +115,12 @@
 
   .btn-arcade:hover {
     transform: translate(-1px, -1px);
-    box-shadow: 5px 5px 0 rgb(66 32 6 / 0.9);
+    box-shadow: 5px 5px 0 var(--color-milk);
   }
 
   .btn-arcade:active {
     transform: translate(3px, 3px);
-    box-shadow: 1px 1px 0 rgb(66 32 6 / 0.9);
+    box-shadow: 1px 1px 0 var(--color-milk);
   }
 
   .btn-arcade:disabled {
@@ -125,7 +131,7 @@
 
   .btn-arcade-primary {
     background-color: var(--color-stream);
-    color: #fff;
+    color: var(--color-cream);
   }
 
   .btn-arcade-primary:hover {
@@ -138,7 +144,7 @@
   }
 
   .btn-arcade-ghost:hover {
-    background-color: rgb(66 32 6 / 0.07);
+    background-color: color-mix(in srgb, var(--color-milk) 7%, transparent);
   }
 
   /* Пиксельный бейдж: только короткие слова, кегль ≤11px. */

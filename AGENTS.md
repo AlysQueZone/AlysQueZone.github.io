@@ -8,12 +8,14 @@
 - Бэкенд — в Supabase, схему — только миграциями; контент лотов — `content/lots.toml` + `just lots-sync` (не миграциями).
 - Витрина и страницы лотов — клиентская проекция БД (`docs/adr/0002`): контент публикует `just lots-sync` без деплоя; билд без запроса к БД, но требует `PUBLIC_SUPABASE_*`.
 - Математика биржи — из одних рук: меняешь механику — обнови витрину и `CONTEXT.md`.
+- Цвет/визуальный стиль — один источник: палитра D1 в `design-system/alysquezone/MASTER.md`, токены — `@theme` в `src/styles/global.css`; hex в коде не хардкодим.
 
 ## Указатели
 
 - Preview-клик / релиз (`gh-pages`, миграции в `main`) → `docs/agents/shipping.md`.
 - Supabase-схема / RLS / миграции / отладка → `docs/agents/supabase.md`.
 - Стиль / импорты / рендер / SQL-гайд / `just` → `docs/agents/code-style.md`.
+- Цвета / токены / типографика / компоненты → `design-system/alysquezone/MASTER.md`.
 - Гамба-звуки / комиссия / рост цены → `docs/agents/economy.md`.
 - Эмоуты / чат VOD / мемы / пасты / стата → `docs/agents/twitch-sources.md`.
 - Ники чатерсов / реестр / резолв написания → `docs/agents/chatters.md`.
