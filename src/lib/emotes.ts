@@ -7,6 +7,10 @@ export const ALYSQUE_CLAP_DARK =
 
 const cdn = (id: string): string => `https://cdn.7tv.app/emote/${id}/2x.webp`;
 
+/** 7TV-эмоут GAMBA канала (ID проверен 2026-09-09 через 7TV API сета):
+ *  кнопка «гамба на пивкойны» в шапке и спин в GambaModal. */
+export const GAMBA_EMOTE_URL = cdn('01FJT4HEXG000FZHS49NWQT5DZ');
+
 /** Токен заголовка → 7TV-эмоут канала (ID сверен 2026-09-15 по сету alysque). */
 const TITLE_EMOTES: Record<string, { src: string; name: string }> = {
   o7: { src: cdn('01KD6VPC2JC6Q7RCT4S6D6ZTWQ'), name: 'o7' },

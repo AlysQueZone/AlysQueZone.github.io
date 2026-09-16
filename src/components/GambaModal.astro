@@ -9,6 +9,7 @@
 //
 // Звуки — публичный бакет media (тикет 10, §3 спеки): абсолютные S3-URL без ${base}.
 import { s3Sound } from '@/lib/media';
+import { GAMBA_EMOTE_URL } from '@/lib/emotes';
 import {
   GAMBA_DAILY_LIMIT,
   GAMBA_JACKPOT_SOUNDS,
@@ -21,8 +22,6 @@ const SPIN_POOL = GAMBA_SPIN_SOUNDS.map((f) => s3Sound(f)).join(',');
 const WIN_POOL = GAMBA_WIN_SOUNDS.map((f) => s3Sound(f)).join(',');
 const JACKPOT_POOL = GAMBA_JACKPOT_SOUNDS.map((f) => s3Sound(f)).join(',');
 const LOSE_POOL = GAMBA_LOSE_SOUNDS.map((f) => s3Sound(f)).join(',');
-/** 7TV-эмоут GAMBA канала (ID проверен 2026-09-09 через 7TV API сета). */
-const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp';
 ---
 
 <div
@@ -61,8 +60,8 @@ const GAMBA_URL = 'https://cdn.7tv.app/emote/01FJT4HEXG000FZHS49NWQT5DZ/2x.webp'
       <button id="gamba-spin" type="button" class="btn-arcade btn-arcade-primary px-6 py-3 text-sm">
         Крутить за 100
         <img
-          src={GAMBA_URL}
-          alt="GAMBA"
+          src={GAMBA_EMOTE_URL}
+          alt=""
           title="GAMBA"
           width="28"
           height="28"

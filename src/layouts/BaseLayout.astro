@@ -17,6 +17,7 @@ import GambaModal from '@/components/GambaModal.astro';
 import DailyLogin from '@/components/DailyLogin.astro';
 import AuthButton from '@/components/AuthButton.astro';
 import { assertSupabaseConfigured } from '@/lib/supabase';
+import { GAMBA_EMOTE_URL } from '@/lib/emotes';
 
 interface Props {
   title?: string;
@@ -79,7 +80,16 @@ assertSupabaseConfigured();
             data-gamba-button
             class="btn-arcade btn-arcade-ghost animate-blink px-4 py-2 text-sm"
           >
-            🎰 гамба на пивкойны
+            <!-- Эмоут декоративный: текстом рядом сказано то же самое. -->
+            <img
+              src={GAMBA_EMOTE_URL}
+              alt=""
+              width="20"
+              height="20"
+              loading="eager"
+              class="h-5 w-5 object-contain"
+            />
+            гамба на пивкойны
           </button>
           <div data-wallet-chip class="hidden chip-arcade bg-void px-4 py-2 text-sm font-black">
             <span class="text-melon">◉</span>
