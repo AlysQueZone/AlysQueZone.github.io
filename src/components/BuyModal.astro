@@ -191,15 +191,14 @@ const clapSound = s3Sound('clap.mp3');
       'text-base',
       'text-lg',
       'top-1/2',
-      '-translate-y-1/2',
-      'relative'
+      '-translate-y-1/2'
     );
     notice.classList.add('bottom-16');
     const span = document.createElement('span');
     span.textContent = text;
-    notice.appendChild(span);
     if (videoUrl) {
-      // Видео-вариант: большое окно строго по центру экрана.
+      // Видео-вариант: большое окно строго по центру экрана. Окно остаётся
+      // `fixed` (не `relative`) — иначе центрирование ломается.
       notice.classList.remove('bottom-16');
       notice.classList.add(
         'whitespace-normal',
@@ -209,18 +208,21 @@ const clapSound = s3Sound('clap.mp3');
         'gap-2',
         'text-lg',
         'top-1/2',
-        '-translate-y-1/2',
-        'relative'
+        '-translate-y-1/2'
       );
       // Метка для клика-вне: прерывать можно только воспроизведение.
       notice.dataset.video = '1';
+      // Крестик — в потоке шапки (не absolute): всегда внутри карточки.
+      const row = document.createElement('div');
+      row.className = 'flex w-full items-start justify-between gap-2';
       const close = document.createElement('button');
       close.type = 'button';
       close.setAttribute('aria-label', 'Закрыть');
-      close.className = 'btn-arcade btn-arcade-ghost absolute -top-3 -right-3 px-2 py-0.5 text-sm';
+      close.className = 'btn-arcade btn-arcade-ghost shrink-0 px-3 py-1 text-sm';
       close.textContent = '✕';
       close.addEventListener('click', () => dismissNotice());
-      notice.appendChild(close);
+      row.append(span, close);
+      notice.appendChild(row);
       const video = document.createElement('video');
       video.src = videoUrl;
       video.controls = true;
@@ -241,18 +243,21 @@ const clapSound = s3Sound('clap.mp3');
       // если 'ended' не выстрелит.
       video.addEventListener('ended', () => dismissNotice());
       videoEl = video;
-    } else if (ok) {
-      const img = document.createElement('img');
-      img.src = ALYSQUE_CLAP_DARK;
-      img.alt = 'alysqueCLAP';
-      img.width = 28;
-      img.height = 28;
-      img.loading = 'eager';
-      img.className = 'ml-2 inline h-7 w-7 object-contain';
-      notice.appendChild(img);
-      notice.classList.add('flex', 'items-center');
     } else {
-      notice.classList.remove('flex', 'items-center');
+      notice.appendChild(span);
+      if (ok) {
+        const img = document.createElement('img');
+        img.src = ALYSQUE_CLAP_DARK;
+        img.alt = 'alysqueCLAP';
+        img.width = 28;
+        img.height = 28;
+        img.loading = 'eager';
+        img.className = 'ml-2 inline h-7 w-7 object-contain';
+        notice.appendChild(img);
+        notice.classList.add('flex', 'items-center');
+      } else {
+        notice.classList.remove('flex', 'items-center');
+      }
     }
     notice.classList.remove('hidden', 'border-pivko', 'border-melon');
     notice.classList.add(ok ? 'border-pivko' : 'border-melon');
