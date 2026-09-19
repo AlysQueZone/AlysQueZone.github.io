@@ -196,11 +196,16 @@ assertSupabaseConfigured();
         return (raw ?? '').replace(/\s+/g, ' ').trim() || 'Биржа приветов';
       })();
 
-      let lastDealHtml = '';
+      let lastDealText = '';
       let swapToken = 0;
+      let refreshingDeals = false;
 
-      /** Обе половины одинаковы — иначе рвётся бесшовный цикл дорожки. */
-      const halfOf = (text: string): string => `${text} ★ ${text} ★ `;
+      // Половина дорожки набирается копиями строки так, чтобы перекрыть
+      // вьюпорт: иначе на широком экране (или при 1–2 сделках) в конце цикла
+      // виден провал `bg-milk`.
+      const copyOf = (text: string): string => `${text} ★ `;
+      const copiesFor = (one: number): number =>
+        one > 0 ? Math.max(1, Math.ceil((window.innerWidth + 32) / one)) : 1;
 
       // Скорость в px/с не зависит от длины контента: длительность цикла
       // считаем от измеренной половины дорожки, иначе длинный лог «убегает»,
@@ -212,7 +217,12 @@ assertSupabaseConfigured();
         if (half > 0) dealTrack.style.animationDuration = `${half / SPEED}s`;
       }
 
-      function swapTrack(html: string): void {
+      /**
+       * Перерисовать обе половины: измерить одну копию и добить её до ширины
+       * вьюпорта. Контент — только `textContent`: ник из JWT-метаданных правит
+       * сам пользователь, в `innerHTML` ему нельзя.
+       */
+      function paintTrack(text: string): void {
         if (
           !(dealTrack instanceof HTMLElement) ||
           !(dealA instanceof HTMLElement) ||
@@ -220,21 +230,30 @@ assertSupabaseConfigured();
         ) {
           return;
         }
-        if (html === lastDealHtml) return;
-        lastDealHtml = html;
+        const one = copyOf(text);
+        dealA.textContent = one;
+        dealB.textContent = one;
+        // Перезапуск под нулевой прозрачностью: ширина сменилась — рывка нет.
+        dealTrack.style.animation = 'none';
+        void dealTrack.offsetWidth;
+        const half = one.repeat(copiesFor(dealTrack.scrollWidth / 2));
+        dealA.textContent = half;
+        dealB.textContent = half;
+        dealTrack.style.animation = '';
+        // Длительность — после возврата shorthand: `animation = ''` сбрасывает
+        // и inline-duration, если поставить её раньше.
+        applyTrackSpeed();
+      }
+
+      function swapTrack(text: string): void {
+        if (text === lastDealText) return;
+        if (!(dealTrack instanceof HTMLElement)) return;
+        lastDealText = text;
         const token = (swapToken += 1);
         dealTrack.style.opacity = '0';
         window.setTimeout(() => {
           if (token !== swapToken) return;
-          dealA.innerHTML = html;
-          dealB.innerHTML = html;
-          // Перезапуск под нулевой прозрачностью: ширина сменилась — рывка нет.
-          dealTrack.style.animation = 'none';
-          void dealTrack.offsetWidth;
-          dealTrack.style.animation = '';
-          // Длительность — после возврата shorthand: `animation = ''` сбрасывает
-          // и inline-duration, если поставить её раньше.
-          applyTrackSpeed();
+          paintTrack(text);
           window.requestAnimationFrame(() => {
             dealTrack.style.opacity = '1';
           });
@@ -242,37 +261,42 @@ assertSupabaseConfigured();
       }
 
       async function refreshDealLog(): Promise<void> {
-        if (!(dealTrack instanceof HTMLElement)) return;
-        let line = '';
-        if (isSupabaseConfigured()) {
-          try {
-            const sb = getSupabase();
-            if (sb) {
-              const { data, error } = await sb
-                .from('purchases')
-                .select('price_paid,buyer_login,created_at,lots(slug,title)')
-                .order('created_at', { ascending: false })
-                .order('id', { ascending: false })
-                .limit(10);
-              if (!error && Array.isArray(data)) {
-                line = (data as unknown as Record<string, unknown>[])
-                  .flatMap((row) => {
-                    const price = Number(row['price_paid']);
-                    const by = row['buyer_login'];
-                    const lot = row['lots'] as unknown as Record<string, unknown> | null;
-                    const title = lot && typeof lot['title'] === 'string' ? lot['title'] : null;
-                    if (!Number.isFinite(price) || typeof by !== 'string' || !title) return [];
-                    return [`${by} забрал «${title}» за ${price} 🍺`];
-                  })
-                  .join(' ★ ');
+        if (!(dealTrack instanceof HTMLElement) || refreshingDeals) return;
+        refreshingDeals = true;
+        try {
+          let line = '';
+          if (isSupabaseConfigured()) {
+            try {
+              const sb = getSupabase();
+              if (sb) {
+                const { data, error } = await sb
+                  .from('purchases')
+                  .select('price_paid,buyer_login,created_at,lots(slug,title)')
+                  .order('created_at', { ascending: false })
+                  .order('id', { ascending: false })
+                  .limit(10);
+                if (!error && Array.isArray(data)) {
+                  line = (data as unknown as Record<string, unknown>[])
+                    .flatMap((row) => {
+                      const price = Number(row['price_paid']);
+                      const by = row['buyer_login'];
+                      const lot = row['lots'] as unknown as Record<string, unknown> | null;
+                      const title = lot && typeof lot['title'] === 'string' ? lot['title'] : null;
+                      if (!Number.isFinite(price) || typeof by !== 'string' || !title) return [];
+                      return [`${by} забрал «${title}» за ${price} 🍺`];
+                    })
+                    .join(' ★ ');
+                }
               }
+            } catch {
+              // лог — best effort, падаем в правила
             }
-          } catch {
-            // лог — best effort, падаем в правила
           }
+          // Пустой лог — честный пустой стейт: живые правила биржи.
+          swapTrack(line || RULES_TEXT);
+        } finally {
+          refreshingDeals = false;
         }
-        // Пустой лог — честный пустой стейт: живые правила биржи.
-        swapTrack(halfOf(line || RULES_TEXT));
       }
 
       if (isSupabaseConfigured()) {
@@ -294,17 +318,20 @@ assertSupabaseConfigured();
         });
       } else {
         // Без ключей БД нет: сразу правила, скелетон не оставляем.
-        swapTrack(halfOf(RULES_TEXT));
+        swapTrack(RULES_TEXT);
       }
       // Скелетон тоже должен идти с той же скоростью, что и контент.
       applyTrackSpeed();
-      // Длина дорожки меняется с контентом и вьюпортом — держим px/с ровным.
+      // Ширина дорожки зависит от Press Start 2P: до загрузки шрифта замер врёт.
+      void document.fonts?.ready.then(() => applyTrackSpeed());
+      // Вьюпорт изменился — пересобрать половину под новую ширину и скорость.
       let speedRaf = 0;
       window.addEventListener('resize', () => {
         if (speedRaf) return;
         speedRaf = window.requestAnimationFrame(() => {
           speedRaf = 0;
-          applyTrackSpeed();
+          if (lastDealText) paintTrack(lastDealText);
+          else applyTrackSpeed();
         });
       });
       // Баланс в шапке (тикет 11, contract): только из БД (таблица profiles,

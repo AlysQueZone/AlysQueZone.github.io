@@ -102,7 +102,7 @@ const base = import.meta.env.BASE_URL;
         </article>
       ))}
     </div>
-    <p data-random-state class="mt-3 hidden text-sm font-bold text-mist" role="status"></p>
+    <p data-random-state class="mt-3 hidden text-sm font-bold text-mist"></p>
     <p data-random-status class="sr-only" role="status">
       Загружаю приветы…
     </p>
@@ -178,18 +178,24 @@ const base = import.meta.env.BASE_URL;
     }
     const pick = pool.slice(0, PICK);
     clearSkeletons();
-    setStatus('');
     slot.replaceChildren(
       ...pick.map((st) => miniCard(st.slug, st.title, st.owner_login, st.price))
     );
-    if (pick.length > 0) setNote(null);
-    else setNote(ok ? 'Пока пусто — зайди на биржу' : 'Приветы не загрузились — проверь связь');
+    const msg =
+      pick.length > 0
+        ? null
+        : ok
+          ? 'Пока пусто — зайди на биржу'
+          : 'Приветы не загрузились — проверь связь';
+    setNote(msg);
+    setStatus(msg ?? '');
   }
 
   if (isSupabaseConfigured()) void renderRandom();
   else {
+    const msg = 'Приветы не загрузились — проверь связь';
     clearSkeletons();
-    setStatus('');
-    setNote('Приветы не загрузились — проверь связь');
+    setNote(msg);
+    setStatus(msg);
   }
 </script>

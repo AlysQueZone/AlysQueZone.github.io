@@ -270,6 +270,10 @@ html[data-plaska='on'] main {
       animation: none;
     }
 
+    .marquee-track {
+      transition: none;
+    }
+
     .btn-arcade,
     .btn-arcade:hover,
     .btn-arcade:active {

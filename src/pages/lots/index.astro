@@ -23,8 +23,7 @@ import BuyModal from '@/components/BuyModal.astro';
     <h2 class="font-display text-xs uppercase">
       Мои приветы{' '}
       <span data-my-privety-count class="text-pivko">
-        {' '}
-        —{' '}
+        —
       </span>
     </h2>
     <div data-my-privety class="mt-3 flex flex-col gap-2">
@@ -40,7 +39,7 @@ import BuyModal from '@/components/BuyModal.astro';
 
   <section aria-label="Все лоты" class="mt-8">
     <h2 class="font-display text-xs uppercase">Все лоты</h2>
-    <p data-lots-state class="mt-3 hidden text-sm font-bold text-mist" role="status"></p>
+    <p data-lots-state class="mt-3 hidden text-sm font-bold text-mist"></p>
     <p data-lots-status class="sr-only" role="status">
       Загружаю лоты…
     </p>
@@ -222,8 +221,9 @@ import BuyModal from '@/components/BuyModal.astro';
       const { ok, states } = await fetchLotCatalogResult(uid);
       lastStates = states;
       reconcile(states);
-      setGridNote(!ok ? FAIL_TEXT : states.size === 0 ? GRID_EMPTY_TEXT : null);
-      setStatus('');
+      const gridMsg = !ok ? FAIL_TEXT : states.size === 0 ? GRID_EMPTY_TEXT : null;
+      setGridNote(gridMsg);
+      setStatus(gridMsg ?? '');
       clearSkeletons();
       renderMyGreetings(states, uid);
     } finally {
@@ -245,7 +245,7 @@ import BuyModal from '@/components/BuyModal.astro';
     getSupabase()?.auth.onAuthStateChange(() => void refresh());
   } else {
     setGridNote(FAIL_TEXT);
-    setStatus('');
+    setStatus(FAIL_TEXT);
     clearSkeletons();
     showMyNote(GUEST_TEXT, 0);
   }
