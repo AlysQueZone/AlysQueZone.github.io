@@ -182,8 +182,7 @@ const LOSE_POOL = GAMBA_LOSE_SOUNDS.map((f) => s3Sound(f)).join(',');
   const spinBtn = document.getElementById('gamba-spin');
   const closeBtn = document.getElementById('gamba-close');
 
-  const GATE_TEXT =
-    'В котле меньше сотни — ставка 100 не влезла. Забери Ежедневный вход и возвращайся пойжемать 🙂';
+  const GATE_TEXT = 'На ставку не хватает — нужно 100 Пивкойнов 🍺';
   const GUEST_TEXT = 'Гамба только для своих — войди через Twitch, и пойжем вместе 🍺';
   const RATE_TEXT = 'Не жми так жоско — дай колесу отдышаться пару секунд 🙂';
   const limitN = modal?.dataset.limit ?? '20';
@@ -453,8 +452,8 @@ const LOSE_POOL = GAMBA_LOSE_SOUNDS.map((f) => s3Sound(f)).join(',');
     trapFocus(modal);
     draw(0);
     preloadPools();
-    // Дружелюбный гейт заранее: при балансе меньше ставки — подсказка
-    // про Ежедневный вход, а не ошибка после клика.
+    // Гейт заранее: при балансе меньше ставки — понятная подсказка,
+    // а не ошибка после клика.
     void (async () => {
       if (!isSupabaseConfigured()) return;
       try {
