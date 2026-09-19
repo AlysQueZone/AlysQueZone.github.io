@@ -30,6 +30,14 @@ const {
 } = Astro.props;
 const base = import.meta.env.BASE_URL;
 
+// Скелетон бегущей строки: бары, одинаковые в обеих половинах дорожки —
+// иначе рвётся бесшовный цикл. Скрипт подменяет их логом сделок или правилами.
+const MQ_SKELETON = Array.from(
+  { length: 16 },
+  () =>
+    '<span class="skeleton-block skeleton-block-cream mr-3 inline-block h-2 w-20 align-middle"></span>'
+).join('');
+
 // Билд-гейт: без PUBLIC_SUPABASE_* сайт нерабочий (витрина — проекция БД).
 assertSupabaseConfigured();
 ---
@@ -106,20 +114,19 @@ assertSupabaseConfigured();
         </div>
       </div>
       <!-- Бегущая строка-лог (ребаланс): живой хвост ~10 последних сделок
-        из purchases через realtime-подписку; без БД/истории — честная
-        строка живых правил (те же цифры, что в окне «Правила биржи»). -->
+        из purchases через realtime-подписку. До первого ответа — скелетон;
+        сделок нет/БД недоступна — честная строка живых правил (те же цифры,
+        что в окне «Правила биржи»). Подмена идёт под fade, см. скрипт. -->
       <div class="marquee border-t-2 border-milk/20 bg-milk py-1" aria-hidden="true">
-        <p class="marquee-track font-display text-[9px] text-cream uppercase">
-          <span data-deal-log-a class="mx-4">
-            Комиссия биржи 7% &#9733; перекуп &#43;10% &#215;15, дальше &#43;1 &#9733; гамба до x10
-            &#183; 20 спинов в день &#9733; вход 200/200/250 &#9733;&nbsp;
-          </span>
-          <span data-deal-log-b class="mx-4">
-            Комиссия биржи 7% &#9733; перекуп &#43;10% &#215;15, дальше &#43;1 &#9733; гамба до x10
-            &#183; 20 спинов в день &#9733; вход 200/200/250 &#9733;&nbsp;
-          </span>
+        <p class="marquee-track font-display text-[9px] text-cream uppercase" data-deal-log-track>
+          <span class="mx-4" data-deal-log-a set:html={MQ_SKELETON} />
+          <span class="mx-4" data-deal-log-b set:html={MQ_SKELETON} />
         </p>
       </div>
+      <template data-deal-log-rules>
+        Комиссия биржи 7% ★ перекуп +10% ×15, дальше +1 ★ гамба до x10 · 20 спинов в день ★ вход
+        200/200/250 ★
+      </template>
     </header>
     <main id="main" class="mx-auto max-w-6xl px-4 py-8">
       <slot />
@@ -178,39 +185,83 @@ assertSupabaseConfigured();
       initOutbidNotice();
       // Бегущая строка-лог (ребаланс, тикет 06): последние ~10 сделок из
       // purchases (публичный SELECT) через realtime-подписку на INSERT.
-      // Без БД/истории — остаётся запечённая строка живых правил выше.
-      async function refreshDealLog(): Promise<void> {
-        const a = document.querySelector('[data-deal-log-a]');
-        const b = document.querySelector('[data-deal-log-b]');
-        if (!(a instanceof HTMLElement) || !(b instanceof HTMLElement)) return;
-        if (!isSupabaseConfigured()) return;
-        try {
-          const sb = getSupabase();
-          if (!sb) return;
-          const { data, error } = await sb
-            .from('purchases')
-            .select('price_paid,buyer_login,created_at,lots(slug,title)')
-            .order('created_at', { ascending: false })
-            .order('id', { ascending: false })
-            .limit(10);
-          if (error || !Array.isArray(data) || data.length === 0) return;
-          const line = (data as unknown as Record<string, unknown>[])
-            .flatMap((row) => {
-              const price = Number(row['price_paid']);
-              const by = row['buyer_login'];
-              const lot = row['lots'] as unknown as Record<string, unknown> | null;
-              const title = lot && typeof lot['title'] === 'string' ? lot['title'] : null;
-              if (!Number.isFinite(price) || typeof by !== 'string' || !title) return [];
-              return [`${by} забрал «${title}» за ${price} 🍺`];
-            })
-            .join(' ★ ');
-          if (!line) return;
-          a.textContent = `${line} ★ `;
-          b.textContent = `${line} ★ `;
-        } catch {
-          // лог — best effort, запечённые правила остаются
+      // В разметке — скелетон; лог (или правила, если сделок нет) приходит
+      // подменой через fade, чтобы смена ширины дорожки не давала рывка.
+      const dealTrack = document.querySelector('[data-deal-log-track]');
+      const dealA = document.querySelector('[data-deal-log-a]');
+      const dealB = document.querySelector('[data-deal-log-b]');
+      const rulesTpl = document.querySelector('[data-deal-log-rules]');
+      const RULES_TEXT = (() => {
+        const raw = rulesTpl instanceof HTMLTemplateElement ? rulesTpl.content.textContent : '';
+        return (raw ?? '').replace(/\s+/g, ' ').trim() || 'Биржа приветов';
+      })();
+
+      let lastDealHtml = '';
+      let swapToken = 0;
+
+      /** Обе половины одинаковы — иначе рвётся бесшовный цикл дорожки. */
+      const halfOf = (text: string): string => `${text} ★ ${text} ★ `;
+
+      function swapTrack(html: string): void {
+        if (
+          !(dealTrack instanceof HTMLElement) ||
+          !(dealA instanceof HTMLElement) ||
+          !(dealB instanceof HTMLElement)
+        ) {
+          return;
         }
+        if (html === lastDealHtml) return;
+        lastDealHtml = html;
+        const token = (swapToken += 1);
+        dealTrack.style.opacity = '0';
+        window.setTimeout(() => {
+          if (token !== swapToken) return;
+          dealA.innerHTML = html;
+          dealB.innerHTML = html;
+          // Перезапуск под нулевой прозрачностью: ширина сменилась — рывка нет.
+          dealTrack.style.animation = 'none';
+          void dealTrack.offsetWidth;
+          dealTrack.style.animation = '';
+          window.requestAnimationFrame(() => {
+            dealTrack.style.opacity = '1';
+          });
+        }, 260);
       }
+
+      async function refreshDealLog(): Promise<void> {
+        if (!(dealTrack instanceof HTMLElement)) return;
+        let line = '';
+        if (isSupabaseConfigured()) {
+          try {
+            const sb = getSupabase();
+            if (sb) {
+              const { data, error } = await sb
+                .from('purchases')
+                .select('price_paid,buyer_login,created_at,lots(slug,title)')
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: false })
+                .limit(10);
+              if (!error && Array.isArray(data)) {
+                line = (data as unknown as Record<string, unknown>[])
+                  .flatMap((row) => {
+                    const price = Number(row['price_paid']);
+                    const by = row['buyer_login'];
+                    const lot = row['lots'] as unknown as Record<string, unknown> | null;
+                    const title = lot && typeof lot['title'] === 'string' ? lot['title'] : null;
+                    if (!Number.isFinite(price) || typeof by !== 'string' || !title) return [];
+                    return [`${by} забрал «${title}» за ${price} 🍺`];
+                  })
+                  .join(' ★ ');
+              }
+            }
+          } catch {
+            // лог — best effort, падаем в правила
+          }
+        }
+        // Пустой лог — честный пустой стейт: живые правила биржи.
+        swapTrack(halfOf(line || RULES_TEXT));
+      }
+
       if (isSupabaseConfigured()) {
         void refreshDealLog();
         try {
@@ -228,6 +279,9 @@ assertSupabaseConfigured();
         document.addEventListener('visibilitychange', () => {
           if (!document.hidden) void refreshDealLog();
         });
+      } else {
+        // Без ключей БД нет: сразу правила, скелетон не оставляем.
+        swapTrack(halfOf(RULES_TEXT));
       }
       // Баланс в шапке (тикет 11, contract): только из БД (таблица profiles,
       // live-подписка). Гостю чип не показываем вообще; залогиненному без

@@ -214,6 +214,33 @@ html[data-plaska='on'] main {
   .marquee-track {
     display: inline-block;
     animation: marquee-scroll 45s linear infinite;
+    /* Смена контента (скелетон → лог/правила) идёт под нулевой прозрачностью:
+       ширина меняется, но рывка не видно. */
+    transition: opacity 0.25s linear;
+  }
+
+  /* Скелетон загрузки: бары на месте данных. Пульсация ступенчатая — в духе
+     arcade-blink, без мягких бликов. Светлый вариант — на панелях, кремовый —
+     на тёмной бегущей строке. */
+  .skeleton-block {
+    background-color: color-mix(in srgb, var(--color-milk) 20%, transparent);
+    border-radius: 2px;
+    animation: skeleton-step 1.1s steps(1, end) infinite;
+  }
+
+  .skeleton-block-cream {
+    background-color: color-mix(in srgb, var(--color-cream) 30%, transparent);
+  }
+
+  @keyframes skeleton-step {
+    0%,
+    55% {
+      opacity: 1;
+    }
+    56%,
+    100% {
+      opacity: 0.45;
+    }
   }
 
   @keyframes marquee-scroll {
@@ -236,7 +263,8 @@ html[data-plaska='on'] main {
 
   @media (prefers-reduced-motion: reduce) {
     .animate-blink,
-    .marquee-track {
+    .marquee-track,
+    .skeleton-block {
       animation: none;
     }
 

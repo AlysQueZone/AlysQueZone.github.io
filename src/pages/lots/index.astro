@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import LotCard from '@/components/LotCard.astro';
+import LotCardSkeleton from '@/components/LotCardSkeleton.astro';
 import BuyModal from '@/components/BuyModal.astro';
 
 // Витрина — каркас: карточек в HTML нет, сетку целиком рисует клиент из БД
@@ -22,18 +23,32 @@ import BuyModal from '@/components/BuyModal.astro';
     <h2 class="font-display text-xs uppercase">
       Мои приветы{' '}
       <span data-my-privety-count class="text-pivko">
-        0
+        {' '}
+        —{' '}
       </span>
     </h2>
-    <div data-my-privety class="mt-3 flex flex-col gap-2"></div>
+    <div data-my-privety class="mt-3 flex flex-col gap-2">
+      <div
+        data-my-privety-skeleton
+        class="border-2 border-milk bg-panel px-3 py-2"
+        aria-hidden="true"
+      >
+        <div class="skeleton-block h-4 w-1/2"></div>
+      </div>
+    </div>
   </section>
 
   <section aria-label="Все лоты" class="mt-8">
     <h2 class="font-display text-xs uppercase">Все лоты</h2>
-    <p data-lots-state class="mt-3 text-sm font-bold text-mist">
+    <p data-lots-state class="mt-3 hidden text-sm font-bold text-mist" role="status"></p>
+    <p data-lots-status class="sr-only" role="status">
       Загружаю лоты…
     </p>
-    <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3" data-lot-grid></div>
+    <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3" data-lot-grid>
+      {Array.from({ length: 6 }, () => (
+        <LotCardSkeleton />
+      ))}
+    </div>
   </section>
 
   <BuyModal />
@@ -65,7 +80,6 @@ import BuyModal from '@/components/BuyModal.astro';
   const GUEST_TEXT = 'Войди через Twitch — тут будут твои приветы';
   const EMPTY_TEXT = 'Пока пусто — забери первый привет ниже';
   const GRID_EMPTY_TEXT = 'Пока лотов нет — скоро появятся';
-  const LOADING_TEXT = 'Загружаю лоты…';
   const FAIL_TEXT = 'Лоты не загрузились. Проверь связь и обнови страницу';
   /** Баланс — зеркало гейта: не хватает — кнопки гаснут. */
   let myBalance: number | null = null;
@@ -92,6 +106,17 @@ import BuyModal from '@/components/BuyModal.astro';
     if (!(note instanceof HTMLElement)) return;
     note.classList.toggle('hidden', text === null);
     note.textContent = text ?? '';
+  }
+
+  /** Скринридеру: «Загружаю…» живёт только до первого ответа БД. */
+  function setStatus(text: string): void {
+    const status = document.querySelector('[data-lots-status]');
+    if (status instanceof HTMLElement) status.textContent = text;
+  }
+
+  /** Скелетоны — только на первую загрузку: дальше сетку держит Realtime. */
+  function clearSkeletons(): void {
+    document.querySelectorAll('[data-lot-skeleton]').forEach((el) => el.remove());
   }
 
   function renderMyGreetings(states: Map<string, LotState>, uid: string | null): void {
@@ -198,6 +223,8 @@ import BuyModal from '@/components/BuyModal.astro';
       lastStates = states;
       reconcile(states);
       setGridNote(!ok ? FAIL_TEXT : states.size === 0 ? GRID_EMPTY_TEXT : null);
+      setStatus('');
+      clearSkeletons();
       renderMyGreetings(states, uid);
     } finally {
       refreshing = false;
@@ -205,7 +232,6 @@ import BuyModal from '@/components/BuyModal.astro';
   }
 
   if (isSupabaseConfigured()) {
-    setGridNote(LOADING_TEXT);
     void refresh();
     subscribeLots(() => void refresh());
     // Свежесть при возврате на вкладку (Realtime мог пропустить): перезапрос.
@@ -219,6 +245,8 @@ import BuyModal from '@/components/BuyModal.astro';
     getSupabase()?.auth.onAuthStateChange(() => void refresh());
   } else {
     setGridNote(FAIL_TEXT);
+    setStatus('');
+    clearSkeletons();
     showMyNote(GUEST_TEXT, 0);
   }
 
