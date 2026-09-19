@@ -35,7 +35,7 @@ const base = import.meta.env.BASE_URL;
 const MQ_SKELETON = Array.from(
   { length: 16 },
   () =>
-    '<span class="skeleton-block skeleton-block-cream mr-3 inline-block h-2 w-20 align-middle"></span>'
+    '<span class="skeleton-block skeleton-block-cream mr-3 inline-block h-2 w-40 align-middle"></span>'
 ).join('');
 
 // Билд-гейт: без PUBLIC_SUPABASE_* сайт нерабочий (витрина — проекция БД).
@@ -202,6 +202,16 @@ assertSupabaseConfigured();
       /** Обе половины одинаковы — иначе рвётся бесшовный цикл дорожки. */
       const halfOf = (text: string): string => `${text} ★ ${text} ★ `;
 
+      // Скорость в px/с не зависит от длины контента: длительность цикла
+      // считаем от измеренной половины дорожки, иначе длинный лог «убегает»,
+      // а короткие правила еле ползут. ~100 px/с — прежний темп лога.
+      const SPEED = 100;
+      function applyTrackSpeed(): void {
+        if (!(dealTrack instanceof HTMLElement)) return;
+        const half = dealTrack.scrollWidth / 2;
+        if (half > 0) dealTrack.style.animationDuration = `${half / SPEED}s`;
+      }
+
       function swapTrack(html: string): void {
         if (
           !(dealTrack instanceof HTMLElement) ||
@@ -222,6 +232,9 @@ assertSupabaseConfigured();
           dealTrack.style.animation = 'none';
           void dealTrack.offsetWidth;
           dealTrack.style.animation = '';
+          // Длительность — после возврата shorthand: `animation = ''` сбрасывает
+          // и inline-duration, если поставить её раньше.
+          applyTrackSpeed();
           window.requestAnimationFrame(() => {
             dealTrack.style.opacity = '1';
           });
@@ -283,6 +296,17 @@ assertSupabaseConfigured();
         // Без ключей БД нет: сразу правила, скелетон не оставляем.
         swapTrack(halfOf(RULES_TEXT));
       }
+      // Скелетон тоже должен идти с той же скоростью, что и контент.
+      applyTrackSpeed();
+      // Длина дорожки меняется с контентом и вьюпортом — держим px/с ровным.
+      let speedRaf = 0;
+      window.addEventListener('resize', () => {
+        if (speedRaf) return;
+        speedRaf = window.requestAnimationFrame(() => {
+          speedRaf = 0;
+          applyTrackSpeed();
+        });
+      });
       // Баланс в шапке (тикет 11, contract): только из БД (таблица profiles,
       // live-подписка). Гостю чип не показываем вообще; залогиненному без
       // строки (счёт ещё не создан триггером / офлайн) — прочерк, деньги целы.
