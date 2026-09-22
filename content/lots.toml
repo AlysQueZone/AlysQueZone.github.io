@@ -162,3 +162,9 @@ slug = "lot-privet-vandalque"
 title = "Привет VandaLQuE"
 price = 800
 video_url = "https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-vandalque.webm"
+
+[[lots]]
+slug = "lot-privet-virratu"
+title = "Привет Virratu"
+price = 800
+video_url = "https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-virratu.webm"
