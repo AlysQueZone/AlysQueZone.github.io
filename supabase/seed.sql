@@ -24,6 +24,7 @@ insert into public.lots (slug, title, price, video_url) values
   ('lot-privet-coolbeback', 'Привет coolbeback', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-coolbeback.webm'),
   ('lot-privet-evilzerg57-double', 'Двойной привет evilzerg57', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-evilzerg57-double.webm'),
   ('lot-privet-olyacaramel', 'Покупка olyacaramel', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-olyacaramel.webm'),
+  ('lot-privet-onghanntto', 'Привет Onghanntto', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-onghanntto.webm'),
   ('lot-privet-revixit', 'Привет Revixit', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-revixit.webm'),
   ('lot-privet-sooblonde', 'Привет sooblonde', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-sooblonde.webm'),
   ('lot-privet-spirit', 'Привет spiritbanbanban', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-spirit.webm'),

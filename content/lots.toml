@@ -140,6 +140,12 @@ price = 800
 video_url = "https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-olyacaramel.webm"
 
 [[lots]]
+slug = "lot-privet-onghanntto"
+title = "Привет Onghanntto"
+price = 800
+video_url = "https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-onghanntto.webm"
+
+[[lots]]
 slug = "lot-privet-revixit"
 title = "Привет Revixit"
 price = 800

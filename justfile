@@ -62,6 +62,11 @@ lots-sync:
 lots-seed:
     python3 scripts/lots_sync.py --write-seed
 
+# Рекомендуемый title карточки: ник из имени файла по реестру ников
+# Пример: just lots-title privets/Onghanntto.mp4
+lots-title *args:
+    python3 scripts/lots_title.py {{args}}
+
 # Синк ников чатерсов из чата VOD в content/chatters.toml
 # Пример: just chatters-sync --vod 2864275043
 chatters-sync *args:
