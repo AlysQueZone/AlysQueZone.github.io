@@ -28,4 +28,3 @@
 - Issues-трекинг (`scratch/`) → `docs/agents/issue-tracker.md`.
 - Триаж-лейблы (`needs-triage` … `wontfix`) → `docs/agents/triage-labels.md`.
 - Термины / глоссарий / ADR-конфликт → `docs/agents/domain.md` (`CONTEXT.md` + `docs/adr/`).
-- Скиллы агента: инженерные (`.agents/skills/`) и дизайн/UI (`.opencode/skills/`) → `README.md`, раздел «Скиллы».
