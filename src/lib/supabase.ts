@@ -51,6 +51,40 @@ export function getSupabase(): SupabaseClient | null {
   return client;
 }
 
+/**
+ * Признак ошибки авторизации PostgREST (просроченный/невалидный JWT).
+ * PGRST301 — JWT verification error; текстовый фолбэк — на случай другого
+ * кода у supabase-js.
+ */
+export function isAuthError(error: unknown): boolean {
+  const e = error as { code?: unknown; message?: unknown } | null;
+  const code = typeof e?.code === 'string' ? e.code : '';
+  const msg = typeof e?.message === 'string' ? e.message.toLowerCase() : '';
+  return code === 'PGRST301' || msg.includes('jwt');
+}
+
+/**
+ * Один best-effort ретрай чтения при 401: гонка обновления токена в SDK
+ * (запрос ушёл со старым токеном во время refresh) гасит первый ответ.
+ * Освежаем сессию и повторяем запрос; не вышло — возвращаем как есть.
+ * Тип ответа сохраняется, потому что функция дженерик по нему.
+ */
+export async function withAuthRetry<R extends { error: unknown }>(
+  run: () => PromiseLike<R>
+): Promise<R> {
+  const first = await run();
+  if (!first.error || !isAuthError(first.error)) return first;
+  const sb = getSupabase();
+  if (!sb) return first;
+  try {
+    const { error: refreshError } = await sb.auth.refreshSession();
+    if (refreshError) return first;
+  } catch {
+    return first;
+  }
+  return run();
+}
+
 /** Ник Чатерса из метаданных Twitch (login — только снапшот, см. спеку). */
 export function displayLogin(
   user: { user_metadata?: Record<string, unknown> } | null | undefined
@@ -156,20 +190,20 @@ export async function fetchSharedHistory(
   const sb = getSupabase();
   if (!sb) return [];
   try {
-    const { data: lot, error: lotError } = await sb
-      .from('lots')
-      .select('id')
-      .eq('slug', slug)
-      .single();
+    const { data: lot, error: lotError } = await withAuthRetry(() =>
+      sb.from('lots').select('id').eq('slug', slug).single()
+    );
     if (lotError || !lot) return [];
     const lotId = (lot as unknown as { id: number }).id;
-    const { data, error } = await sb
-      .from('purchases')
-      .select('buyer_login,buyer_uid,price_paid,created_at')
-      .eq('lot_id', lotId)
-      .order('created_at', { ascending: true })
-      .order('id', { ascending: true })
-      .limit(50);
+    const { data, error } = await withAuthRetry(() =>
+      sb
+        .from('purchases')
+        .select('buyer_login,buyer_uid,price_paid,created_at')
+        .eq('lot_id', lotId)
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true })
+        .limit(50)
+    );
     if (error || !Array.isArray(data)) return [];
     const rows = data as unknown as Record<string, unknown>[];
     let prev = staticOwner && staticOwner.length > 0 ? staticOwner : '—';
@@ -213,12 +247,14 @@ export async function fetchOutbidCatchup(uid: string, limit = 10): Promise<Outbi
   const sb = getSupabase();
   if (!sb || !uid) return [];
   try {
-    const { data: mine, error: mineError } = await sb
-      .from('purchases')
-      .select('lot_id')
-      .eq('buyer_uid', uid)
-      .order('id', { ascending: false })
-      .limit(200);
+    const { data: mine, error: mineError } = await withAuthRetry(() =>
+      sb
+        .from('purchases')
+        .select('lot_id')
+        .eq('buyer_uid', uid)
+        .order('id', { ascending: false })
+        .limit(200)
+    );
     if (mineError || !Array.isArray(mine) || mine.length === 0) return [];
     const lotIds = [
       ...new Set(
@@ -228,15 +264,17 @@ export async function fetchOutbidCatchup(uid: string, limit = 10): Promise<Outbi
       ),
     ];
     if (lotIds.length === 0) return [];
-    const { data, error } = await sb
-      .from('purchases')
-      .select(
-        'lot_id,buyer_uid,buyer_login,price_paid,created_at,lots(slug,title,video_url,owner_uid)'
-      )
-      .in('lot_id', lotIds)
-      .order('created_at', { ascending: true })
-      .order('id', { ascending: true })
-      .limit(500);
+    const { data, error } = await withAuthRetry(() =>
+      sb
+        .from('purchases')
+        .select(
+          'lot_id,buyer_uid,buyer_login,price_paid,created_at,lots(slug,title,video_url,owner_uid)'
+        )
+        .in('lot_id', lotIds)
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true })
+        .limit(500)
+    );
     if (error || !Array.isArray(data)) return [];
     const byLot = new Map<number, Record<string, unknown>[]>();
     for (const row of data as unknown as Record<string, unknown>[]) {

@@ -1,4 +1,4 @@
-import { getSupabase, subscribeSharedLots, buyLotShared } from './supabase';
+import { getSupabase, withAuthRetry, subscribeSharedLots, buyLotShared } from './supabase';
 
 /**
  * Живое состояние Лота: каталог + прайс-фид + флаг «мой» за один запрос.
@@ -83,7 +83,7 @@ export async function fetchLotCatalogResult(uid: string | null): Promise<Catalog
   const sb = getSupabase();
   if (!sb) return { ok: false, states: empty };
   try {
-    const fromView = await sb.from(VIEW).select(VIEW_COLUMNS);
+    const fromView = await withAuthRetry(() => sb.from(VIEW).select(VIEW_COLUMNS));
     if (!fromView.error && Array.isArray(fromView.data)) {
       return { ok: true, states: fillCatalog(fromView.data, uid) };
     }
@@ -91,7 +91,7 @@ export async function fetchLotCatalogResult(uid: string | null): Promise<Catalog
     // вью нет — фолбэк ниже
   }
   try {
-    const fromTable = await sb.from('lots').select(TABLE_COLUMNS);
+    const fromTable = await withAuthRetry(() => sb.from('lots').select(TABLE_COLUMNS));
     if (fromTable.error || !Array.isArray(fromTable.data)) return { ok: false, states: empty };
     return { ok: true, states: fillCatalog(fromTable.data, uid) };
   } catch {
@@ -110,15 +110,12 @@ export interface LotStateResult {
   state: LotState | null;
 }
 
-/** PostgREST-код «строки нет» — это отсутствие Лота, а не сбой запроса. */
-function isNoRow(err: { code?: string } | null | undefined): boolean {
-  return err?.code === 'PGRST116';
-}
-
 /**
  * Живое состояние одного Лота (проекция модалки, свежая N перед записью).
  * Пробуем вью, затем таблицу. `state: null` при `ok: true` — строки нет;
  * `ok: false` — вью и таблица недоступны или хранилище не настроено.
+ * `maybeSingle` вместо `single`: отсутствие строки — это null без ошибки,
+ * а не PostgREST 406 (PGRST116) в логах.
  */
 export async function fetchLotStateResult(
   slug: string,
@@ -127,7 +124,9 @@ export async function fetchLotStateResult(
   const sb = getSupabase();
   if (!sb) return { ok: false, state: null };
   try {
-    const fromView = await sb.from(VIEW).select(VIEW_COLUMNS).eq('slug', slug).single();
+    const fromView = await withAuthRetry(() =>
+      sb.from(VIEW).select(VIEW_COLUMNS).eq('slug', slug).maybeSingle()
+    );
     if (!fromView.error && fromView.data) {
       return { ok: true, state: toLotState(fromView.data as unknown as LotRow, uid) };
     }
@@ -135,11 +134,13 @@ export async function fetchLotStateResult(
     // вью нет — фолбэк ниже
   }
   try {
-    const fromTable = await sb.from('lots').select(TABLE_COLUMNS).eq('slug', slug).single();
+    const fromTable = await withAuthRetry(() =>
+      sb.from('lots').select(TABLE_COLUMNS).eq('slug', slug).maybeSingle()
+    );
     if (!fromTable.error && fromTable.data) {
       return { ok: true, state: toLotState(fromTable.data as unknown as LotRow, uid) };
     }
-    if (isNoRow(fromTable.error)) return { ok: true, state: null };
+    if (!fromTable.error) return { ok: true, state: null };
     return { ok: false, state: null };
   } catch {
     return { ok: false, state: null };

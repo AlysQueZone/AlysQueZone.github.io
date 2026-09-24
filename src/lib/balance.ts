@@ -10,7 +10,7 @@
  * - Секретов здесь нет: только publishable-ключ через getSupabase().
  */
 
-import { getSupabase } from './supabase';
+import { getSupabase, withAuthRetry } from './supabase';
 
 /** Отразить баланс во всех чипах шапки (`data-wallet-balance`). */
 export function paintBalance(balance: number): void {
@@ -48,7 +48,9 @@ export async function fetchMyBalance(): Promise<number | null> {
     const { data: sessionData } = await sb.auth.getSession();
     const uid = sessionData.session?.user.id;
     if (!uid) return null;
-    const { data, error } = await sb.from('profiles').select('balance').eq('user_id', uid).single();
+    const { data, error } = await withAuthRetry(() =>
+      sb.from('profiles').select('balance').eq('user_id', uid).single()
+    );
     if (error || !data) return null;
     const balance = Number((data as unknown as { balance: unknown }).balance);
     return Number.isFinite(balance) && balance >= 0 ? balance : null;

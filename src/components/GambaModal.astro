@@ -198,6 +198,11 @@ const LOSE_POOL = GAMBA_LOSE_SOUNDS.map((f) => s3Sound(f)).join(',');
   let attemptKey: string | null = null;
 
   let spinning = false;
+  // Запрос уже в полёте: синхронный лок от повторных кликов/зажатого Enter
+  // (кнопку гасим сразу, до первого await — иначе пачка параллельных спинов).
+  let pending = false;
+  // Пауза после rate-limit: кнопка остаётся disabled, пока таймер не истечёт.
+  let lockTimer: ReturnType<typeof setTimeout> | undefined;
   let raf = 0;
   let bgAudio: HTMLAudioElement | null = null;
   let outcomeAudio: HTMLAudioElement | null = null;
@@ -446,6 +451,13 @@ const LOSE_POOL = GAMBA_LOSE_SOUNDS.map((f) => s3Sound(f)).join(',');
 
   function open(): void {
     if (!modal || spinning) return;
+    // Повторное открытие снимает лок дня и паузу rate-limit. Если запрос
+    // ещё в полёте — кнопку не включаем (иначе клик молча проглотится).
+    if (lockTimer) {
+      clearTimeout(lockTimer);
+      lockTimer = undefined;
+    }
+    setBusy(pending);
     if (result) result.textContent = '';
     modal.classList.remove('hidden');
     modal.classList.add('flex');
@@ -473,6 +485,10 @@ const LOSE_POOL = GAMBA_LOSE_SOUNDS.map((f) => s3Sound(f)).join(',');
       cancelAnimationFrame(raf);
       stopAll();
     }
+    if (lockTimer) {
+      clearTimeout(lockTimer);
+      lockTimer = undefined;
+    }
     if (!modal) return;
     modal.classList.add('hidden');
     modal.classList.remove('flex');
@@ -481,7 +497,9 @@ const LOSE_POOL = GAMBA_LOSE_SOUNDS.map((f) => s3Sound(f)).join(',');
   }
 
   async function spin(): Promise<void> {
-    if (spinning || !modal) return;
+    // Синхронный лок: ни повторный клик, ни зажатый Enter не запустят второй
+    // запрос, пока текущий в полёте. Кнопку гасим до первого await.
+    if (spinning || pending || !modal) return;
     if (!isSupabaseConfigured()) {
       if (result) result.textContent = ERROR_TEXT;
       return;
@@ -490,67 +508,82 @@ const LOSE_POOL = GAMBA_LOSE_SOUNDS.map((f) => s3Sound(f)).join(',');
       if (result) result.textContent = OFFLINE_TEXT;
       return;
     }
-    const sb = getSupabase();
-    const { data } = (await sb?.auth.getSession()) ?? { data: { session: null } };
-    if (!data.session) {
-      if (result) result.textContent = GUEST_TEXT;
-      await signInWithTwitch(window.location.href.split('#')[0]);
-      return;
-    }
-    // Предгейт по живому балансу — сервер всё равно перепроверит под локом.
-    try {
-      const balance = await fetchMyBalance();
-      if (balance !== null && balance < GAMBA_STAKE) {
-        if (result) result.textContent = GATE_TEXT;
-        return;
-      }
-    } catch {
-      // баланс не прочитался — дальше правда сервера
-    }
+    pending = true;
     setBusy(true);
-    if (result) result.textContent = 'Стучимся к серверу за исходом…';
-    let spinOutcome: GambaOutcome;
-    let spinBalance: number | null;
-    // Ключ держится на попытку: генерируется на спин, повтор той же попытки
-    // (ретрай/офлайн-повтор в spinGambaWithRetry, следующий клик после ошибки
-    // без исхода) шлёт ТОТ ЖЕ ключ. Истекает только после показанного исхода
-    // (см. конец animateToOutcome) — при ошибке ключ жив, дублей нет.
-    attemptKey ??= newGambaAttemptKey();
     try {
-      const done = await spinGambaWithRetry(attemptKey);
-      spinOutcome = done.outcome;
-      spinBalance = done.balance;
-    } catch (err) {
-      setBusy(false);
-      const info = mapGambaError(err);
-      if (!result) return;
-      if (info.kind === 'insufficient-funds') {
-        result.textContent = GATE_TEXT;
-        return;
-      }
-      if (info.kind === 'unauthenticated') {
-        result.textContent = GUEST_TEXT;
+      const sb = getSupabase();
+      const { data } = (await sb?.auth.getSession()) ?? { data: { session: null } };
+      if (!data.session) {
+        if (result) result.textContent = GUEST_TEXT;
+        setBusy(false);
         await signInWithTwitch(window.location.href.split('#')[0]);
         return;
       }
-      if (info.kind === 'rate-limit') {
-        result.textContent = RATE_TEXT;
+      // Предгейт по живому балансу — сервер всё равно перепроверит под локом.
+      try {
+        const balance = await fetchMyBalance();
+        if (balance !== null && balance < GAMBA_STAKE) {
+          if (result) result.textContent = GATE_TEXT;
+          setBusy(false);
+          return;
+        }
+      } catch {
+        // баланс не прочитался — дальше правда сервера
+      }
+      if (result) result.textContent = 'Стучимся к серверу за исходом…';
+      let spinOutcome: GambaOutcome;
+      let spinBalance: number | null;
+      // Ключ держится на попытку: генерируется на спин, повтор той же попытки
+      // (ретрай/офлайн-повтор в spinGambaWithRetry, следующий клик после ошибки
+      // без исхода) шлёт ТОТ ЖЕ ключ. Истекает только после показанного исхода
+      // (см. конец animateToOutcome) — при ошибке ключ жив, дублей нет.
+      attemptKey ??= newGambaAttemptKey();
+      try {
+        const done = await spinGambaWithRetry(attemptKey);
+        spinOutcome = done.outcome;
+        spinBalance = done.balance;
+      } catch (err) {
+        const info = mapGambaError(err);
+        if (!result) return;
+        if (info.kind === 'insufficient-funds') {
+          result.textContent = GATE_TEXT;
+          setBusy(false);
+          return;
+        }
+        if (info.kind === 'unauthenticated') {
+          result.textContent = GUEST_TEXT;
+          setBusy(false);
+          await signInWithTwitch(window.location.href.split('#')[0]);
+          return;
+        }
+        if (info.kind === 'rate-limit') {
+          result.textContent = RATE_TEXT;
+          // Кнопка уже disabled — включаем только по таймеру. «20 в минуту»
+          // ждёт минуту, короткий «1/2с» — две секунды.
+          if (lockTimer) clearTimeout(lockTimer);
+          const waitMs = info.raw.includes('20 per minute') ? 60000 : 2000;
+          lockTimer = setTimeout(() => setBusy(false), waitMs);
+          return;
+        }
+        if (info.kind === 'daily-limit') {
+          result.textContent = LIMIT_TEXT;
+          return; // disabled до повторного открытия — держим кэп дня
+        }
+        if (info.kind === 'offline') {
+          result.textContent = OFFLINE_TEXT;
+          setBusy(false);
+          return;
+        }
+        result.textContent = ERROR_TEXT;
+        setBusy(false);
         return;
       }
-      if (info.kind === 'daily-limit') {
-        result.textContent = LIMIT_TEXT;
-        return;
-      }
-      if (info.kind === 'offline') {
-        result.textContent = OFFLINE_TEXT;
-        return;
-      }
-      result.textContent = ERROR_TEXT;
-      return;
+      // Баланс из ответа сервера — сразу в шапку (realtime дотянет остальных).
+      if (spinBalance !== null) paintBalance(spinBalance);
+      animateToOutcome(spinOutcome);
+    } finally {
+      pending = false;
     }
-    // Баланс из ответа сервера — сразу в шапку (realtime дотянет остальных).
-    if (spinBalance !== null) paintBalance(spinBalance);
-    animateToOutcome(spinOutcome);
   }
 
   document.addEventListener('click', (e) => {

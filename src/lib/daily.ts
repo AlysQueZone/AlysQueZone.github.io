@@ -12,7 +12,7 @@
  * Секретов здесь нет: только publishable-ключ через getSupabase().
  */
 
-import { getSupabase } from './supabase';
+import { getSupabase, withAuthRetry } from './supabase';
 
 /** Ключ локальной метки «автоклейм в этот UTC-день уже отработал». */
 export const AUTO_DAILY_KEY = 'alysque:daily-auto-day';
@@ -113,12 +113,14 @@ export async function fetchDailyStatus(): Promise<DailyStatus | null> {
     if (!uid) return null;
     // День суток — UTC-дата, как claim_day на сервере.
     const today = todayUtcDate();
-    const { data: todayRow, error: todayError } = await sb
-      .from('daily_claims')
-      .select('streak,amount')
-      .eq('user_id', uid)
-      .eq('claim_day', today)
-      .maybeSingle();
+    const { data: todayRow, error: todayError } = await withAuthRetry(() =>
+      sb
+        .from('daily_claims')
+        .select('streak,amount')
+        .eq('user_id', uid)
+        .eq('claim_day', today)
+        .maybeSingle()
+    );
     if (todayError) return null;
     if (todayRow) {
       const row = todayRow as unknown as { streak: unknown; amount: unknown };
@@ -131,10 +133,9 @@ export async function fetchDailyStatus(): Promise<DailyStatus | null> {
         nextStreak: Number.isFinite(streak) && streak >= 1 ? Math.floor(streak) + 1 : 1,
       };
     }
-    const { count, error: countError } = await sb
-      .from('daily_claims')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', uid);
+    const { count, error: countError } = await withAuthRetry(() =>
+      sb.from('daily_claims').select('id', { count: 'exact', head: true }).eq('user_id', uid)
+    );
     if (countError || count === null || !Number.isFinite(count)) return null;
     return { claimedToday: false, todayAmount: null, todayStreak: null, nextStreak: count + 1 };
   } catch {
