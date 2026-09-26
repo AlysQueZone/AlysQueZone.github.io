@@ -22,6 +22,8 @@ export interface LotState {
   nextPrice: number | null;
   owner_login: string | null;
   owner_uid: string | null;
+  /** Ник автора принятой заявки — только подробности лота, в списках не показываем. */
+  suggested_by_login: string | null;
   mine: boolean;
 }
 
@@ -46,6 +48,7 @@ function toLotState(row: LotRow, uid: string | null): LotState | null {
     nextPrice: Number.isFinite(nextRaw) && nextRaw > 0 ? nextRaw : null,
     owner_login: str(row, 'owner_login'),
     owner_uid,
+    suggested_by_login: str(row, 'suggested_by_login'),
     mine: uid !== null && owner_uid !== null && owner_uid === uid,
   };
 }
@@ -61,8 +64,9 @@ function fillCatalog(rows: unknown, uid: string | null): Map<string, LotState> {
 }
 
 const VIEW = 'lots_with_next_price';
-const VIEW_COLUMNS = 'slug,title,video_url,price,owner_login,owner_uid,next_price';
-const TABLE_COLUMNS = 'slug,title,video_url,price,owner_login,owner_uid';
+const VIEW_COLUMNS =
+  'slug,title,video_url,price,owner_login,owner_uid,suggested_by_login,next_price';
+const TABLE_COLUMNS = 'slug,title,video_url,price,owner_login,owner_uid,suggested_by_login';
 
 /** Каталог + признак «ответ от БД получен»: пустой каталог ≠ ошибка. */
 export interface CatalogResult {

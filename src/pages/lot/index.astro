@@ -43,6 +43,13 @@ const base = import.meta.env.BASE_URL;
         · ТВОЙ{' '}
       </span>
     </p>
+    <p data-lot-suggested class="mt-1 hidden text-sm text-mist">
+      Привет добавил:{' '}
+      <b data-lot-suggested-login class="text-mist">
+        {' '}
+        —{' '}
+      </b>
+    </p>
     <p data-shared-price class="mt-3 text-2xl font-black text-pivko">
       — 🍺
     </p>
@@ -110,6 +117,8 @@ const base = import.meta.env.BASE_URL;
   const ownerEl = document.querySelector('[data-lot-owner]');
   const priceEl = document.querySelector('[data-shared-price]');
   const mineBadge = document.querySelector('[data-mine-badge]');
+  const suggestedEl = document.querySelector('[data-lot-suggested]');
+  const suggestedLoginEl = document.querySelector('[data-lot-suggested-login]');
   const buyBtn = document.querySelector('[data-buy-lot]');
   const skeleton = document.querySelector('[data-lot-skeleton]');
   const statusEl = document.querySelector('[data-lot-status]');
@@ -160,6 +169,11 @@ const base = import.meta.env.BASE_URL;
     fillVideo(videoRoot, st.video_url);
     initLotVideos(document);
     if (ownerEl) ownerEl.textContent = st.owner_login ?? '—';
+    // Автор привета — только в подробностях лота, в списках подписи нет.
+    if (suggestedEl instanceof HTMLElement) {
+      suggestedEl.classList.toggle('hidden', !st.suggested_by_login);
+      if (suggestedLoginEl) suggestedLoginEl.textContent = st.suggested_by_login ?? '—';
+    }
     if (priceEl) priceEl.textContent = `${st.price} 🍺`;
     if (mineBadge instanceof HTMLElement) mineBadge.classList.toggle('hidden', !st.mine);
     lastState = st;

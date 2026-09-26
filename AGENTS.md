@@ -35,6 +35,8 @@
 - Эмоуты / чат VOD / мемы / пасты / стата → `docs/agents/twitch-sources.md`.
 - Ники чатерсов / реестр / резолв написания → `docs/agents/chatters.md`.
 - Новый лот / `ffmpeg` / `media` / `content/lots.toml` → `docs/agents/media-pipeline.md`.
+- Заявки на привет / приём и отказ / `just submission` → `docs/agents/submissions.md`.
+- Telegram-уведомление о заявке / Vault / триггер → `docs/agents/telegram-notify.md`.
 - Issues-трекинг (`scratch/`) → `docs/agents/issue-tracker.md`.
 - Триаж-лейблы (`needs-triage` … `wontfix`) → `docs/agents/triage-labels.md`.
 - Термины / глоссарий / ADR-конфликт → `docs/agents/domain.md` (`CONTEXT.md` + `docs/adr/`).

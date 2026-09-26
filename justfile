@@ -72,6 +72,17 @@ lots-title *args:
 chatters-sync *args:
     python3 scripts/chatters_sync.py {{args}}
 
+# Приём заявки на привет: id -> скачивание -> медиа -> карточка -> синк -> лот.
+# Безопасный первый заход: just submission 12 --check (скачает и покажет, стоп).
+# Полный проход: just submission 12
+submission *args:
+    python3 scripts/submission.py {{args}}
+
+# Отказ по заявке без выплаты: rejected (по умолчанию) или duplicate.
+# Пример: just submission-reject 12 --status duplicate
+submission-reject *args:
+    python3 scripts/submission.py reject {{args}}
+
 # -------------------------------------
 # Релиз
 # -------------------------------------
