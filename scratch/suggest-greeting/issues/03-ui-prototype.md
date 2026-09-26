@@ -1,6 +1,6 @@
 # Прототип: место «Предложить привет» и форма
 
-Status: open
+Status: claimed
 Type: prototype
 Blocked by: none
 
