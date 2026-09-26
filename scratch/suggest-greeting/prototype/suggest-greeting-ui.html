@@ -1,0 +1,2252 @@
+<!doctype html>
+<!--
+  ПРОТОТИП (throwaway) — карта «Предложить привет», тикет scratch/suggest-greeting/issues/03-ui-prototype.md
+
+  Вопрос: где в интерфейсе живёт вход «Предложить привет» и как выглядит форма —
+  на фоне настоящей витрины, шапки, бегущей строки и инфо-плашки.
+
+  План вариантов (переключатель снизу по центру, клавиши ← / →, вариант в hash URL):
+    A «Тихая строка на витрине»      — ghost-ссылка под «Все лоты» на /lots/, модалка в одну колонку.
+    B «Иконка в шапке»               — кнопка-иконка 🎬 рядом с балансом/колокольчиком (шапка общая,
+                                       показываем на /lots/), модалка в два шага: сначала «что считается
+                                       приветом», потом поля.
+    C «Страница /suggest/»           — тихая ссылка в hero главной + секция внизу «Правил биржи»,
+                                       форма живёт на отдельной странице (URL можно расшарить).
+    D «Инлайн-секция внизу витрины»  — раскрывающаяся секция под «Все лоты», форма в потоке, без модалок.
+
+  Набор полей во всех вариантах одинаков: название привета, ссылка на видео ИЛИ файл
+  (показаны оба способа), опциональный комментарий, пометка про вход через Twitch,
+  состояния: загрузка / успех / ошибки (чужой хост, файл > 25 МБ, не вошёл).
+
+  Оговорка throwaway:
+    - это НЕ продакшн и НЕ часть сборки проекта; отдельный самодостаточный HTML-файл, открывается как файл;
+    - отклонение от скилла `prototype` (ветка UI): варианты не вживлены маршрутом в Astro-сайт,
+      потому что вопрос — про размещение входа в разных местах сайта, а не про один существующий роут;
+    - никакой персистентности и сетевых запросов: форма «отправляется» в память вкладки;
+    - шапка/витрина/правила — статичная копия реального каркаса; эмоуты, аватарные картинки и
+      видео в карточках заменены эмодзи/заглушками (прототип не ходит в CDN); шрифты — по URL.
+
+  Подсказки для смотрящего:
+    «⚙ состояния» в нижней панели: гость / вошёл, ✔ успех, ⏳ отправка, ⚠ не вошёл,
+    ⚠ ссылка (чужой хост), ⚠ файл 30 МБ, ⟲ сброс. Триггер сам открывает форму текущего варианта.
+    «✔ успех» показывает финальное состояние «Заявка #12 улетела админу».
+    Ссылку на конкретный вариант можно кинуть как #variant=C или #variant=C&who=chatter —
+    состояние переживает перезагрузку и вставку хеша в тот же таб.
+-->
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Прототип · Предложить привет — AlysQueZone</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rubik:wght@400;700;800;900&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* Токены скопированы из src/styles/global.css (@theme, палитра D1). */
+      :root {
+        color-scheme: light;
+        --color-void: #fff6bf;
+        --color-panel: #ffe6ac;
+        --color-bar: #ffe4a6;
+        --color-card: #f0c46c;
+        --color-milk: #422006;
+        --color-mist: #744210;
+        --color-stream: #c2187b;
+        --color-ctahover: #9e145f;
+        --color-ember: #ff9e2c;
+        --color-melon: #c21d3b;
+        --color-blush: #ff00bc;
+        --color-detail: #92400e;
+        --color-terra: #9a3412;
+        --color-legend: #b3127a;
+        --color-cream: #fffbea;
+        --color-pivko: #7a5f00;
+        --color-twitch: #9146ff;
+        --color-ember-deep: #a34400;
+        --color-blush-deep: #c4008c;
+        --font-display: 'Press Start 2P', 'Rubik', system-ui, sans-serif;
+        --font-sans: 'Rubik', system-ui, -apple-system, sans-serif;
+        /* Высота инфо-плашки: переключатель прототипа стоит над ней. */
+        --plashka-h: 4.5rem;
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background-color: var(--color-void);
+        color: var(--color-milk);
+        font-family: var(--font-sans);
+        -webkit-font-smoothing: antialiased;
+      }
+
+      body.plashka-off {
+        --plashka-h: 0.75rem;
+      }
+
+      .display {
+        font-family: var(--font-display);
+        line-height: 1.7;
+      }
+
+      .wrap {
+        max-width: 72rem;
+        margin-inline: auto;
+        padding-inline: 1rem;
+      }
+
+      .page-main {
+        padding-block: 2rem 13rem;
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+      }
+
+      :focus-visible {
+        outline: 3px solid var(--color-blush);
+        outline-offset: 2px;
+      }
+
+      ::selection {
+        background: var(--color-blush);
+        color: var(--color-cream);
+      }
+
+      /* ── Компоненты стиля C (копия src/styles/global.css, только нужное) ── */
+      .card-pixel {
+        background-color: var(--color-panel);
+        border: 3px solid var(--color-milk);
+        box-shadow: 6px 6px 0 var(--color-milk);
+        border-radius: 4px;
+      }
+
+      .card-pixel-accent {
+        box-shadow: 6px 6px 0 var(--color-legend);
+      }
+
+      .btn-arcade {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.25rem;
+        min-height: 2.75rem;
+        border: 3px solid var(--color-milk);
+        box-shadow: 4px 4px 0 var(--color-milk);
+        border-radius: 4px;
+        font: inherit;
+        font-weight: 900;
+        text-transform: uppercase;
+        cursor: pointer;
+        transition:
+          transform 80ms steps(2, end),
+          box-shadow 80ms steps(2, end);
+      }
+
+      .btn-arcade:hover {
+        transform: translate(-1px, -1px);
+        box-shadow: 5px 5px 0 var(--color-milk);
+      }
+
+      .btn-arcade:active {
+        transform: translate(3px, 3px);
+        box-shadow: 1px 1px 0 var(--color-milk);
+      }
+
+      .btn-arcade:disabled {
+        opacity: 0.5;
+        cursor: default;
+        transform: none;
+      }
+
+      .btn-arcade-primary {
+        background-color: var(--color-stream);
+        color: var(--color-cream);
+      }
+
+      .btn-arcade-primary:hover:not(:disabled) {
+        background-color: var(--color-ctahover);
+      }
+
+      .btn-arcade-ghost {
+        background-color: transparent;
+        color: var(--color-milk);
+      }
+
+      .btn-arcade-ghost:hover:not(:disabled) {
+        background-color: color-mix(in srgb, var(--color-milk) 7%, transparent);
+      }
+
+      .btn-twitch {
+        background-color: var(--color-twitch);
+        color: #fff;
+      }
+
+      .chip-arcade {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        min-height: 2.75rem;
+        border: 3px solid var(--color-milk);
+        border-radius: 4px;
+        box-shadow: 4px 4px 0 color-mix(in srgb, var(--color-milk) 30%, transparent);
+        font-weight: 900;
+        cursor: default;
+      }
+
+      .badge-pixel {
+        display: inline-block;
+        font-family: var(--font-display);
+        font-size: 9px;
+        line-height: 1.7;
+        padding: 4px 8px;
+        border-radius: 2px;
+        text-transform: uppercase;
+      }
+
+      @keyframes arcade-blink {
+        0%,
+        55% {
+          opacity: 1;
+        }
+        56%,
+        100% {
+          opacity: 0.2;
+        }
+      }
+
+      .animate-blink {
+        animation: arcade-blink 1.1s steps(1, end) infinite;
+      }
+
+      .skeleton-block {
+        display: block;
+        background-color: color-mix(in srgb, var(--color-milk) 20%, transparent);
+        border-radius: 2px;
+        animation: skeleton-step 1.1s steps(1, end) infinite;
+      }
+
+      @keyframes skeleton-step {
+        0%,
+        55% {
+          opacity: 1;
+        }
+        56%,
+        100% {
+          opacity: 0.45;
+        }
+      }
+
+      .marquee {
+        overflow: hidden;
+        white-space: nowrap;
+      }
+
+      .marquee-track {
+        display: inline-block;
+        margin: 0;
+        animation: marquee-scroll 60s linear infinite;
+      }
+
+      @keyframes marquee-scroll {
+        from {
+          transform: translateX(0);
+        }
+        to {
+          transform: translateX(-50%);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .animate-blink,
+        .marquee-track,
+        .skeleton-block {
+          animation: none;
+        }
+      }
+
+      /* ── Каркас: шапка, бегущая строка, плашка ── */
+      .site-header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        border-bottom: 4px solid var(--color-milk);
+        background-color: color-mix(in srgb, var(--color-bar) 95%, transparent);
+        backdrop-filter: blur(4px);
+      }
+
+      .header-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        padding-block: 0.75rem;
+      }
+
+      .logo {
+        display: flex;
+        align-items: center;
+        min-height: 2.75rem;
+        color: inherit;
+        text-decoration: none;
+        background: none;
+        border: 0;
+        padding: 0;
+        cursor: pointer;
+      }
+
+      .logo .display {
+        font-size: 1rem;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+
+      .header-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .header-actions .btn-arcade {
+        padding: 0.5rem 1rem;
+        font-size: 0.875rem;
+      }
+
+      .header-actions .icon-btn {
+        padding-inline: 0.75rem;
+        font-size: 1rem;
+      }
+
+      .wallet {
+        padding: 0.5rem 1rem;
+        font-size: 0.875rem;
+        background-color: var(--color-void);
+      }
+
+      .marquee-strip {
+        border-top: 2px solid color-mix(in srgb, var(--color-milk) 20%, transparent);
+        background-color: var(--color-milk);
+        padding-block: 0.25rem;
+      }
+
+      .marquee-strip .marquee-track {
+        font-size: 9px;
+        color: var(--color-cream);
+        text-transform: uppercase;
+      }
+
+      .plashka {
+        position: fixed;
+        inset-inline: 0;
+        bottom: 0;
+        z-index: 50;
+        border-top: 4px solid var(--color-milk);
+        background-color: var(--color-bar);
+      }
+
+      .plashka-inner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        padding-block: 0.75rem;
+      }
+
+      .plashka p {
+        margin: 0;
+        font-size: 0.875rem;
+        font-weight: 700;
+      }
+
+      /* ── Страницы вариантов ── */
+      .h1 {
+        font-size: 1rem;
+        text-transform: uppercase;
+      }
+
+      .h2 {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+      }
+
+      .h3 {
+        font-size: 0.6875rem;
+        text-transform: uppercase;
+      }
+
+      @media (min-width: 640px) {
+        .h1 {
+          font-size: 1.5rem;
+        }
+      }
+
+      .lede {
+        margin: 0.75rem 0 0;
+        color: var(--color-mist);
+      }
+
+      .muted {
+        color: var(--color-mist);
+      }
+
+      .text-ember {
+        color: var(--color-ember-deep);
+      }
+
+      .text-stream {
+        color: var(--color-stream);
+      }
+
+      .text-pivko {
+        color: var(--color-pivko);
+      }
+
+      .text-blush {
+        color: var(--color-blush-deep);
+      }
+
+      .section {
+        margin-top: 2rem;
+      }
+
+      .grid {
+        display: grid;
+        gap: 1rem;
+        margin-top: 1rem;
+      }
+
+      @media (min-width: 640px) {
+        .grid-2,
+        .grid-3,
+        .grid-4 {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (min-width: 1024px) {
+        .grid-3 {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+        .grid-4 {
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+      }
+
+      .lot-card {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        padding: 1rem;
+        min-width: 0;
+      }
+
+      .lot-title {
+        font-size: 1rem;
+        font-weight: 800;
+        overflow-wrap: anywhere;
+      }
+
+      .lot-link {
+        color: inherit;
+        text-decoration: none;
+        background: none;
+        border: 0;
+        padding: 0;
+        font: inherit;
+        font-weight: 800;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .lot-link:hover {
+        color: var(--color-ember-deep);
+      }
+
+      .lot-video {
+        display: grid;
+        place-items: center;
+        aspect-ratio: 16 / 9;
+        border: 2px solid var(--color-milk);
+        background-color: color-mix(in srgb, var(--color-milk) 12%, transparent);
+        color: var(--color-mist);
+        font-size: 0.75rem;
+        font-weight: 700;
+      }
+
+      .price {
+        margin: 0.25rem 0 0;
+        font-size: 1.25rem;
+        font-weight: 900;
+        color: var(--color-pivko);
+      }
+
+      .lot-card .btn-arcade {
+        margin-top: auto;
+        padding: 0.75rem 1rem;
+        font-size: 0.875rem;
+      }
+
+      .my-rows {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+      }
+
+      .my-row {
+        display: flex;
+        gap: 0.5rem;
+        align-items: baseline;
+        border: 2px solid var(--color-milk);
+        background-color: var(--color-panel);
+        box-shadow: 3px 3px 0 var(--color-milk);
+        padding: 0.5rem 0.75rem;
+        font-size: 0.875rem;
+      }
+
+      .my-row b {
+        font-weight: 700;
+      }
+
+      /* Тихая ссылка-вход: не бросается в глаза, но находима. */
+      .entry-row {
+        margin: 1.25rem 0 0;
+      }
+
+      .quiet-link {
+        background: none;
+        border: 0;
+        padding: 0;
+        font: inherit;
+        font-weight: 700;
+        color: var(--color-mist);
+        text-decoration: underline dotted;
+        text-underline-offset: 3px;
+        cursor: pointer;
+      }
+
+      .quiet-link:hover {
+        color: var(--color-milk);
+        text-decoration-style: solid;
+      }
+
+      .back-link {
+        margin-bottom: 1rem;
+        display: inline-block;
+      }
+
+      .hero {
+        padding: 1.5rem;
+      }
+
+      @media (min-width: 640px) {
+        .hero {
+          padding: 2.5rem;
+        }
+      }
+
+      .hero-inner {
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+      }
+
+      @media (min-width: 900px) {
+        .hero-inner {
+          flex-direction: row;
+          align-items: center;
+        }
+      }
+
+      .hero-text {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .hero-badge {
+        background-color: var(--color-stream);
+        color: var(--color-cream);
+      }
+
+      .hero-h1 {
+        margin-top: 1.25rem;
+      }
+
+      .hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin-top: 1.5rem;
+      }
+
+      .hero-actions .btn-arcade {
+        padding: 0.75rem 1.5rem;
+      }
+
+      .hero-sign {
+        width: 100%;
+        max-width: 20rem;
+        padding: 1.5rem;
+        text-align: center;
+        transform: rotate(-1deg);
+      }
+
+      .hero-emote {
+        font-size: 3rem;
+        line-height: 1;
+      }
+
+      .hero-sign .badge-pixel {
+        margin-top: 0.75rem;
+        background-color: var(--color-stream);
+        color: var(--color-cream);
+        font-size: 0.75rem;
+        transform: rotate(-3deg);
+      }
+
+      .steps {
+        margin: 0.75rem 0 0;
+        padding-left: 1.1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+        color: var(--color-mist);
+      }
+
+      /* ── Модалки (паттерн RulesModal / BuyModal) ── */
+      .overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: rgb(0 0 0 / 0.6);
+        padding: 1rem;
+      }
+
+      .modal-card {
+        width: 100%;
+        max-width: 30rem;
+        max-height: 85vh;
+        overflow-y: auto;
+        padding: 1.25rem;
+      }
+
+      .modal-card--rules {
+        max-width: 34rem;
+      }
+
+      .modal-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.75rem;
+      }
+
+      .modal-head .icon-btn {
+        min-width: 2.75rem;
+        padding: 0.25rem 0.75rem;
+        font-size: 0.875rem;
+      }
+
+      .modal-body {
+        margin-top: 1rem;
+      }
+
+      .step-chip {
+        margin: 0.75rem 0 0;
+        font-size: 9px;
+        color: var(--color-mist);
+        text-transform: uppercase;
+      }
+
+      .mini-list {
+        margin: 1rem 0 0;
+        padding-left: 1.1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+        font-size: 0.875rem;
+        color: var(--color-mist);
+      }
+
+      .mini-list b {
+        color: var(--color-milk);
+      }
+
+      .rule-item {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+      }
+
+      .rule-title {
+        font-size: 10px;
+        margin: 0;
+        text-transform: uppercase;
+      }
+
+      .rule-list {
+        list-style: none;
+        margin: 1rem 0 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        font-size: 0.875rem;
+        font-weight: 700;
+      }
+
+      .rule-list p {
+        margin: 0;
+      }
+
+      .rules-suggest {
+        margin-top: 0.75rem;
+        padding: 0.75rem 1rem;
+        font-size: 0.8125rem;
+      }
+
+      /* ── Форма «Предложить привет» ── */
+      .sg-form {
+        display: grid;
+        gap: 1.1rem;
+      }
+
+      .sg-col {
+        display: grid;
+        gap: 1.1rem;
+        align-content: start;
+        min-width: 0;
+      }
+
+      @media (min-width: 760px) {
+        .sg-form--wide {
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+          gap: 1.5rem;
+        }
+      }
+
+      .sg-instruction {
+        margin: 0;
+        font-size: 0.875rem;
+        font-weight: 700;
+        border-left: 4px solid var(--color-ember);
+        background-color: var(--color-void);
+        padding: 0.6rem 0.75rem;
+      }
+
+      .sg-field {
+        display: grid;
+        gap: 0.4rem;
+      }
+
+      .sg-label {
+        font-weight: 900;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.02em;
+      }
+
+      .sg-input {
+        width: 100%;
+        min-height: 2.75rem;
+        border: 3px solid var(--color-milk);
+        border-radius: 4px;
+        background-color: var(--color-cream);
+        color: var(--color-milk);
+        font: inherit;
+        padding: 0.5rem 0.75rem;
+      }
+
+      .sg-input::placeholder {
+        color: var(--color-mist);
+        opacity: 1;
+      }
+
+      .sg-input:focus-visible {
+        outline: 3px solid var(--color-blush);
+        outline-offset: 1px;
+      }
+
+      .sg-input.is-bad {
+        border-color: var(--color-melon);
+      }
+
+      .sg-input:disabled {
+        opacity: 0.6;
+      }
+
+      .sg-textarea {
+        resize: vertical;
+        min-height: 4rem;
+      }
+
+      .sg-way {
+        border: 3px solid var(--color-milk);
+        border-radius: 4px;
+        background-color: color-mix(in srgb, var(--color-void) 70%, transparent);
+        padding: 0.75rem;
+        margin: 0;
+      }
+
+      .sg-legend {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding-inline: 0.25rem;
+        font-size: 0.8125rem;
+        font-weight: 900;
+      }
+
+      .sg-way .sg-input {
+        background-color: var(--color-cream);
+        margin-top: 0.25rem;
+      }
+
+      .sg-hint {
+        margin: 0.5rem 0 0;
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: var(--color-mist);
+      }
+
+      .sg-or {
+        margin: 0;
+        text-align: center;
+        font-family: var(--font-display);
+        font-size: 10px;
+        text-transform: uppercase;
+        color: var(--color-mist);
+      }
+
+      .sg-file-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.75rem;
+        margin-top: 0.25rem;
+      }
+
+      .sg-file-btn {
+        padding: 0.5rem 1rem;
+        font-size: 0.8125rem;
+      }
+
+      .sg-file-name {
+        font-size: 0.75rem;
+        font-weight: 700;
+        overflow-wrap: anywhere;
+      }
+
+      .sg-note {
+        margin: 0;
+        font-size: 0.8125rem;
+        font-weight: 700;
+        background-color: var(--color-void);
+        border: 2px dashed var(--color-mist);
+        padding: 0.5rem 0.75rem;
+      }
+
+      .sg-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.75rem;
+      }
+
+      .sg-actions .btn-arcade {
+        padding: 0.75rem 1.25rem;
+        font-size: 0.875rem;
+      }
+
+      .sg-actions .sg-hint {
+        margin: 0;
+        flex: 1 1 12rem;
+      }
+
+      .sg-notice {
+        border: 3px solid var(--color-milk);
+        background-color: var(--color-void);
+        padding: 0.6rem 0.75rem;
+        font-size: 0.875rem;
+        font-weight: 700;
+      }
+
+      .sg-notice p {
+        margin: 0;
+      }
+
+      .sg-notice.is-err {
+        border-color: var(--color-melon);
+        color: var(--color-melon);
+      }
+
+      .sg-notice.is-ok {
+        border-color: var(--color-pivko);
+        color: var(--color-pivko);
+      }
+
+      .sg-notice.is-info {
+        border-color: var(--color-mist);
+        color: var(--color-mist);
+      }
+
+      .sg-notice .sk-line {
+        height: 0.6rem;
+        width: 100%;
+        margin-top: 0.5rem;
+      }
+
+      .sg-notice .sk-short {
+        width: 40%;
+      }
+
+      .sg-success {
+        display: grid;
+        gap: 0.75rem;
+        justify-items: start;
+        border: 3px solid var(--color-pivko);
+        background-color: var(--color-void);
+        padding: 1rem;
+      }
+
+      .sg-success p {
+        margin: 0;
+        font-size: 0.875rem;
+        font-weight: 700;
+      }
+
+      .sg-success .btn-arcade {
+        padding: 0.6rem 1rem;
+        font-size: 0.8125rem;
+      }
+
+      /* ── Страница /suggest/ (вариант C) ── */
+      .suggest-hero {
+        padding: 1.25rem;
+      }
+
+      .suggest-hero .badge-pixel {
+        background-color: var(--color-stream);
+        color: var(--color-cream);
+      }
+
+      .suggest-hero .h1 {
+        margin-top: 0.75rem;
+      }
+
+      .suggest-grid {
+        display: grid;
+        gap: 1rem;
+        margin-top: 1.5rem;
+      }
+
+      @media (min-width: 960px) {
+        .suggest-grid {
+          grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+          align-items: start;
+        }
+      }
+
+      .form-card {
+        padding: 1.25rem;
+      }
+
+      .aside-card {
+        padding: 1.25rem;
+      }
+
+      .aside-card + .aside-card {
+        margin-top: 1rem;
+      }
+
+      .aside-card p {
+        margin: 0.5rem 0 0;
+        font-size: 0.875rem;
+      }
+
+      /* ── Инлайн-секция (вариант D) ── */
+      .inline-section {
+        margin-top: 1.25rem;
+        padding: 1.25rem;
+      }
+
+      .inline-section .form-lead {
+        margin: 0 0 1rem;
+        color: var(--color-mist);
+        font-size: 0.875rem;
+      }
+
+      .inline-section[hidden] {
+        display: none;
+      }
+
+      /* ── Хром прототипа (намеренно чужой дизайну: тёмная пилюля) ── */
+      .proto-ribbon {
+        background-color: var(--color-milk);
+        color: var(--color-cream);
+        font-size: 0.6875rem;
+        font-weight: 700;
+        text-align: center;
+        padding: 0.3rem 1rem;
+      }
+
+      .proto-ribbon b {
+        font-family: var(--font-display);
+        font-size: 9px;
+        letter-spacing: 0.03em;
+        color: var(--color-ember);
+      }
+      .proto-bar {
+        position: fixed;
+        left: 50%;
+        bottom: calc(var(--plashka-h) + 0.5rem);
+        transform: translateX(-50%);
+        z-index: 120;
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+        width: max-content;
+        max-width: calc(100vw - 1rem);
+        padding: 0.5rem 0.6rem;
+        background-color: var(--color-milk);
+        color: var(--color-cream);
+        border: 3px solid var(--color-milk);
+        border-radius: 6px;
+        box-shadow: 6px 6px 0 rgb(66 32 6 / 0.35);
+      }
+
+      .proto-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+      }
+
+      .proto-row-state {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.1rem;
+      }
+
+      .proto-state {
+        white-space: normal;
+        text-align: left;
+      }
+
+      /* Узкий экран: панель не растёт в высоту — строки скроллятся вбок. */
+      @media (max-width: 720px) {
+        .proto-bar {
+          width: calc(100vw - 1rem);
+          max-width: none;
+          padding: 0.4rem;
+        }
+
+        .proto-row-main,
+        .proto-row-chips,
+        .proto-row-state {
+          flex-wrap: nowrap;
+          justify-content: flex-start;
+          overflow-x: auto;
+          scrollbar-width: none;
+        }
+
+        .proto-row-main > *,
+        .proto-row-chips > *,
+        .proto-row-state > * {
+          flex: 0 0 auto;
+          white-space: nowrap;
+        }
+
+        .proto-row-main::-webkit-scrollbar,
+        .proto-row-chips::-webkit-scrollbar,
+        .proto-row-state::-webkit-scrollbar {
+          display: none;
+        }
+
+        .proto-hint {
+          display: none;
+        }
+      }
+
+      .proto-badge {
+        font-family: var(--font-display);
+        font-size: 9px;
+        line-height: 1.7;
+        text-transform: uppercase;
+        background-color: var(--color-melon);
+        color: var(--color-cream);
+        border-radius: 2px;
+        padding: 3px 6px;
+      }
+
+      .proto-arrow,
+      .proto-chip,
+      .proto-toggle {
+        font: inherit;
+        font-weight: 900;
+        cursor: pointer;
+        border: 2px solid var(--color-cream);
+        border-radius: 4px;
+        background-color: transparent;
+        color: var(--color-cream);
+        padding: 0.25rem 0.55rem;
+        font-size: 0.75rem;
+        line-height: 1.4;
+      }
+
+      .proto-arrow:hover,
+      .proto-chip:hover,
+      .proto-toggle:hover {
+        background-color: rgb(255 251 234 / 0.18);
+      }
+
+      .proto-chip[aria-pressed='true'],
+      .proto-toggle[aria-pressed='true'] {
+        background-color: var(--color-cream);
+        color: var(--color-milk);
+      }
+
+      .proto-label {
+        font-family: var(--font-display);
+        font-size: 10px;
+        line-height: 1.7;
+        text-transform: uppercase;
+        padding-inline: 0.35rem;
+      }
+
+      .proto-hint,
+      .proto-state {
+        font-size: 0.6875rem;
+        font-weight: 700;
+        color: color-mix(in srgb, var(--color-cream) 78%, transparent);
+      }
+
+      .proto-state {
+        font-family: var(--font-mono, monospace);
+      }
+
+      .proto-sep {
+        width: 1px;
+        align-self: stretch;
+        background-color: rgb(255 251 234 / 0.4);
+        margin-inline: 0.15rem;
+      }
+
+      .sk-line {
+        height: 0.75rem;
+        width: 100%;
+      }
+
+      .sk-short {
+        width: 40%;
+      }
+    </style>
+  </head>
+  <body>
+    <a class="quiet-link" href="#main" style="position: absolute; left: -9999px">К содержимому</a>
+    <header id="site-header" class="site-header"></header>
+    <p class="proto-ribbon">
+      <b>Прототип — не продакшн</b> · throwaway-артефакт, варианты листаются панелью снизу (← / →)
+    </p>
+    <main id="main" class="wrap page-main"><div id="page"></div></main>
+    <div id="overlays"></div>
+    <div id="info-plashka" class="plashka" role="note" aria-label="Инфо-плашка сайта">
+      <div class="wrap plashka-inner">
+        <p>🔊 Включи звук<br />🛡️ Без VPN часть штук может не грузиться</p>
+        <button
+          type="button"
+          class="btn-arcade btn-arcade-ghost icon-btn"
+          data-plashka-close
+          aria-label="Закрыть подсказку"
+        >
+          ✕
+        </button>
+      </div>
+    </div>
+    <div id="proto-bar" class="proto-bar" role="region" aria-label="Переключатель прототипа"></div>
+
+    <script>
+      // ─────────────────────────────────────────────────────────────────────
+      // Прототип: всё состояние — в памяти вкладки. Запросов нет.
+      // ─────────────────────────────────────────────────────────────────────
+
+      const VARIANTS = [
+        {
+          key: 'A',
+          name: 'Тихая строка на витрине',
+          entry: 'ghost-ссылка под «Все лоты» на /lots/',
+          surface: 'модалка, одна колонка',
+        },
+        {
+          key: 'B',
+          name: 'Иконка в шапке',
+          entry: 'кнопка-иконка 🎬 рядом с балансом/колокольчиком',
+          surface: 'модалка в два шага',
+        },
+        {
+          key: 'C',
+          name: 'Страница /suggest/',
+          entry: 'ссылка в hero главной + низ «Правил биржи»',
+          surface: 'отдельная страница, URL можно расшарить',
+        },
+        {
+          key: 'D',
+          name: 'Инлайн-секция внизу витрины',
+          entry: 'раскрывающаяся строка под «Все лоты»',
+          surface: 'форма в потоке страницы, без модалки',
+        },
+      ];
+
+      // Хосты из research/video-upload-safety.md §7 (allowlist ссылок).
+      const ALLOWED_HOSTS = [
+        'clips.twitch.tv',
+        'twitch.tv',
+        'www.twitch.tv',
+        'youtube.com',
+        'www.youtube.com',
+        'youtu.be',
+        'streamable.com',
+        'www.streamable.com',
+        'medal.tv',
+        'www.medal.tv',
+        'vk.com',
+        'vkvideo.ru',
+        'cdns.memealerts.com',
+      ];
+
+      const LOTS = [
+        { title: 'Массовый привет (коты одобряют)', price: 800 },
+        { title: 'Здраствуйте, nyanyachos', price: 1200 },
+        { title: 'Миф о бесплатном пивете', price: 1000 },
+        { title: 'Привет сразу всем (оптом)', price: 700 },
+        { title: 'Грубый привет от Bradhi', price: 800 },
+        { title: 'Привет AkseLWalkerQuE', price: 800 },
+      ];
+
+      const MY_LOTS = [
+        { title: 'o7 arhion24', price: 800 },
+        { title: 'Привет сразу всем (оптом)', price: 700 },
+      ];
+
+      const RULES_LINE =
+        'Комиссия биржи 7% ★ перекуп +10% ×15, дальше +1 ★ гамба до x10 · 20 спинов в день ★ вход 200/200/250 ★ ';
+
+      const ERRORS = {
+        login: 'Сначала войди через Twitch — иначе награду не начислить. Поля никуда не денутся.',
+        empty: 'Нужна ссылка на видео или файл — без этого админу нечего смотреть.',
+        both: 'Оставь что-то одно: ссылку или файл.',
+        title: 'Придумай название — по нему админ поймёт, о чём привет.',
+        scheme: 'Ссылка должна начинаться с https://.',
+        host: 'Ссылка не с той площадки. Принимаем Twitch clip, YouTube, streamable, medal.tv, VK и MemeAlerts.',
+        'file-type': 'Файл не похож на видео — принимаем webm или mp4.',
+        'file-size': 'Файл больше 25 МБ — не влезет. Подожми или пришли ссылку.',
+      };
+
+      const ERR_LABEL = {
+        login: 'не вошёл',
+        empty: 'нет видео',
+        both: 'ссылка и файл сразу',
+        title: 'нет названия',
+        scheme: 'не https',
+        host: 'чужой хост',
+        'file-type': 'не видео',
+        'file-size': 'файл > 25 МБ',
+      };
+
+      const state = {
+        variant: 'A',
+        who: 'guest',
+        route: 'home', // только для варианта C: 'home' | 'lots' | 'suggest'
+        overlay: null, // 'a' | 'b' | 'rules'
+        bStep: 1,
+        dOpen: false,
+        demoOpen: true,
+        lastEvent: 'форма не открыта',
+        focus: null,
+      };
+
+      const forms = {};
+
+      function freshForm() {
+        return { title: '', url: '', comment: '', file: null, status: 'idle', error: null };
+      }
+
+      function formOf(prefix) {
+        if (!forms[prefix]) forms[prefix] = freshForm();
+        return forms[prefix];
+      }
+
+      function resetForms() {
+        for (const key of Object.keys(forms)) delete forms[key];
+      }
+
+      function esc(value) {
+        return String(value).replace(
+          /[&<>"']/g,
+          (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
+        );
+      }
+
+      function fmtSize(bytes) {
+        if (!Number.isFinite(bytes)) return '';
+        const mb = bytes / (1024 * 1024);
+        return `${mb >= 10 ? mb.toFixed(0) : mb.toFixed(1)} МБ`;
+      }
+
+      function activePrefix() {
+        if (state.variant === 'A') return state.overlay === 'a' ? 'a' : null;
+        if (state.variant === 'B') return state.overlay === 'b' ? 'b' : null;
+        if (state.variant === 'C') return state.route === 'suggest' ? 'c' : null;
+        if (state.variant === 'D') return state.dOpen ? 'd' : null;
+        return null;
+      }
+
+      // ── Форма ────────────────────────────────────────────────────────────
+
+      const INSTRUCTION =
+        '<p class="sg-instruction">Предлагаемое видео должно быть по смыслу похоже на уже существующие приветы — ' +
+        'то, что не стыдно показать всему чату. Пример: «Массовый привет (коты одобряют)».</p>';
+
+      function noticeHTML(f) {
+        if (f.status === 'loading') {
+          return (
+            '<div class="sg-notice is-info" role="status" tabindex="-1" data-notice>' +
+            '<p><b>Отправляем заявку…</b></p>' +
+            '<span class="skeleton-block sk-line"></span>' +
+            '<span class="skeleton-block sk-line sk-short"></span>' +
+            '</div>'
+          );
+        }
+        if (f.error) {
+          return `<div class="sg-notice is-err" role="alert" tabindex="-1" data-notice><p>⚠ ${esc(
+            ERRORS[f.error] ?? 'Что-то пошло не так.'
+          )}</p></div>`;
+        }
+        return '<div class="sg-notice" data-notice hidden></div>';
+      }
+
+      function submitDisabled(f) {
+        return f.status === 'loading' || f.status === 'success';
+      }
+
+      function actionsHTML(prefix) {
+        const f = formOf(prefix);
+        if (state.who !== 'chatter') {
+          return (
+            '<div class="sg-actions">' +
+            '<button type="button" class="btn-arcade btn-twitch" data-login>▶ Войти через Twitch</button>' +
+            '<p class="sg-hint">Гость может заполнить форму, но отправить — только после входа.</p>' +
+            '</div>'
+          );
+        }
+        const loading = f.status === 'loading';
+        return (
+          '<div class="sg-actions">' +
+          `<button type="submit" class="btn-arcade btn-arcade-primary" data-submit ${
+            submitDisabled(f) ? 'disabled' : ''
+          }>${loading ? '⏳ Отправляем…' : 'Отправить заявку'}</button>` +
+          '</div>'
+        );
+      }
+
+      function waysHTML(f) {
+        const badUrl =
+          f.error === 'url' || f.error === 'scheme' || f.error === 'host' ? ' is-bad' : '';
+        const badFile = f.error === 'file-type' || f.error === 'file-size' ? ' is-bad' : '';
+        const dis = f.status === 'loading' ? ' disabled' : '';
+        return (
+          '<fieldset class="sg-way">' +
+          '<legend class="sg-legend"><span class="badge-pixel" style="background:var(--color-stream);color:var(--color-cream)">Способ 1</span> Ссылка на видео</legend>' +
+          `<input class="sg-input${badUrl}" data-f="url" type="text" inputmode="url" autocomplete="off"${dis} ` +
+          `placeholder="https://clips.twitch.tv/..." value="${esc(f.url)}">` +
+          '<p class="sg-hint">Twitch clip / YouTube / streamable / MemeAlerts. Только https — и хосты из списка.</p>' +
+          '</fieldset>' +
+          '<p class="sg-or"><span>— или —</span></p>' +
+          '<fieldset class="sg-way">' +
+          '<legend class="sg-legend"><span class="badge-pixel" style="background:var(--color-ember);color:var(--color-milk)">Способ 2</span> Загрузить файл</legend>' +
+          '<div class="sg-file-row">' +
+          `<label class="btn-arcade btn-arcade-ghost sg-file-btn">Выбрать файл<input class="sg-file-input" type="file" data-f="file" accept="video/webm,video/mp4"${dis} hidden></label>` +
+          `<span class="sg-file-name${f.file ? '' : ' muted'}" data-file-name>${
+            f.file ? `${esc(f.file.name)} · ${fmtSize(f.file.size)}` : 'файл не выбран'
+          }</span>` +
+          '</div>' +
+          '<p class="sg-hint">webm / mp4, до 25 МБ. До принятия файл лежит в приватном хранилище. Файл или ссылка — что-то одно.</p>' +
+          '</fieldset>'
+        );
+      }
+
+      function successHTML(prefix) {
+        return (
+          '<div class="sg-success" role="status" tabindex="-1" data-success>' +
+          '<p class="display h3">Заявка #12 улетела админу</p>' +
+          '<p>Админ посмотрит видео и решит. Придёт принятие — награда капнет в Пивкойны. ' +
+          'Статус заявок на сайте пока не показываем — это отдельный разговор.</p>' +
+          `<button type="button" class="btn-arcade btn-arcade-ghost" data-reset-form="${prefix}">Отправить ещё одну</button>` +
+          '</div>'
+        );
+      }
+
+      function formHTML(prefix, layout) {
+        const f = formOf(prefix);
+        if (f.status === 'success') return successHTML(prefix);
+        const dis = f.status === 'loading' ? ' disabled' : '';
+        const main =
+          INSTRUCTION +
+          noticeHTML(f) +
+          '<label class="sg-field"><span class="sg-label">Название привета</span>' +
+          `<input class="sg-input" data-f="title" type="text" maxlength="80" autocomplete="off"${dis} ` +
+          `placeholder="Массовый привет" value="${esc(f.title)}"></label>` +
+          (layout === 'inline'
+            ? '<label class="sg-field"><span class="sg-label">Комментарий <span class="muted">(не обязательно)</span></span>' +
+              `<textarea class="sg-input sg-textarea" data-f="comment" rows="2" placeholder="В этом VOD на 15:01 отличный привет"${dis}>${esc(
+                f.comment
+              )}</textarea></label>` +
+              '<p class="sg-note">🔒 Войти через Twitch нужно, чтобы начислить награду.</p>' +
+              actionsHTML(prefix)
+            : '');
+        const wide = layout === 'inline';
+        const ways = waysHTML(f);
+        const tail =
+          layout === 'inline'
+            ? ''
+            : '<label class="sg-field"><span class="sg-label">Комментарий <span class="muted">(не обязательно)</span></span>' +
+              `<textarea class="sg-input sg-textarea" data-f="comment" rows="2" placeholder="В этом VOD на 15:01 отличный привет"${dis}>${esc(
+                f.comment
+              )}</textarea></label>` +
+              '<p class="sg-note">🔒 Войти через Twitch нужно, чтобы начислить награду.</p>' +
+              actionsHTML(prefix);
+
+        if (!wide) {
+          return (
+            `<form class="sg-form" data-form="${prefix}" novalidate ` +
+            `onsubmit="return false">` +
+            main +
+            ways +
+            tail +
+            '</form>'
+          );
+        }
+        return (
+          `<form class="sg-form sg-form--wide" data-form="${prefix}" novalidate onsubmit="return false">` +
+          `<div class="sg-col">${main}</div>` +
+          `<div class="sg-col">${ways}</div>` +
+          '</form>'
+        );
+      }
+
+      function paintForm(prefix) {
+        const form = document.querySelector(`form[data-form="${prefix}"]`);
+        if (!form) return;
+        const f = formOf(prefix);
+        const notice = form.querySelector('[data-notice]');
+        if (notice && !f.error) {
+          if (notice.classList.contains('is-err')) notice.outerHTML = noticeHTML(f);
+        } else if (f.error && notice) {
+          notice.outerHTML = noticeHTML(f);
+        }
+        const url = form.querySelector('[data-f="url"]');
+        if (url) {
+          url.classList.toggle(
+            'is-bad',
+            f.error === 'url' || f.error === 'scheme' || f.error === 'host'
+          );
+        }
+        const file = form.querySelector('[data-file-name]');
+        if (file) {
+          file.textContent = f.file ? `${f.file.name} · ${fmtSize(f.file.size)}` : 'файл не выбран';
+          file.classList.toggle('muted', !f.file);
+        }
+      }
+
+      function validate(f) {
+        const url = f.url.trim();
+        if (!url && !f.file) return 'empty';
+        if (url && f.file) return 'both';
+        if (!f.title.trim()) return 'title';
+        if (url) {
+          if (!/^https:\/\//i.test(url)) return 'scheme';
+          let host = '';
+          try {
+            host = new URL(url).host.toLowerCase();
+          } catch {
+            return 'scheme';
+          }
+          if (!ALLOWED_HOSTS.includes(host)) return 'host';
+        }
+        if (f.file) {
+          const ext = (f.file.name.split('.').pop() ?? '').toLowerCase();
+          if (ext !== 'webm' && ext !== 'mp4') return 'file-type';
+          if (f.file.size > 25 * 1024 * 1024) return 'file-size';
+        }
+        return null;
+      }
+
+      let loadingTimer = 0;
+
+      function submitForm(prefix) {
+        const f = formOf(prefix);
+        if (f.status === 'loading' || f.status === 'success') return;
+        if (state.who !== 'chatter') {
+          f.error = 'login';
+          state.lastEvent = 'ошибка: не вошёл';
+          state.focus = 'notice';
+          render();
+          return;
+        }
+        const error = validate(f);
+        if (error) {
+          f.error = error;
+          state.lastEvent = `ошибка: ${ERR_LABEL[error]}`;
+          state.focus = 'notice';
+          render();
+          return;
+        }
+        f.error = null;
+        f.status = 'loading';
+        state.lastEvent = 'загрузка: отправляем';
+        render();
+        window.clearTimeout(loadingTimer);
+        loadingTimer = window.setTimeout(() => {
+          f.status = 'success';
+          state.lastEvent = 'успех: заявка #12';
+          render();
+        }, 1200);
+      }
+
+      // ── Шапка ────────────────────────────────────────────────────────────
+
+      function marqueeHTML() {
+        const half = `<span>${RULES_LINE.repeat(4)}</span>`;
+        return (
+          '<div class="marquee marquee-strip" aria-hidden="true">' +
+          `<p class="marquee-track display">${half}${half}</p>` +
+          '</div>'
+        );
+      }
+
+      function headerHTML() {
+        const chatter = state.who === 'chatter';
+        const bEntry =
+          state.variant === 'B'
+            ? '<button type="button" class="btn-arcade btn-arcade-ghost icon-btn" data-open-form="b" ' +
+              'title="Предложить привет" aria-label="Предложить привет">🎬</button>'
+            : '';
+        const wallet = chatter
+          ? '<div class="chip-arcade wallet">🍺 <span>1 240</span> <span class="muted">Пивкойнов</span></div>'
+          : '';
+        const bell = chatter
+          ? '<button type="button" class="btn-arcade btn-arcade-ghost icon-btn" title="Перекупы твоих лотов" aria-label="Перекупы твоих лотов">🔔</button>'
+          : '';
+        const auth = chatter
+          ? '<span class="chip-arcade wallet">@nyanyachos</span>' +
+            '<button type="button" class="btn-arcade btn-arcade-ghost" data-logout>Выйти</button>'
+          : '<button type="button" class="btn-arcade btn-twitch" data-login>▶ Войти через Twitch</button>';
+        return (
+          '<div class="wrap header-row">' +
+          '<button type="button" class="logo" data-route="home" aria-label="AlysQueZone — на главную">' +
+          '<span class="display">Alys<span class="text-stream">Que</span>Zone<span class="text-blush">.</span></span>' +
+          '</button>' +
+          '<div class="header-actions">' +
+          '<button type="button" class="btn-arcade btn-arcade-ghost animate-blink">🍺 гамба на пивкойны</button>' +
+          wallet +
+          bEntry +
+          bell +
+          '<span style="display:flex;flex-wrap:wrap;align-items:center;gap:.5rem">' +
+          auth +
+          '</span>' +
+          '</div>' +
+          '</div>' +
+          marqueeHTML()
+        );
+      }
+
+      // ── Витрина / главная / /suggest/ ─────────────────────────────────────
+
+      function lotCard(lot) {
+        return (
+          '<article class="card-pixel lot-card">' +
+          `<h3 class="lot-title"><button type="button" class="lot-link" data-noop>${esc(
+            lot.title
+          )}</button></h3>` +
+          '<div class="lot-video">▶ видео лота</div>' +
+          '<p class="muted" style="margin:0;font-size:.875rem">владелец: —</p>' +
+          `<p class="price">${lot.price} 🍺</p>` +
+          '<button type="button" class="btn-arcade btn-arcade-primary" data-noop>▶ Купить</button>' +
+          '</article>'
+        );
+      }
+
+      function myGreetingsHTML() {
+        if (state.who !== 'chatter') {
+          return '<div class="my-rows"><p class="muted" style="margin:0;font-size:.875rem;font-weight:700">Войди через Twitch — тут будут твои приветы</p></div>';
+        }
+        return (
+          '<div class="my-rows">' +
+          MY_LOTS.map(
+            (lot) =>
+              `<div class="my-row"><button type="button" class="lot-link" data-noop>${esc(
+                lot.title
+              )}</button><span class="text-pivko"> ${lot.price} 🍺</span></div>`
+          ).join('') +
+          '</div>'
+        );
+      }
+
+      function entryHTMLA() {
+        return (
+          '<p class="entry-row"><button type="button" class="quiet-link" data-open-form="a">' +
+          'Не нашёл свой привет? Предложи →</button></p>'
+        );
+      }
+
+      function entryHTMLD() {
+        const open = state.dOpen;
+        return (
+          '<p class="entry-row"><button type="button" class="quiet-link" data-toggle-inline aria-expanded="' +
+          (open ? 'true' : 'false') +
+          '">' +
+          (open ? 'Не нашёл свой привет? Сверни ↑' : 'Не нашёл свой привет? Предложи →') +
+          '</button></p>' +
+          `<section class="card-pixel inline-section"${open ? '' : ' hidden'} aria-label="Предложить привет">` +
+          '<h3 class="display h3">Предложить привет</h3>' +
+          '<p class="form-lead">Пришли видео — если привет зайдёт, он станет лотом на бирже.</p>' +
+          formHTML('d', 'inline') +
+          '</section>'
+        );
+      }
+
+      function lotsPage() {
+        return (
+          '<h1 class="display h1">Биржа приветов.<br><span class="text-ember">Стрим включился, а ты?</span></h1>' +
+          '<p class="lede">Выбирай лот, жми «купить» и забирай, пока чат не разобрал</p>' +
+          '<section class="section" aria-label="Мои приветы">' +
+          '<h2 class="display h2">Мои приветы <span class="text-pivko">' +
+          (state.who === 'chatter' ? MY_LOTS.length : 0) +
+          '</span></h2>' +
+          myGreetingsHTML() +
+          '</section>' +
+          '<section class="section" aria-label="Все лоты">' +
+          '<h2 class="display h2">Все лоты</h2>' +
+          `<div class="grid grid-3">${LOTS.map(lotCard).join('')}</div>` +
+          (state.variant === 'A' ? entryHTMLA() : '') +
+          (state.variant === 'D' ? entryHTMLD() : '') +
+          '</section>'
+        );
+      }
+
+      function homePage() {
+        const suggestLink =
+          state.variant === 'C'
+            ? '<p class="entry-row"><button type="button" class="quiet-link" data-open-form="c">' +
+              'Не нашёл свой привет? Предложи →</button></p>'
+            : '';
+        return (
+          '<section class="card-pixel card-pixel-accent hero">' +
+          '<div class="hero-inner">' +
+          '<div class="hero-text">' +
+          '<p class="badge-pixel animate-blink hero-badge">▶ стрим включился, а ты?</p>' +
+          '<h1 class="display h1 hero-h1">Биржа приветов.<br>Стрим включился, <span class="text-ember">а ты?</span></h1>' +
+          '<p class="lede">Привет стримера — это ценность. Выбирай лот, жми «купить» и забирай, пока чат не разобрал</p>' +
+          '<div class="hero-actions">' +
+          '<button type="button" class="btn-arcade btn-arcade-primary" data-route="lots">▶ К бирже</button>' +
+          '<button type="button" class="btn-arcade btn-arcade-ghost" data-rules-open>+1000 на старте</button>' +
+          '<button type="button" class="btn-arcade btn-arcade-ghost" data-rules-open>Ежедневный вход: до 500🍺</button>' +
+          '<button type="button" class="btn-arcade btn-arcade-ghost" data-rules-open>📜 Правила биржи</button>' +
+          '</div>' +
+          suggestLink +
+          '</div>' +
+          '<div class="card-pixel hero-sign">' +
+          '<div class="hero-emote" aria-hidden="true">😹</div>' +
+          '<p class="badge-pixel">продам привет<br>недорого</p>' +
+          '</div>' +
+          '</div>' +
+          '</section>' +
+          '<section class="section">' +
+          '<h2 class="display h2">Как это работает</h2>' +
+          '<ol class="grid grid-3" style="list-style:none;padding:0">' +
+          '<li class="card-pixel" style="padding:1.25rem">' +
+          '<p class="display text-stream" style="font-size:10px;margin:0">01</p>' +
+          '<p style="margin:.5rem 0 0;font-weight:900;text-transform:uppercase">Выбираешь привет</p>' +
+          '<p class="muted" style="margin:.25rem 0 0;font-size:.875rem">Случайные лоты ниже — бери, пока чат не разобрал.</p>' +
+          '</li>' +
+          '<li class="card-pixel" style="padding:1.25rem">' +
+          '<p class="display text-ember" style="font-size:10px;margin:0">02</p>' +
+          '<p style="margin:.5rem 0 0;font-weight:900;text-transform:uppercase">Жмёшь «купить за Пивкойны»</p>' +
+          '<p class="muted" style="margin:.25rem 0 0;font-size:.875rem">Баланс в шапке, старт — 1000 Пивкойнов.</p>' +
+          '</li>' +
+          '<li class="card-pixel" style="padding:1.25rem">' +
+          '<p class="display text-pivko" style="font-size:10px;margin:0">03</p>' +
+          '<p style="margin:.5rem 0 0;font-weight:900;text-transform:uppercase">Привет твой</p>' +
+          '<p class="muted" style="margin:.25rem 0 0;font-size:.875rem">Чат в шоке!</p>' +
+          '</li>' +
+          '</ol>' +
+          '</section>' +
+          '<section class="section">' +
+          '<div style="display:flex;align-items:flex-end;justify-content:space-between;gap:1rem">' +
+          '<h2 class="display h2">Случайные приветы</h2>' +
+          '<button type="button" class="quiet-link" data-route="lots">Все лоты →</button>' +
+          '</div>' +
+          `<div class="grid grid-4">${LOTS.slice(0, 4).map(lotCard).join('')}</div>` +
+          '<div class="card-pixel card-pixel-accent" style="margin-top:2rem;padding:2rem;text-align:center">' +
+          '<p class="display h2">Готов забрать свой привет?</p>' +
+          '<button type="button" class="btn-arcade btn-arcade-primary" style="margin-top:1rem;padding:.75rem 2rem" data-route="lots">▶ На биржу</button>' +
+          '</div>' +
+          '</section>'
+        );
+      }
+
+      function suggestPage() {
+        return (
+          '<button type="button" class="quiet-link back-link" data-route="home">← На главную</button>' +
+          '<section class="card-pixel suggest-hero">' +
+          '<p class="badge-pixel">заявка уходит админу</p>' +
+          '<h1 class="display h1">Предложить привет</h1>' +
+          '<p class="lede">Пришли видео — админ посмотрит и соберёт карточку. Ссылку на эту страницу можно кинуть в чат.</p>' +
+          '</section>' +
+          '<div class="suggest-grid">' +
+          `<section class="card-pixel form-card" aria-label="Форма заявки">${formHTML('c', 'stack')}</section>` +
+          '<aside>' +
+          '<section class="card-pixel aside-card">' +
+          '<h2 class="display h3">Что считается приветом</h2>' +
+          '<p class="muted">Видео, по смыслу похожее на уже существующие приветы: не «просто смешная нарезка», ' +
+          'а привет, который можно показать всему чату.</p>' +
+          '<p class="muted">Пример: «Массовый привет (коты одобряют)», «Здраствуйте, nyanyachos».</p>' +
+          '</section>' +
+          '<section class="card-pixel aside-card">' +
+          '<h2 class="display h3">Что дальше</h2>' +
+          '<ol class="steps">' +
+          '<li>Заявка с номером уходит админу.</li>' +
+          '<li>Админ смотрит видео и решает: принято или нет.</li>' +
+          '<li>Принятая заявка становится лотом, а награда капает в Пивкойны.</li>' +
+          '</ol>' +
+          '</section>' +
+          '</aside>' +
+          '</div>'
+        );
+      }
+
+      function pageHTML() {
+        if (state.variant === 'C') {
+          if (state.route === 'suggest') return suggestPage();
+          if (state.route === 'lots') return lotsPage();
+          return homePage();
+        }
+        return lotsPage();
+      }
+
+      // ── Оверлеи ──────────────────────────────────────────────────────────
+
+      function overlayA() {
+        return (
+          '<div class="overlay" data-overlay="a" role="dialog" aria-modal="true" aria-labelledby="a-title" tabindex="-1">' +
+          '<div class="card-pixel modal-card">' +
+          '<div class="modal-head">' +
+          '<h2 id="a-title" class="display h3">Предложить привет</h2>' +
+          '<button type="button" class="btn-arcade btn-arcade-ghost icon-btn" data-close-overlay aria-label="Закрыть">✕</button>' +
+          '</div>' +
+          `<div class="modal-body">${formHTML('a', 'stack')}</div>` +
+          '</div>' +
+          '</div>'
+        );
+      }
+
+      function overlayB() {
+        const step = state.bStep;
+        const title = step === 1 ? 'Что считается приветом' : 'Заявка на привет';
+        const body =
+          step === 1
+            ? '<div class="modal-body">' +
+              '<p class="sg-instruction">Привет — это видео, которое можно показать всему чату: по смыслу оно похоже ' +
+              'на уже существующие приветы на бирже.</p>' +
+              '<ul class="mini-list">' +
+              '<li><b>Подойдёт:</b> «Массовый привет (коты одобряют)», «Здраствуйте, nyanyachos».</li>' +
+              '<li><b>Не подойдёт:</b> нарезка без привета, чужая реклама, NSFW.</li>' +
+              '<li><b>Кто решает:</b> админ смотрит сам — примем или вежливо откажем.</li>' +
+              '</ul>' +
+              '<div class="sg-actions" style="margin-top:1.25rem">' +
+              '<button type="button" class="btn-arcade btn-arcade-primary" data-b-step="2">Понятно, дальше →</button>' +
+              '<button type="button" class="btn-arcade btn-arcade-ghost" data-close-overlay>Передумал</button>' +
+              '</div>' +
+              '</div>'
+            : '<div class="modal-body">' +
+              '<p style="margin:0 0 .75rem"><button type="button" class="quiet-link" data-b-step="1">← Что считается приветом</button></p>' +
+              formHTML('b', 'stack') +
+              '</div>';
+        return (
+          '<div class="overlay" data-overlay="b" role="dialog" aria-modal="true" aria-labelledby="b-title" tabindex="-1">' +
+          '<div class="card-pixel modal-card">' +
+          '<div class="modal-head">' +
+          `<h2 id="b-title" class="display h3">${title}</h2>` +
+          '<button type="button" class="btn-arcade btn-arcade-ghost icon-btn" data-close-overlay aria-label="Закрыть">✕</button>' +
+          '</div>' +
+          `<p class="step-chip display">шаг ${step} из 2</p>` +
+          body +
+          '</div>' +
+          '</div>'
+        );
+      }
+
+      function rulesModal() {
+        return (
+          '<div class="overlay" data-overlay="rules" role="dialog" aria-modal="true" aria-labelledby="rules-title" tabindex="-1">' +
+          '<div class="card-pixel modal-card modal-card--rules">' +
+          '<div class="modal-head">' +
+          '<h2 id="rules-title" class="display h3">Правила биржи</h2>' +
+          '<button type="button" class="btn-arcade btn-arcade-ghost icon-btn" data-close-overlay aria-label="Закрыть правила">✕</button>' +
+          '</div>' +
+          '<ul class="rule-list">' +
+          '<li class="rule-item"><p class="display rule-title text-ember">Комиссия биржи 7%</p>' +
+          '<p class="muted">Платит продавец из выручки (округление вверх, минимум 1), комиссия сгорает. Покупатель платит ровно цену кнопки.</p></li>' +
+          '<li class="rule-item"><p class="display rule-title text-stream">Рост цены</p>' +
+          '<p class="muted">Первые 15 покупок лота поднимают цену на +10% (вверх, минимум +1), дальше — ровно на +1.</p></li>' +
+          '<li class="rule-item"><p class="display rule-title text-blush">Владелец лота</p>' +
+          '<p class="muted">Лот без владельца забирает первый покупатель. Дальше лот перекупают: выручку получает предыдущий владелец, минус комиссия.</p></li>' +
+          '<li class="rule-item"><p class="display rule-title text-pivko">Гамба · ставка 100 · 20 спинов в день</p>' +
+          '<p class="muted">х0 — 42% · х1.5 — 28% · х2 — 18% · х3 — 8% · х5 — 3% · х10 — 1%</p></li>' +
+          '<li class="rule-item"><p class="display rule-title text-pivko">Ежедневный вход</p>' +
+          '<p class="muted">Дни 1–3: 200 / 200 / 250. Дальше: 150 / 200 / 250 / 500 (7-й день), затем цикл заново. Старт — 1000.</p></li>' +
+          '<li class="rule-item"><p class="display rule-title text-stream">Предложить привет</p>' +
+          '<p class="muted">Знаешь привет, которого нет на бирже? Пришли видео — админ посмотрит. За принятую заявку капнет награда в Пивкойнах.</p>' +
+          '<button type="button" class="btn-arcade btn-arcade-ghost rules-suggest" data-open-form="c">Предложить привет →</button></li>' +
+          '</ul>' +
+          '<button type="button" class="btn-arcade btn-arcade-primary" style="margin-top:1.25rem;width:100%;padding:.75rem" data-close-overlay>Понятно</button>' +
+          '</div>' +
+          '</div>'
+        );
+      }
+
+      function overlaysHTML() {
+        let html = '';
+        if (state.variant === 'A' && state.overlay === 'a') html += overlayA();
+        if (state.variant === 'B' && state.overlay === 'b') html += overlayB();
+        if (state.variant === 'C' && state.overlay === 'rules') html += rulesModal();
+        return html;
+      }
+
+      // ── Нижняя панель прототипа ──────────────────────────────────────────
+
+      function stateLine() {
+        const parts = [
+          `вариант ${state.variant}`,
+          state.who === 'chatter' ? 'вошёл @nyanyachos' : 'гость',
+        ];
+        const prefix = activePrefix();
+        if (!prefix) {
+          parts.push('форма закрыта');
+          return parts.join(' · ');
+        }
+        const f = formOf(prefix);
+        const where = {
+          a: 'модалка на витрине',
+          b: 'модалка в два шага',
+          c: 'страница /suggest/',
+          d: 'инлайн-секция',
+        }[prefix];
+        parts.push(`форма: ${where}`);
+        if (prefix === 'b' && state.bStep === 1) {
+          parts.push('шаг 1: что считается приветом');
+          return parts.join(' · ');
+        }
+        parts.push(
+          f.status === 'success'
+            ? 'заявка #12 отправлена'
+            : f.status === 'loading'
+              ? 'отправка…'
+              : f.error
+                ? `ошибка: ${ERR_LABEL[f.error]}`
+                : 'заполняется'
+        );
+        return parts.join(' · ');
+      }
+
+      function protoBarHTML() {
+        const v = VARIANTS.find((item) => item.key === state.variant) ?? VARIANTS[0];
+        const chip = (trigger, label, title) =>
+          `<button type="button" class="proto-chip" data-trigger="${trigger}" title="${title}">${label}</button>`;
+        return (
+          '<div class="proto-row proto-row-main">' +
+          '<span class="proto-badge">Прототип — не продакшн</span>' +
+          '<button type="button" class="proto-arrow" data-nav="-1" aria-label="Предыдущий вариант">←</button>' +
+          `<span class="proto-label">${v.key} (${v.name})</span>` +
+          '<button type="button" class="proto-arrow" data-nav="1" aria-label="Следующий вариант">→</button>' +
+          `<button type="button" class="proto-toggle" data-demo-toggle aria-pressed="${state.demoOpen}" title="Показать/скрыть состояния">⚙ состояния</button>` +
+          '<span class="proto-hint">клавиши ← / → листают</span>' +
+          '</div>' +
+          (state.demoOpen
+            ? '<div class="proto-row proto-row-chips">' +
+              '<span class="proto-hint">кто:</span>' +
+              `<button type="button" class="proto-chip" data-who="guest" aria-pressed="${state.who === 'guest'}">гость</button>` +
+              `<button type="button" class="proto-chip" data-who="chatter" aria-pressed="${state.who === 'chatter'}">@nyanyachos</button>` +
+              '<span class="proto-sep"></span>' +
+              chip('success', '✔ успех', 'Показать успех: «Заявка #12 улетела админу»') +
+              chip('loading', '⏳ отправка', 'Показать загрузку: кнопка disabled') +
+              chip('nologin', '⚠ не вошёл', 'Показать ошибку «не вошёл»') +
+              chip('badlink', '⚠ ссылка', 'Подставить чужой хост и показать ошибку') +
+              chip('bigfile', '⚠ файл 30 МБ', 'Подставить файл 30 МБ и показать ошибку лимита') +
+              chip('reset', '⟲ сброс', 'Очистить форму') +
+              '</div>'
+            : '') +
+          '<div class="proto-row proto-row-state">' +
+          `<span class="proto-state" data-proto-state>состояние: ${esc(stateLine())}</span>` +
+          `<span class="proto-state" data-proto-event>последнее: ${esc(state.lastEvent)}</span>` +
+          '</div>'
+        );
+      }
+
+      function renderBar() {
+        document.getElementById('proto-bar').innerHTML = protoBarHTML();
+      }
+
+      // ── Рендер и действия ────────────────────────────────────────────────
+
+      function render() {
+        document.getElementById('site-header').innerHTML = headerHTML();
+        document.getElementById('page').innerHTML = pageHTML();
+        document.getElementById('overlays').innerHTML = overlaysHTML();
+        renderBar();
+        syncUrl();
+        if (state.focus) {
+          const sel = state.focus === 'success' ? '[data-success]' : '[data-notice]';
+          const el = document.querySelector(sel);
+          if (el) el.focus();
+          state.focus = null;
+        }
+      }
+
+      function syncUrl() {
+        const params = new URLSearchParams();
+        params.set('variant', state.variant);
+        params.set('who', state.who);
+        const hash = `#${params.toString()}`;
+        try {
+          history.replaceState(null, '', hash);
+        } catch {
+          location.hash = hash.slice(1);
+        }
+      }
+
+      function readUrl() {
+        const raw = (location.hash.slice(1) || location.search.slice(1)).trim();
+        if (!raw) return;
+        const params = new URLSearchParams(raw);
+        const variant = (params.get('variant') ?? '').toUpperCase();
+        if (VARIANTS.some((v) => v.key === variant)) state.variant = variant;
+        const who = params.get('who');
+        if (who === 'guest' || who === 'chatter') state.who = who;
+      }
+
+      /** Ссылку с чужим #variant=… можно вставить в тот же таб: перечитываем hash без перезагрузки. */
+      window.addEventListener('hashchange', () => {
+        const before = `${state.variant}:${state.who}`;
+        readUrl();
+        if (`${state.variant}:${state.who}` === before) return;
+        state.overlay = null;
+        state.route = 'home';
+        state.dOpen = false;
+        state.bStep = 1;
+        state.lastEvent = 'вариант из URL';
+        resetForms();
+        render();
+      });
+
+      function setVariant(key) {
+        state.variant = key;
+        state.overlay = null;
+        state.route = 'home';
+        state.dOpen = false;
+        state.bStep = 1;
+        state.lastEvent = 'форма не закрыта — вход не тронут';
+        state.focus = null;
+        resetForms();
+        render();
+      }
+
+      function setWho(who) {
+        state.who = who;
+        state.lastEvent = who === 'chatter' ? 'вход: @nyanyachos' : 'режим гостя';
+        for (const f of Object.values(forms)) {
+          if (f.error === 'login') f.error = null;
+        }
+        render();
+      }
+
+      function ensureOpen() {
+        if (state.variant === 'A') state.overlay = 'a';
+        else if (state.variant === 'B') state.overlay = 'b';
+        else if (state.variant === 'C') state.route = 'suggest';
+        else if (state.variant === 'D') state.dOpen = true;
+      }
+
+      function openForm(prefix) {
+        state.overlay = null;
+        if (prefix === 'a') state.overlay = 'a';
+        if (prefix === 'b') {
+          state.overlay = 'b';
+          state.bStep = 1;
+        }
+        if (prefix === 'c') {
+          state.route = 'suggest';
+        }
+        if (prefix === 'd') {
+          state.dOpen = true;
+        }
+        forms[prefix] = freshForm();
+        state.lastEvent = 'форма открыта — ждём заполнения';
+        render();
+      }
+
+      const TRIGGERS = {
+        success() {
+          state.who = 'chatter';
+          const f = formOf(activePrefix());
+          f.error = null;
+          f.status = 'success';
+          state.lastEvent = 'успех: заявка #12 улетела админу';
+        },
+        loading() {
+          state.who = 'chatter';
+          const f = formOf(activePrefix());
+          f.error = null;
+          f.status = 'loading';
+          state.lastEvent = 'загрузка: кнопка disabled';
+        },
+        nologin() {
+          state.who = 'guest';
+          const f = formOf(activePrefix());
+          f.status = 'idle';
+          f.error = 'login';
+          state.lastEvent = 'ошибка: не вошёл';
+        },
+        badlink() {
+          const f = formOf(activePrefix());
+          f.status = 'idle';
+          f.url = 'https://example.com/privet.mp4';
+          f.file = null;
+          f.error = 'host';
+          state.lastEvent = 'ошибка: чужой хост ссылки';
+        },
+        bigfile() {
+          const f = formOf(activePrefix());
+          f.status = 'idle';
+          f.url = '';
+          f.file = { name: 'bolshoy_privet.webm', size: 31 * 1024 * 1024 };
+          f.error = 'file-size';
+          state.lastEvent = 'ошибка: файл 30 МБ > 25 МБ';
+        },
+        reset() {
+          const prefix = activePrefix();
+          if (prefix) forms[prefix] = freshForm();
+          state.lastEvent = 'форма сброшена';
+        },
+      };
+
+      // ── События ──────────────────────────────────────────────────────────
+
+      document.addEventListener('click', (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        const hit = (sel) => target.closest(sel);
+
+        if (hit('[data-noop]')) {
+          event.preventDefault();
+          return;
+        }
+
+        const nav = hit('[data-nav]');
+        if (nav) {
+          const dir = Number(nav.dataset.nav) || 1;
+          const index = VARIANTS.findIndex((v) => v.key === state.variant);
+          const next = VARIANTS[(index + dir + VARIANTS.length) % VARIANTS.length];
+          setVariant(next.key);
+          return;
+        }
+
+        const toggle = hit('[data-demo-toggle]');
+        if (toggle) {
+          state.demoOpen = !state.demoOpen;
+          renderBar();
+          return;
+        }
+
+        const who = hit('[data-who]');
+        if (who) {
+          setWho(who.dataset.who);
+          return;
+        }
+
+        const trigger = hit('[data-trigger]');
+        if (trigger) {
+          const name = trigger.dataset.trigger;
+          ensureOpen();
+          TRIGGERS[name]?.();
+          render();
+          return;
+        }
+
+        const open = hit('[data-open-form]');
+        if (open) {
+          event.preventDefault();
+          openForm(open.dataset.openForm);
+          return;
+        }
+
+        const closeOverlay = hit('[data-close-overlay]');
+        if (closeOverlay) {
+          state.overlay = null;
+          state.lastEvent = 'окно закрыто';
+          render();
+          return;
+        }
+
+        const overlay = hit('[data-overlay]');
+        if (overlay && event.target === overlay) {
+          state.overlay = null;
+          render();
+          return;
+        }
+
+        const bStep = hit('[data-b-step]');
+        if (bStep) {
+          state.bStep = Number(bStep.dataset.bStep) === 2 ? 2 : 1;
+          render();
+          return;
+        }
+
+        const inline = hit('[data-toggle-inline]');
+        if (inline) {
+          state.dOpen = !state.dOpen;
+          state.lastEvent = state.dOpen ? 'форма раскрыта' : 'форма свёрнута';
+          render();
+          return;
+        }
+
+        const reset = hit('[data-reset-form]');
+        if (reset) {
+          forms[reset.dataset.resetForm] = freshForm();
+          state.lastEvent = 'форма готова к новой заявке';
+          render();
+          return;
+        }
+
+        const login = hit('[data-login]');
+        if (login) {
+          event.preventDefault();
+          setWho('chatter');
+          return;
+        }
+
+        const logout = hit('[data-logout]');
+        if (logout) {
+          setWho('guest');
+          return;
+        }
+
+        const rules = hit('[data-rules-open]');
+        if (rules) {
+          state.overlay = 'rules';
+          render();
+          return;
+        }
+
+        const route = hit('[data-route]');
+        if (route) {
+          const next = route.dataset.route;
+          state.route = next;
+          state.overlay = null;
+          state.lastEvent = `страница: ${next === 'suggest' ? '/suggest/' : next === 'lots' ? '/lots/' : '/'}`;
+          render();
+          return;
+        }
+
+        const plashka = hit('[data-plashka-close]');
+        if (plashka) {
+          document.getElementById('info-plashka').hidden = true;
+          document.body.classList.add('plashka-off');
+        }
+      });
+
+      document.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const form =
+          event.target instanceof Element ? event.target.closest('form[data-form]') : null;
+        if (form) submitForm(form.dataset.form);
+      });
+
+      document.addEventListener('input', (event) => {
+        const el = event.target;
+        if (!(el instanceof Element)) return;
+        const field = el.closest('[data-f]');
+        if (!field) return;
+        const form = field.closest('form[data-form]');
+        if (!form) return;
+        const key = field.dataset.f;
+        if (key !== 'title' && key !== 'url' && key !== 'comment') return;
+        const f = formOf(form.dataset.form);
+        f[key] = field.value;
+        if (f.error) {
+          f.error = null;
+          state.lastEvent = 'ошибка снята — правь дальше';
+          paintForm(form.dataset.form);
+          const bar = document.querySelector('[data-proto-state]');
+          if (bar) bar.textContent = stateLine();
+          const ev = document.querySelector('[data-proto-event]');
+          if (ev) ev.textContent = `последнее: ${state.lastEvent}`;
+        }
+      });
+
+      document.addEventListener('change', (event) => {
+        const el = event.target;
+        if (!(el instanceof HTMLInputElement)) return;
+        if (el.dataset.f !== 'file') return;
+        const form = el.closest('form[data-form]');
+        if (!form) return;
+        const f = formOf(form.dataset.form);
+        const file = el.files && el.files[0];
+        f.file = file ? { name: file.name, size: file.size } : null;
+        f.error = null;
+        paintForm(form.dataset.form);
+      });
+
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && state.overlay) {
+          state.overlay = null;
+          render();
+          return;
+        }
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+        const target = event.target;
+        if (
+          target instanceof Element &&
+          target.closest('input, textarea, select, [contenteditable]')
+        ) {
+          return;
+        }
+        if (state.overlay) return;
+        event.preventDefault();
+        const dir = event.key === 'ArrowRight' ? 1 : -1;
+        const index = VARIANTS.findIndex((v) => v.key === state.variant);
+        const next = VARIANTS[(index + dir + VARIANTS.length) % VARIANTS.length];
+        setVariant(next.key);
+      });
+
+      readUrl();
+      render();
+    </script>
+  </body>
+</html>
