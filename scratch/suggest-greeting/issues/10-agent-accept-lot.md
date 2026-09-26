@@ -16,3 +16,9 @@ Blocked by: 08
 - [ ] `just submission-reject <id>` ставит «отклонена» или «дубликат»; выплат не делает.
 - [ ] Пайплайн описан документом для агента + указатель в `AGENTS.md`; при мёртвой ссылке, не-привете или дубликате агент останавливается и докладывает.
 - [ ] Проверено: принятая заявка видна как лот с подписью; отклонённая не появляется.
+
+## Comments
+
+- Реализовано в коммите `6045aef`: миграция `supabase/migrations/20260926150000_submission_accept.sql` (колонки `lots.suggested_by_uid/_login`, пересоздание вью `lots_with_next_price` через `DROP VIEW + CREATE`, RPC `accept_submission`/`reject_submission` только для `service_role`; награду не начисляет — тикет 11), пайплайн `scripts/submission.py` и рецепты `just submission` / `just submission-reject`, подпись «Привет добавил: <ник>» на странице лота (`src/lib/lots.ts`, `src/pages/lot/index.astro`), документ `docs/agents/submissions.md` и указатели в `AGENTS.md`.
+- Гейт «стоп и спроси человека» — флаг `--check` (скачать и собрать медиа, ничего не публикуя), авто-остановка на мёртвой/приватной ссылке и на дубликате по ссылке, остановка на неоднозначном нике; отказ — `just submission-reject <id> [--status duplicate]`.
+- Отложено: SQL-проверки RPC против локального Supabase (по указанию тикета `supabase start`/`db reset` не запускал — проверка централизованная); награда +500 и роялти — тикет 11.
