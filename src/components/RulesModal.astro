@@ -9,6 +9,14 @@
 // data-rules-button на кнопку открытия — скрипт ниже делегированный.
 // Закрытие: «Понятно» / крестик / клик по затемнению / Escape.
 import { GAMBA_DAILY_LIMIT, GAMBA_PAYTABLE } from '@/lib/gamba';
+import { COMMISSION_RATE, ROYALTY_PURCHASES, ROYALTY_RATE, SUBMISSION_BONUS } from '@/lib/prices';
+
+// Цифры награды/комиссии — из зеркал lib/prices.ts (серверные ставки живут
+// в public.commission_rate()/public.royalty_rate() и в pay_submission_reward).
+const COMMISSION_PCT = Math.round(COMMISSION_RATE * 100);
+const ROYALTY_PCT = Math.round(ROYALTY_RATE * 100);
+const BURN_PCT = COMMISSION_PCT - ROYALTY_PCT;
+const REWARD_LINE = `+${SUBMISSION_BONUS} сразу и ${ROYALTY_PCT}% с первых ${ROYALTY_PURCHASES} перекупов`;
 ---
 
 <div
@@ -35,10 +43,20 @@ import { GAMBA_DAILY_LIMIT, GAMBA_PAYTABLE } from '@/lib/gamba';
     </div>
     <ul class="mt-4 flex flex-col gap-4 text-sm font-bold">
       <li>
-        <p class="font-display text-[10px] uppercase text-ember">Комиссия биржи 7%</p>
+        <p class="font-display text-[10px] uppercase text-ember">
+          Комиссия биржи {COMMISSION_PCT}%
+        </p>
         <p class="mt-1 text-mist">
-          Платит продавец из выручки (округление вверх, минимум 1), комиссия сгорает. Покупатель
+          Платит продавец из выручки (округление вверх, минимум 1): {BURN_PCT}% сгорает,{' '}
+          {ROYALTY_PCT}% уходит автору привета за первые {ROYALTY_PURCHASES} перекупа. Покупатель
           платит ровно цену кнопки — без сюрпризов.
+        </p>
+      </li>
+      <li>
+        <p class="font-display text-[10px] uppercase text-melon">Награда за принятый привет</p>
+        <p class="mt-1 text-mist">
+          Прислал привет, который взяли на биржу, — {REWARD_LINE}. Бонус приходит один раз при
+          принятии.
         </p>
       </li>
       <li>

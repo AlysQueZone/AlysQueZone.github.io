@@ -18,6 +18,7 @@ import DailyLogin from '@/components/DailyLogin.astro';
 import AuthButton from '@/components/AuthButton.astro';
 import { assertSupabaseConfigured } from '@/lib/supabase';
 import { GAMBA_EMOTE_URL } from '@/lib/emotes';
+import { COMMISSION_RATE, ROYALTY_PURCHASES, ROYALTY_RATE, SUBMISSION_BONUS } from '@/lib/prices';
 
 interface Props {
   title?: string;
@@ -37,6 +38,16 @@ const MQ_SKELETON = Array.from(
   () =>
     '<span class="skeleton-block skeleton-block-cream mr-3 inline-block h-2 w-40 align-middle"></span>'
 ).join('');
+
+// Правила для бегущей строки (когда сделок нет): те же ставки, что в окне
+// «Правила биржи», из зеркал lib/prices.ts — витрина не врёт про математику.
+const MQ_COMMISSION_PCT = Math.round(COMMISSION_RATE * 100);
+const MQ_ROYALTY_PCT = Math.round(ROYALTY_RATE * 100);
+const MQ_BURN_PCT = MQ_COMMISSION_PCT - MQ_ROYALTY_PCT;
+const MQ_RULES =
+  `Комиссия биржи ${MQ_COMMISSION_PCT}% (${MQ_BURN_PCT}% сгорает + ${MQ_ROYALTY_PCT}% автору) ★ ` +
+  `перекуп +10% ×15, дальше +1 ★ за принятый привет +${SUBMISSION_BONUS} и ${MQ_ROYALTY_PCT}% ` +
+  `с первых ${ROYALTY_PURCHASES} перекупов ★ гамба до x10 · 20 спинов в день ★ вход 200/200/250 ★`;
 
 // Билд-гейт: без PUBLIC_SUPABASE_* сайт нерабочий (витрина — проекция БД).
 assertSupabaseConfigured();
@@ -123,10 +134,7 @@ assertSupabaseConfigured();
           <span class="mx-4" data-deal-log-b set:html={MQ_SKELETON} />
         </p>
       </div>
-      <template data-deal-log-rules>
-        Комиссия биржи 7% ★ перекуп +10% ×15, дальше +1 ★ гамба до x10 · 20 спинов в день ★ вход
-        200/200/250 ★
-      </template>
+      <template data-deal-log-rules>{MQ_RULES}</template>
     </header>
     <main id="main" class="mx-auto max-w-6xl px-4 py-8">
       <slot />

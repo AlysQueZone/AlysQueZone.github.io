@@ -16,7 +16,8 @@
 
 Шаги accept: заявка -> yt-dlp во временную папку -> ffmpeg-тройка по
 docs/agents/media-pipeline.md -> storage_upload.py в videos/<slug> -> [[lots]]
-в content/lots.toml -> lots_sync.py -> RPC accept_submission. Заголовок берётся
+в content/lots.toml -> lots_sync.py -> RPC accept_submission -> выплата награды
+(RPC pay_submission_reward). Заголовок берётся
 из заявки с резолвом ника по реестру content/chatters.toml; слаг — новый
 уникальный. Отказ ничего не публикует и не платит.
 
@@ -502,6 +503,33 @@ def call_accept(cfg, sid, lot_id):
     say("Заявка #%d принята, связана с лотом id=%d" % (sid, lot_id))
 
 
+def call_reward(cfg, sid):
+    """Выплата награды автору: только после accept, идемпотентна на сервере."""
+    status, body = rest_request(
+        cfg.key,
+        "POST",
+        "%s/rest/v1/rpc/pay_submission_reward" % cfg.base,
+        {"p_submission_id": sid},
+    )
+    if status not in (200, 204):
+        raise SystemExit("pay_submission_reward #%d: %s %s" % (sid, status, body))
+
+    outcome = ""
+    text = (body or "").strip()
+    if text:
+        try:
+            outcome = str(json.loads(text))
+        except ValueError:
+            outcome = text.strip('"')
+    messages = {
+        "paid": "Награда за заявку #%d выплачена (+500 и 3%% с первых 3 перекупов)"
+        % sid,
+        "already": "Награда за заявку #%d уже выплачена — повторно не платим" % sid,
+        "no_account": "У автора заявки #%d нет счёта — выплаты нет" % sid,
+    }
+    say(messages.get(outcome, "Награда за заявку #%d обработана" % sid))
+
+
 def call_reject(cfg, sid, status_name):
     status, body = rest_request(
         cfg.key,
@@ -637,6 +665,7 @@ def cmd_accept(cfg, args):
     run_lots_sync(cfg)
     lot_id = fetch_lot_id(cfg, ctx["slug"])
     call_accept(cfg, sub["id"], lot_id)
+    call_reward(cfg, sub["id"])
     say(
         "Готово: лот %s (id=%d) на витрине, заявка #%d принята"
         % (ctx["slug"], lot_id, sub["id"])
