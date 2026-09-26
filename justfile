@@ -20,6 +20,7 @@ foo := "bar"
 
 alias lg := lazygit
 alias r := run
+alias db-rest := db-reset
 
 # -----------------------------------------------------------------------------
 # Recipes
@@ -88,6 +89,38 @@ submission-reject *args:
 # Пример: just submission-reward 12
 submission-reward *args:
     python3 scripts/submission.py reward {{args}}
+
+# -------------------------------------
+# Локальная разработка (Supabase + фронт)
+# -------------------------------------
+
+# Поднять локальный Supabase и до-накатить миграции (данные сохраняются)
+db-up:
+    ./node_modules/.bin/supabase start
+    ./node_modules/.bin/supabase migration up --local
+
+# Остановить локальный Supabase
+db-stop:
+    ./node_modules/.bin/supabase stop
+
+# Чистая локальная БД: миграции + сид из content/lots.toml (данные теряются).
+# --write-seed пишет только файл supabase/seed.sql; в локальную БД его заливает db reset.
+db-reset: db-up
+    python3 scripts/lots_sync.py --write-seed
+    ./node_modules/.bin/supabase db reset
+
+# Dev-сервер на локальной БД: вначале just db-up, затем astro против 127.0.0.1:54321.
+# `--force` заменяет уже запущенный astro dev (порт 4321 один) — этот сервер и должен победить.
+run-local: db-up
+    #!/usr/bin/env bash
+    set -euo pipefail
+    status_env=$(./node_modules/.bin/supabase status -o env)
+    url=$(printf '%s\n' "$status_env" | sed -n 's/^\(API_URL\|SUPABASE_URL\)="\(.*\)"/\2/p' | head -1)
+    key=$(printf '%s\n' "$status_env" | sed -n 's/^\(PUBLISHABLE_KEY\|ANON_KEY\)="\(.*\)"/\2/p' | head -1)
+    : "${url:=http://127.0.0.1:54321}"
+    [ -n "$key" ] || { echo 'Не нашёл publishable-ключ локального стека (supabase status -o env)' >&2; exit 1; }
+    echo "Локальная БД: $url"
+    PUBLIC_SUPABASE_URL="$url" PUBLIC_SUPABASE_PUBLISHABLE_KEY="$key" npm run dev -- --force
 
 # -------------------------------------
 # Релиз
