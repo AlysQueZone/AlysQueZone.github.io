@@ -12,11 +12,14 @@
                                        приветом», потом поля.
     C «Страница /suggest/»           — тихая ссылка в hero главной + секция внизу «Правил биржи»,
                                        форма живёт на отдельной странице (URL можно расшарить).
-    D «Инлайн-секция внизу витрины»  — раскрывающаяся секция под «Все лоты», форма в потоке, без модалок.
+    D «Инлайн-секция внизу витрины»  — раскрывающаяся секция под «Все лоты», форма в потоке в две
+                                       колонки, без модалок.
+    E «Инлайн-секция: форма + инфо»  — постоянная секция под «Все лоты» (открыта по умолчанию):
+                                       слева форма, справа информация. Показывается при открытии.
 
-  Набор полей во всех вариантах одинаков: название привета, ссылка на видео ИЛИ файл
-  (показаны оба способа), опциональный комментарий, пометка про вход через Twitch,
-  состояния: загрузка / успех / ошибки (чужой хост, файл > 25 МБ, не вошёл).
+  Набор полей во всех вариантах одинаков: название привета, ссылка на видео, опциональный
+  комментарий, пометка про вход через Twitch рядом с кнопкой; состояния: загрузка / успех /
+  ошибки (чужой хост ссылки, не вошёл). Загрузки файла нет — решено владельцем, только ссылка.
 
   Оговорка throwaway:
     - это НЕ продакшн и НЕ часть сборки проекта; отдельный самодостаточный HTML-файл, открывается как файл;
@@ -28,9 +31,9 @@
 
   Подсказки для смотрящего:
     «⚙ состояния» в нижней панели: гость / вошёл, ✔ успех, ⏳ отправка, ⚠ не вошёл,
-    ⚠ ссылка (чужой хост), ⚠ файл 30 МБ, ⟲ сброс. Триггер сам открывает форму текущего варианта.
+    ⚠ ссылка (чужой хост), ⟲ сброс. Триггер сам открывает форму текущего варианта.
     «✔ успех» показывает финальное состояние «Заявка #12 улетела админу».
-    Ссылку на конкретный вариант можно кинуть как #variant=C или #variant=C&who=chatter —
+    Ссылку на конкретный вариант можно кинуть как #variant=E или #variant=C&who=chatter —
     состояние переживает перезагрузку и вставку хеша в тот же таб.
 -->
 <html lang="ru">
@@ -795,70 +798,11 @@
         min-height: 4rem;
       }
 
-      .sg-way {
-        border: 3px solid var(--color-milk);
-        border-radius: 4px;
-        background-color: color-mix(in srgb, var(--color-void) 70%, transparent);
-        padding: 0.75rem;
-        margin: 0;
-      }
-
-      .sg-legend {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        padding-inline: 0.25rem;
-        font-size: 0.8125rem;
-        font-weight: 900;
-      }
-
-      .sg-way .sg-input {
-        background-color: var(--color-cream);
-        margin-top: 0.25rem;
-      }
-
       .sg-hint {
-        margin: 0.5rem 0 0;
+        margin: 0;
         font-size: 0.75rem;
         font-weight: 700;
         color: var(--color-mist);
-      }
-
-      .sg-or {
-        margin: 0;
-        text-align: center;
-        font-family: var(--font-display);
-        font-size: 10px;
-        text-transform: uppercase;
-        color: var(--color-mist);
-      }
-
-      .sg-file-row {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 0.75rem;
-        margin-top: 0.25rem;
-      }
-
-      .sg-file-btn {
-        padding: 0.5rem 1rem;
-        font-size: 0.8125rem;
-      }
-
-      .sg-file-name {
-        font-size: 0.75rem;
-        font-weight: 700;
-        overflow-wrap: anywhere;
-      }
-
-      .sg-note {
-        margin: 0;
-        font-size: 0.8125rem;
-        font-weight: 700;
-        background-color: var(--color-void);
-        border: 2px dashed var(--color-mist);
-        padding: 0.5rem 0.75rem;
       }
 
       .sg-actions {
@@ -876,6 +820,40 @@
       .sg-actions .sg-hint {
         margin: 0;
         flex: 1 1 12rem;
+      }
+
+      /* Вариант E: слева форма, справа информация. */
+      .sg-split {
+        display: grid;
+        gap: 1.5rem;
+        align-items: start;
+      }
+
+      @media (min-width: 760px) {
+        .sg-split {
+          grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+        }
+      }
+
+      .sg-info {
+        display: grid;
+        gap: 1rem;
+        align-content: start;
+      }
+
+      .sg-info-lead {
+        margin: 0;
+        font-size: 0.875rem;
+        font-weight: 700;
+      }
+
+      .sg-info-card {
+        border: 3px solid var(--color-milk);
+        border-radius: 4px;
+        background-color: var(--color-void);
+        padding: 0.6rem 0.75rem;
+        font-size: 0.875rem;
+        font-weight: 700;
       }
 
       .sg-notice {
@@ -985,10 +963,8 @@
         padding: 1.25rem;
       }
 
-      .inline-section .form-lead {
-        margin: 0 0 1rem;
-        color: var(--color-mist);
-        font-size: 0.875rem;
+      .inline-section .inline-body {
+        margin-top: 1rem;
       }
 
       .inline-section[hidden] {
@@ -1209,7 +1185,13 @@
           key: 'D',
           name: 'Инлайн-секция внизу витрины',
           entry: 'раскрывающаяся строка под «Все лоты»',
-          surface: 'форма в потоке страницы, без модалки',
+          surface: 'форма в потоке страницы, две колонки полей',
+        },
+        {
+          key: 'E',
+          name: 'Инлайн-секция: форма слева, инфо справа',
+          entry: 'постоянная секция под «Все лоты», открыта всегда',
+          surface: 'форма слева, информация справа, без модалки',
         },
       ];
 
@@ -1248,29 +1230,24 @@
         'Комиссия биржи 7% ★ перекуп +10% ×15, дальше +1 ★ гамба до x10 · 20 спинов в день ★ вход 200/200/250 ★ ';
 
       const ERRORS = {
-        login: 'Сначала войди через Twitch — иначе награду не начислить. Поля никуда не денутся.',
-        empty: 'Нужна ссылка на видео или файл — без этого админу нечего смотреть.',
-        both: 'Оставь что-то одно: ссылку или файл.',
+        login:
+          'Сначала войди через Twitch — иначе награду не начислить и авторство не получить. Поля никуда не денутся.',
+        empty: 'Нужна ссылка на видео — без неё админу нечего смотреть.',
         title: 'Придумай название — по нему админ поймёт, о чём привет.',
         scheme: 'Ссылка должна начинаться с https://.',
         host: 'Ссылка не с той площадки. Принимаем Twitch clip, YouTube, streamable, medal.tv, VK и MemeAlerts.',
-        'file-type': 'Файл не похож на видео — принимаем webm или mp4.',
-        'file-size': 'Файл больше 25 МБ — не влезет. Подожми или пришли ссылку.',
       };
 
       const ERR_LABEL = {
         login: 'не вошёл',
-        empty: 'нет видео',
-        both: 'ссылка и файл сразу',
+        empty: 'нет ссылки',
         title: 'нет названия',
         scheme: 'не https',
         host: 'чужой хост',
-        'file-type': 'не видео',
-        'file-size': 'файл > 25 МБ',
       };
 
       const state = {
-        variant: 'A',
+        variant: 'E', // на открытии показываем победивший вариант
         who: 'guest',
         route: 'home', // только для варианта C: 'home' | 'lots' | 'suggest'
         overlay: null, // 'a' | 'b' | 'rules'
@@ -1284,7 +1261,7 @@
       const forms = {};
 
       function freshForm() {
-        return { title: '', url: '', comment: '', file: null, status: 'idle', error: null };
+        return { title: '', url: '', comment: '', status: 'idle', error: null };
       }
 
       function formOf(prefix) {
@@ -1303,17 +1280,12 @@
         );
       }
 
-      function fmtSize(bytes) {
-        if (!Number.isFinite(bytes)) return '';
-        const mb = bytes / (1024 * 1024);
-        return `${mb >= 10 ? mb.toFixed(0) : mb.toFixed(1)} МБ`;
-      }
-
       function activePrefix() {
         if (state.variant === 'A') return state.overlay === 'a' ? 'a' : null;
         if (state.variant === 'B') return state.overlay === 'b' ? 'b' : null;
         if (state.variant === 'C') return state.route === 'suggest' ? 'c' : null;
         if (state.variant === 'D') return state.dOpen ? 'd' : null;
+        if (state.variant === 'E') return 'e';
         return null;
       }
 
@@ -1322,6 +1294,11 @@
       const INSTRUCTION =
         '<p class="sg-instruction">Предлагаемое видео должно быть по смыслу похоже на уже существующие приветы — ' +
         'то, что не стыдно показать всему чату. Пример: «Массовый привет (коты одобряют)».</p>';
+
+      // Вариант E: инструкция — обычный текст в правой колонке, без callout и без примера.
+      const INSTRUCTION_PLAIN =
+        '<p class="sg-info-lead">Предлагаемое видео должно быть по смыслу похоже на уже существующие приветы — ' +
+        'то, что не стыдно показать всему чату.</p>';
 
       function noticeHTML(f) {
         if (f.status === 'loading') {
@@ -1351,7 +1328,7 @@
           return (
             '<div class="sg-actions">' +
             '<button type="button" class="btn-arcade btn-twitch" data-login>▶ Войти через Twitch</button>' +
-            '<p class="sg-hint">Гость может заполнить форму, но отправить — только после входа.</p>' +
+            '<p class="sg-hint">🔒 Войти через Twitch нужно, чтобы начислить награду и получить авторство</p>' +
             '</div>'
           );
         }
@@ -1365,29 +1342,14 @@
         );
       }
 
-      function waysHTML(f) {
-        const badUrl =
-          f.error === 'url' || f.error === 'scheme' || f.error === 'host' ? ' is-bad' : '';
-        const badFile = f.error === 'file-type' || f.error === 'file-size' ? ' is-bad' : '';
+      function urlFieldHTML(f) {
+        const badUrl = f.error === 'scheme' || f.error === 'host' ? ' is-bad' : '';
         const dis = f.status === 'loading' ? ' disabled' : '';
         return (
-          '<fieldset class="sg-way">' +
-          '<legend class="sg-legend"><span class="badge-pixel" style="background:var(--color-stream);color:var(--color-cream)">Способ 1</span> Ссылка на видео</legend>' +
+          '<label class="sg-field"><span class="sg-label">Ссылка на видео</span>' +
           `<input class="sg-input${badUrl}" data-f="url" type="text" inputmode="url" autocomplete="off"${dis} ` +
           `placeholder="https://clips.twitch.tv/..." value="${esc(f.url)}">` +
-          '<p class="sg-hint">Twitch clip / YouTube / streamable / MemeAlerts. Только https — и хосты из списка.</p>' +
-          '</fieldset>' +
-          '<p class="sg-or"><span>— или —</span></p>' +
-          '<fieldset class="sg-way">' +
-          '<legend class="sg-legend"><span class="badge-pixel" style="background:var(--color-ember);color:var(--color-milk)">Способ 2</span> Загрузить файл</legend>' +
-          '<div class="sg-file-row">' +
-          `<label class="btn-arcade btn-arcade-ghost sg-file-btn">Выбрать файл<input class="sg-file-input" type="file" data-f="file" accept="video/webm,video/mp4"${dis} hidden></label>` +
-          `<span class="sg-file-name${f.file ? '' : ' muted'}" data-file-name>${
-            f.file ? `${esc(f.file.name)} · ${fmtSize(f.file.size)}` : 'файл не выбран'
-          }</span>` +
-          '</div>' +
-          '<p class="sg-hint">webm / mp4, до 25 МБ. До принятия файл лежит в приватном хранилище. Файл или ссылка — что-то одно.</p>' +
-          '</fieldset>'
+          '<span class="sg-hint">Twitch clip / YouTube / MemeAlerts и т.д.</span></label>'
         );
       }
 
@@ -1406,46 +1368,37 @@
         const f = formOf(prefix);
         if (f.status === 'success') return successHTML(prefix);
         const dis = f.status === 'loading' ? ' disabled' : '';
-        const main =
-          INSTRUCTION +
-          noticeHTML(f) +
+        const title =
           '<label class="sg-field"><span class="sg-label">Название привета</span>' +
           `<input class="sg-input" data-f="title" type="text" maxlength="80" autocomplete="off"${dis} ` +
-          `placeholder="Массовый привет" value="${esc(f.title)}"></label>` +
-          (layout === 'inline'
-            ? '<label class="sg-field"><span class="sg-label">Комментарий <span class="muted">(не обязательно)</span></span>' +
-              `<textarea class="sg-input sg-textarea" data-f="comment" rows="2" placeholder="В этом VOD на 15:01 отличный привет"${dis}>${esc(
-                f.comment
-              )}</textarea></label>` +
-              '<p class="sg-note">🔒 Войти через Twitch нужно, чтобы начислить награду.</p>' +
-              actionsHTML(prefix)
-            : '');
-        const wide = layout === 'inline';
-        const ways = waysHTML(f);
-        const tail =
-          layout === 'inline'
-            ? ''
-            : '<label class="sg-field"><span class="sg-label">Комментарий <span class="muted">(не обязательно)</span></span>' +
-              `<textarea class="sg-input sg-textarea" data-f="comment" rows="2" placeholder="В этом VOD на 15:01 отличный привет"${dis}>${esc(
-                f.comment
-              )}</textarea></label>` +
-              '<p class="sg-note">🔒 Войти через Twitch нужно, чтобы начислить награду.</p>' +
-              actionsHTML(prefix);
+          `placeholder="Массовый привет" value="${esc(f.title)}"></label>`;
+        const comment =
+          '<label class="sg-field"><span class="sg-label">Комментарий <span class="muted">(не обязательно)</span></span>' +
+          `<textarea class="sg-input sg-textarea" data-f="comment" rows="2" placeholder="В этом VOD на 15:01 отличный привет"${dis}>${esc(
+            f.comment
+          )}</textarea></label>`;
+        const url = urlFieldHTML(f);
 
-        if (!wide) {
+        if (layout === 'inline') {
+          // Вариант D: две колонки — поля слева, ссылка справа.
           return (
-            `<form class="sg-form" data-form="${prefix}" novalidate ` +
-            `onsubmit="return false">` +
-            main +
-            ways +
-            tail +
+            `<form class="sg-form sg-form--wide" data-form="${prefix}" novalidate onsubmit="return false">` +
+            `<div class="sg-col">${INSTRUCTION}${noticeHTML(f)}${title}${comment}${actionsHTML(
+              prefix
+            )}</div>` +
+            `<div class="sg-col">${url}</div>` +
             '</form>'
           );
         }
+        // stack (A/B/C) и split (E): одна колонка полей; в split инструкция живёт в правой колонке.
         return (
-          `<form class="sg-form sg-form--wide" data-form="${prefix}" novalidate onsubmit="return false">` +
-          `<div class="sg-col">${main}</div>` +
-          `<div class="sg-col">${ways}</div>` +
+          `<form class="sg-form" data-form="${prefix}" novalidate onsubmit="return false">` +
+          (layout === 'split' ? '' : INSTRUCTION) +
+          noticeHTML(f) +
+          title +
+          url +
+          comment +
+          actionsHTML(prefix) +
           '</form>'
         );
       }
@@ -1462,38 +1415,22 @@
         }
         const url = form.querySelector('[data-f="url"]');
         if (url) {
-          url.classList.toggle(
-            'is-bad',
-            f.error === 'url' || f.error === 'scheme' || f.error === 'host'
-          );
-        }
-        const file = form.querySelector('[data-file-name]');
-        if (file) {
-          file.textContent = f.file ? `${f.file.name} · ${fmtSize(f.file.size)}` : 'файл не выбран';
-          file.classList.toggle('muted', !f.file);
+          url.classList.toggle('is-bad', f.error === 'scheme' || f.error === 'host');
         }
       }
 
       function validate(f) {
         const url = f.url.trim();
-        if (!url && !f.file) return 'empty';
-        if (url && f.file) return 'both';
+        if (!url) return 'empty';
         if (!f.title.trim()) return 'title';
-        if (url) {
-          if (!/^https:\/\//i.test(url)) return 'scheme';
-          let host = '';
-          try {
-            host = new URL(url).host.toLowerCase();
-          } catch {
-            return 'scheme';
-          }
-          if (!ALLOWED_HOSTS.includes(host)) return 'host';
+        if (!/^https:\/\//i.test(url)) return 'scheme';
+        let host = '';
+        try {
+          host = new URL(url).host.toLowerCase();
+        } catch {
+          return 'scheme';
         }
-        if (f.file) {
-          const ext = (f.file.name.split('.').pop() ?? '').toLowerCase();
-          if (ext !== 'webm' && ext !== 'mp4') return 'file-type';
-          if (f.file.size > 25 * 1024 * 1024) return 'file-size';
-        }
+        if (!ALLOWED_HOSTS.includes(host)) return 'host';
         return null;
       }
 
@@ -1625,8 +1562,35 @@
           '</button></p>' +
           `<section class="card-pixel inline-section"${open ? '' : ' hidden'} aria-label="Предложить привет">` +
           '<h3 class="display h3">Предложить привет</h3>' +
-          '<p class="form-lead">Пришли видео — если привет зайдёт, он станет лотом на бирже.</p>' +
-          formHTML('d', 'inline') +
+          `<div class="inline-body">${formHTML('d', 'inline')}</div>` +
+          '</section>'
+        );
+      }
+
+      // Вариант E: постоянная инлайн-секция под «Все лоты» — слева форма, справа информация.
+      function infoColumnE() {
+        const nick = state.who === 'chatter' ? '@nyanyachos' : '<ник>';
+        return (
+          INSTRUCTION_PLAIN +
+          '<div class="sg-info-card">🍺 За принятый привет начисляются Пивкойны.</div>' +
+          '<div class="sg-info-card">✍️ В карточке лота будешь указан как „Привет добавил: ' +
+          `${esc(nick)}“.</div>`
+        );
+      }
+
+      function inlineSectionE() {
+        const f = formOf('e');
+        const body =
+          f.status === 'success'
+            ? successHTML('e')
+            : '<div class="sg-split">' +
+              formHTML('e', 'split') +
+              `<aside class="sg-info" aria-label="Что важно знать о заявке">${infoColumnE()}</aside>` +
+              '</div>';
+        return (
+          '<section class="card-pixel inline-section" aria-label="Предложить привет">' +
+          '<h3 class="display h3">Предложить привет</h3>' +
+          `<div class="inline-body">${body}</div>` +
           '</section>'
         );
       }
@@ -1646,6 +1610,7 @@
           `<div class="grid grid-3">${LOTS.map(lotCard).join('')}</div>` +
           (state.variant === 'A' ? entryHTMLA() : '') +
           (state.variant === 'D' ? entryHTMLD() : '') +
+          (state.variant === 'E' ? inlineSectionE() : '') +
           '</section>'
         );
       }
@@ -1856,7 +1821,8 @@
           a: 'модалка на витрине',
           b: 'модалка в два шага',
           c: 'страница /suggest/',
-          d: 'инлайн-секция',
+          d: 'инлайн-секция, две колонки полей',
+          e: 'инлайн-секция, форма + инфо',
         }[prefix];
         parts.push(`форма: ${where}`);
         if (prefix === 'b' && state.bStep === 1) {
@@ -1898,7 +1864,6 @@
               chip('loading', '⏳ отправка', 'Показать загрузку: кнопка disabled') +
               chip('nologin', '⚠ не вошёл', 'Показать ошибку «не вошёл»') +
               chip('badlink', '⚠ ссылка', 'Подставить чужой хост и показать ошибку') +
-              chip('bigfile', '⚠ файл 30 МБ', 'Подставить файл 30 МБ и показать ошибку лимита') +
               chip('reset', '⟲ сброс', 'Очистить форму') +
               '</div>'
             : '') +
@@ -1988,8 +1953,10 @@
 
       function ensureOpen() {
         if (state.variant === 'A') state.overlay = 'a';
-        else if (state.variant === 'B') state.overlay = 'b';
-        else if (state.variant === 'C') state.route = 'suggest';
+        else if (state.variant === 'B') {
+          state.overlay = 'b';
+          state.bStep = 2; // панель состояний открывает сразу форму, а не шаг «что считается приветом»
+        } else if (state.variant === 'C') state.route = 'suggest';
         else if (state.variant === 'D') state.dOpen = true;
       }
 
@@ -2037,17 +2004,8 @@
           const f = formOf(activePrefix());
           f.status = 'idle';
           f.url = 'https://example.com/privet.mp4';
-          f.file = null;
           f.error = 'host';
           state.lastEvent = 'ошибка: чужой хост ссылки';
-        },
-        bigfile() {
-          const f = formOf(activePrefix());
-          f.status = 'idle';
-          f.url = '';
-          f.file = { name: 'bolshoy_privet.webm', size: 31 * 1024 * 1024 };
-          f.error = 'file-size';
-          state.lastEvent = 'ошибка: файл 30 МБ > 25 МБ';
         },
         reset() {
           const prefix = activePrefix();
@@ -2208,19 +2166,6 @@
           const ev = document.querySelector('[data-proto-event]');
           if (ev) ev.textContent = `последнее: ${state.lastEvent}`;
         }
-      });
-
-      document.addEventListener('change', (event) => {
-        const el = event.target;
-        if (!(el instanceof HTMLInputElement)) return;
-        if (el.dataset.f !== 'file') return;
-        const form = el.closest('form[data-form]');
-        if (!form) return;
-        const f = formOf(form.dataset.form);
-        const file = el.files && el.files[0];
-        f.file = file ? { name: file.name, size: file.size } : null;
-        f.error = null;
-        paintForm(form.dataset.form);
       });
 
       document.addEventListener('keydown', (event) => {
