@@ -1,0 +1,321 @@
+---
+// Заявка на привет — вариант E прототипа (scratch/suggest-greeting/prototype/
+// suggest-greeting-ui.html): тихая ссылка под «Все лоты» раскрывает инлайн-
+// секцию «форма слева, инфо справа» (на узком — одна колонка), по умолчанию
+// свёрнута. Запись — прямой INSERT в submissions под RLS (lib/submissions.ts),
+// автора/статус/связи ставит BEFORE-триггер. Гость может заполнить поля, но
+// вместо отправки видит вход через Twitch (нужен для награды и авторства).
+const INFO_LEAD =
+  'Предлагаемое видео должно быть по смыслу похоже на уже существующие приветы — то, что не стыдно показать всему чату.';
+const NOTICE_CLASS = 'border-2 border-milk bg-void px-3 py-2 text-sm font-bold';
+const FIELD_CLASS =
+  'min-h-11 w-full rounded border-2 border-milk bg-cream px-3 py-2 text-milk disabled:opacity-60';
+---
+
+<div data-sg-root>
+  <p class="mt-5">
+    <button
+      type="button"
+      data-sg-toggle
+      aria-expanded="false"
+      aria-controls="sg-panel"
+      class="cursor-pointer font-bold text-mist underline decoration-dotted underline-offset-[3px] hover:text-milk hover:decoration-solid"
+    >
+      <span data-sg-toggle-text>Не нашёл свой привет? Предложи →</span>
+    </button>
+  </p>
+
+  <section
+    id="sg-panel"
+    data-sg-panel
+    aria-label="Предложить привет"
+    class="card-pixel mt-5 hidden p-5"
+  >
+    <h3 class="font-display text-[11px] leading-relaxed uppercase">Предложить привет</h3>
+
+    <div data-sg-split class="mt-4 grid gap-6 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+      <form data-sg-form novalidate class="grid content-start gap-4">
+        <div data-sg-notice role="status" class={NOTICE_CLASS + ' hidden'}></div>
+
+        <label class="grid gap-1.5">
+          <span class="text-xs font-black uppercase">Название привета</span>
+          <input
+            data-sg-title
+            type="text"
+            maxlength="80"
+            autocomplete="off"
+            placeholder="Массовый привет"
+            class={FIELD_CLASS}
+          />
+        </label>
+
+        <label class="grid gap-1.5">
+          <span class="text-xs font-black uppercase">Ссылка на видео</span>
+          <input
+            data-sg-url
+            type="text"
+            inputmode="url"
+            maxlength="2048"
+            autocomplete="off"
+            placeholder="https://clips.twitch.tv/..."
+            class={FIELD_CLASS}
+          />
+          <span class="text-xs font-bold text-mist">Twitch clip / YouTube / MemeAlerts и т.д.</span>
+        </label>
+
+        <label class="grid gap-1.5">
+          <span class="text-xs font-black uppercase">
+            Комментарий <span class="font-bold text-mist normal-case">(не обязательно)</span>
+          </span>
+          <textarea
+            data-sg-comment
+            rows="2"
+            maxlength="500"
+            placeholder="В этом VOD на 15:01 отличный привет"
+            class="min-h-16 w-full resize-y rounded border-2 border-milk bg-cream px-3 py-2 text-milk disabled:opacity-60"
+          ></textarea>
+        </label>
+
+        <div class="flex flex-wrap items-center gap-3">
+          <div data-sg-guest class="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              data-sg-login
+              class="btn-arcade bg-twitch px-4 py-3 text-sm text-white"
+            >
+              ▶ Войти через Twitch
+            </button>
+            <p class="basis-48 flex-1 text-xs font-bold text-mist">
+              🔒 Войти через Twitch нужно, чтобы начислить награду и получить авторство
+            </p>
+          </div>
+          <div data-sg-user class="hidden">
+            <button
+              type="submit"
+              data-sg-submit
+              class="btn-arcade btn-arcade-primary px-4 py-3 text-sm"
+            >
+              Отправить заявку
+            </button>
+          </div>
+        </div>
+      </form>
+
+      <aside aria-label="Что важно знать о заявке" class="grid content-start gap-4">
+        <p class="text-sm font-bold">{INFO_LEAD}</p>
+        <div class="rounded border-2 border-milk bg-void px-3 py-2 text-sm font-bold">
+          🍺 За принятый привет начисляются Пивкойны.
+        </div>
+        <div class="rounded border-2 border-milk bg-void px-3 py-2 text-sm font-bold">
+          ✍️ В карточке лота будешь указан как „Привет добавил:{' '}
+          <span data-sg-nick>&lt;ник&gt;</span>“.
+        </div>
+      </aside>
+    </div>
+
+    <div data-sg-success role="status" tabindex="-1" class="mt-4 hidden">
+      <div class="grid justify-items-start gap-3 border-2 border-pivko bg-void p-4">
+        <p data-sg-success-title class="font-display text-sm leading-relaxed"></p>
+        <p class="text-sm font-bold">
+          Админ посмотрит видео и решит. Придёт принятие — награда капнет в Пивкойны. Статус заявок
+          на сайте пока не показываем — это отдельный разговор.
+        </p>
+        <button type="button" data-sg-reset class="btn-arcade btn-arcade-ghost px-4 py-2 text-xs">
+          Отправить ещё одну
+        </button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+  import {
+    getSupabase,
+    isSupabaseConfigured,
+    displayLogin,
+    signInWithTwitch,
+  } from '@/lib/supabase';
+  import {
+    submitSubmission,
+    submissionErrorText,
+    validateSubmissionInput,
+    type SubmissionErrorKind,
+  } from '@/lib/submissions';
+
+  const root = document.querySelector('[data-sg-root]');
+  const toggle = root?.querySelector('[data-sg-toggle]');
+  const toggleText = root?.querySelector('[data-sg-toggle-text]');
+  const panel = root?.querySelector('[data-sg-panel]');
+  const split = root?.querySelector('[data-sg-split]');
+  const form = root?.querySelector('[data-sg-form]');
+  const notice = root?.querySelector('[data-sg-notice]');
+  const guestActions = root?.querySelector('[data-sg-guest]');
+  const userActions = root?.querySelector('[data-sg-user]');
+  const loginBtn = root?.querySelector('[data-sg-login]');
+  const submitBtn = root?.querySelector('[data-sg-submit]');
+  const success = root?.querySelector('[data-sg-success]');
+  const successTitle = root?.querySelector('[data-sg-success-title]');
+  const resetBtn = root?.querySelector('[data-sg-reset]');
+  const nickEl = root?.querySelector('[data-sg-nick]');
+  const titleInput = root?.querySelector('[data-sg-title]');
+  const urlInput = root?.querySelector('[data-sg-url]');
+  const commentInput = root?.querySelector('[data-sg-comment]');
+
+  let authed = false;
+  let panelOpen = false;
+  let sending = false;
+
+  function inputValue(el: Element | null): string {
+    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return el.value;
+    return '';
+  }
+
+  function openPanel(open: boolean): void {
+    panelOpen = open;
+    panel?.classList.toggle('hidden', !open);
+    if (toggleText instanceof HTMLElement) {
+      toggleText.textContent = open
+        ? 'Не нашёл свой привет? Сверни ↑'
+        : 'Не нашёл свой привет? Предложи →';
+    }
+    toggle?.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+
+  function setNotice(mode: 'hidden' | 'loading' | 'error', text = ''): void {
+    if (!(notice instanceof HTMLElement)) return;
+    notice.classList.toggle('hidden', mode === 'hidden');
+    notice.classList.toggle('border-melon', mode === 'error');
+    notice.classList.toggle('text-melon', mode === 'error');
+    notice.classList.toggle('border-milk', mode !== 'error');
+    if (mode === 'hidden') {
+      notice.textContent = '';
+      return;
+    }
+    if (mode === 'loading') {
+      notice.setAttribute('role', 'status');
+      notice.textContent = '';
+      const line = document.createElement('b');
+      line.textContent = 'Отправляем заявку…';
+      const bar1 = document.createElement('span');
+      bar1.className = 'skeleton-block mt-2 block h-2.5 w-full';
+      const bar2 = document.createElement('span');
+      bar2.className = 'skeleton-block mt-2 block h-2.5 w-2/5';
+      notice.append(line, bar1, bar2);
+      return;
+    }
+    notice.setAttribute('role', 'alert');
+    notice.textContent = text;
+  }
+
+  function markUrlError(kind: SubmissionErrorKind | null): void {
+    if (!(urlInput instanceof HTMLInputElement)) return;
+    const bad =
+      kind === 'scheme' || kind === 'host' || kind === 'url-too-long' || kind === 'empty-url';
+    urlInput.classList.toggle('border-melon', bad);
+    urlInput.classList.toggle('border-milk', !bad);
+  }
+
+  function setBusy(busy: boolean): void {
+    if (titleInput instanceof HTMLInputElement) titleInput.disabled = busy;
+    if (urlInput instanceof HTMLInputElement) urlInput.disabled = busy;
+    if (commentInput instanceof HTMLTextAreaElement) commentInput.disabled = busy;
+    if (submitBtn instanceof HTMLButtonElement) {
+      submitBtn.disabled = busy;
+      submitBtn.textContent = busy ? '⏳ Отправляем…' : 'Отправить заявку';
+    }
+  }
+
+  function setAuth(login: string | null): void {
+    authed = login !== null;
+    guestActions?.classList.toggle('hidden', authed);
+    userActions?.classList.toggle('hidden', !authed);
+    if (nickEl instanceof HTMLElement) nickEl.textContent = authed ? `@${login}` : '<ник>';
+  }
+
+  function clearFields(): void {
+    if (titleInput instanceof HTMLInputElement) titleInput.value = '';
+    if (urlInput instanceof HTMLInputElement) urlInput.value = '';
+    if (commentInput instanceof HTMLTextAreaElement) commentInput.value = '';
+  }
+
+  function showSuccess(id: number): void {
+    clearFields();
+    if (successTitle instanceof HTMLElement) {
+      successTitle.textContent = `Заявка #${id} улетела админу`;
+    }
+    split?.classList.add('hidden');
+    success?.classList.remove('hidden');
+    if (success instanceof HTMLElement) success.focus();
+  }
+
+  function showForm(): void {
+    clearFields();
+    markUrlError(null);
+    setNotice('hidden');
+    success?.classList.add('hidden');
+    split?.classList.remove('hidden');
+    setBusy(false);
+    if (titleInput instanceof HTMLInputElement) titleInput.focus();
+  }
+
+  async function handleSubmit(): Promise<void> {
+    if (!authed) {
+      setNotice('error', submissionErrorText('unauthenticated'));
+      return;
+    }
+    if (sending) return;
+    const input = {
+      title: inputValue(titleInput),
+      video_url: inputValue(urlInput),
+      comment: inputValue(commentInput),
+    };
+    const clientError = validateSubmissionInput(input);
+    if (clientError) {
+      markUrlError(clientError);
+      setNotice('error', submissionErrorText(clientError));
+      return;
+    }
+    markUrlError(null);
+    sending = true;
+    setBusy(true);
+    setNotice('loading');
+    const result = await submitSubmission(input);
+    sending = false;
+    setBusy(false);
+    if (result.status === 'ok') {
+      showSuccess(result.id);
+      return;
+    }
+    markUrlError(result.kind);
+    setNotice('error', submissionErrorText(result.kind));
+  }
+
+  toggle?.addEventListener('click', () => openPanel(!panelOpen));
+
+  loginBtn?.addEventListener('click', () => {
+    if (!isSupabaseConfigured()) {
+      setNotice('error', 'Вход пока спит — человек ещё не вбил ключи (см. .env.example).');
+      return;
+    }
+    void signInWithTwitch();
+  });
+
+  form?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    void handleSubmit();
+  });
+
+  resetBtn?.addEventListener('click', () => showForm());
+
+  if (isSupabaseConfigured()) {
+    const sb = getSupabase();
+    void sb?.auth.getSession().then(({ data }) => {
+      setAuth(data.session ? displayLogin(data.session.user) : null);
+    });
+    sb?.auth.onAuthStateChange((_event, session) => {
+      setAuth(session ? displayLogin(session.user) : null);
+    });
+  } else {
+    setAuth(null);
+  }
+</script>

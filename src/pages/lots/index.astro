@@ -3,6 +3,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 import LotCard from '@/components/LotCard.astro';
 import LotCardSkeleton from '@/components/LotCardSkeleton.astro';
 import BuyModal from '@/components/BuyModal.astro';
+import SuggestGreeting from '@/components/SuggestGreeting.astro';
 
 // Витрина — каркас: карточек в HTML нет, сетку целиком рисует клиент из БД
 // (см. docs/adr/0002). Шаблон карточки — единственный источник разметки.
@@ -48,6 +49,8 @@ import BuyModal from '@/components/BuyModal.astro';
         <LotCardSkeleton />
       ))}
     </div>
+
+    <SuggestGreeting />
   </section>
 
   <BuyModal />
