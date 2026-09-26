@@ -11,6 +11,7 @@
 - Правила проекта: математика из одних рук (меняешь механику — обнови витрину и `CONTEXT.md`); денежный гейт серверный; схема — только миграциями с грантами по шаблону `docs/agents/supabase.md`; контент лотов — `content/lots.toml` + `just lots-sync`.
 - Админ — владелец проекта: решения по месту в UI, экономике и текстам — за ним (HITL).
 - Скиллы по тикетам: `research` (AFK, отчёты в `scratch/suggest-greeting/research/`), `prototype`, `grilling` + `domain-modeling`.
+- Спека собрана — [`spec.md`](spec.md) (`ready-for-agent`); реализация нарезана на вертикальные тикеты `issues/08…13` (frontier — 08; 09 и 10 ждут 08).
 
 ## Decisions so far
 
