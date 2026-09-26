@@ -2,33 +2,14 @@
  * Заявки на привет: клиентский шов к public.submissions (тикет 08).
  *
  * Путь записи — прямой INSERT под RLS (паттерн покупок): клиент шлёт только
- * пользовательские поля (title/video_url/comment), а автора, статус, связи и
- * нормализацию ссылки считает BEFORE-триггер enforce_submission_rules
- * (supabase/migrations/20260926130000_submissions.sql). Здесь — клиентская
- * проверка «для UX» и маппинг ошибок сервера на дружелюбные тексты; источник
- * истины — сервер, обход браузера ничего не даёт.
+ * пользовательские поля (title/video_url/comment), а автора, статус и связи
+ * считает BEFORE-триггер enforce_submission_rules
+ * (supabase/migrations/20260926130000_submissions.sql). Ссылку принимаем как
+ * есть: её пригодность смотрит человек при приёме (проверок схемы и площадки
+ * нет). Здесь — клиентская проверка «для UX» и маппинг ошибок сервера на
+ * дружелюбные тексты; источник истины — сервер, обход браузера ничего не даёт.
  */
 import { getSupabase } from './supabase';
-
-/**
- * Хосты, которые принимает сервер (allowlist из research/video-upload-safety.md
- * §7). Зеркало списка c_hosts в enforce_submission_rules — правим парой.
- */
-export const SUBMISSION_ALLOWED_HOSTS = [
-  'clips.twitch.tv',
-  'twitch.tv',
-  'www.twitch.tv',
-  'youtube.com',
-  'www.youtube.com',
-  'youtu.be',
-  'streamable.com',
-  'www.streamable.com',
-  'medal.tv',
-  'www.medal.tv',
-  'vk.com',
-  'vkvideo.ru',
-  'cdns.memealerts.com',
-] as const;
 
 export const SUBMISSION_TITLE_MAX = 80;
 export const SUBMISSION_COMMENT_MAX = 500;
@@ -40,8 +21,6 @@ export type SubmissionErrorKind =
   | 'session-expired'
   | 'empty-url'
   | 'empty-title'
-  | 'scheme'
-  | 'host'
   | 'title-too-long'
   | 'comment-too-long'
   | 'url-too-long'
@@ -56,8 +35,6 @@ const ERROR_TEXT: Record<SubmissionErrorKind, string> = {
   'session-expired': 'Сессия истекла — войди через Twitch заново.',
   'empty-url': 'Нужна ссылка на видео — без неё админу нечего смотреть.',
   'empty-title': 'Придумай название — по нему админ поймёт, о чём привет.',
-  scheme: 'Ссылка должна начинаться с https://.',
-  host: 'Ссылка не с той площадки. Принимаем Twitch clip, YouTube, streamable, medal.tv, VK и MemeAlerts.',
   'title-too-long': `Название слишком длинное — до ${SUBMISSION_TITLE_MAX} символов.`,
   'comment-too-long': `Комментарий слишком длинный — до ${SUBMISSION_COMMENT_MAX} символов.`,
   'url-too-long': `Ссылка слишком длинная — до ${SUBMISSION_URL_MAX} символов.`,
@@ -68,30 +45,6 @@ const ERROR_TEXT: Record<SubmissionErrorKind, string> = {
 
 export function submissionErrorText(kind: SubmissionErrorKind): string {
   return ERROR_TEXT[kind];
-}
-
-/** Проверка ссылки для UX (не источник истины): пусто / не https / чужой хост. */
-export type SubmissionUrlCheck =
-  { ok: true; url: string } | { ok: false; kind: 'empty-url' | 'scheme' | 'host' };
-
-export function checkSubmissionUrl(raw: string): SubmissionUrlCheck {
-  const value = raw.trim();
-  if (!value) return { ok: false, kind: 'empty-url' };
-  let url: URL;
-  try {
-    url = new URL(value);
-  } catch {
-    return { ok: false, kind: 'scheme' };
-  }
-  if (url.protocol !== 'https:') return { ok: false, kind: 'scheme' };
-  // userinfo (логин@) и нестандартный порт сервер тоже отклоняет.
-  if (url.username || url.password) return { ok: false, kind: 'host' };
-  if (url.port && url.port !== '443') return { ok: false, kind: 'host' };
-  const host = url.hostname.toLowerCase();
-  if (!(SUBMISSION_ALLOWED_HOSTS as readonly string[]).includes(host)) {
-    return { ok: false, kind: 'host' };
-  }
-  return { ok: true, url: value };
 }
 
 /** Пользовательский ввод формы (сырые значения полей). */
@@ -105,13 +58,12 @@ const charLength = (value: string): number => [...value].length;
 
 /**
  * Клиентская проверка формы: ошибка или null. Сервер проверяет то же самое
- * заново — здесь только чтобы не гонять заведомо плохую заявку.
+ * заново — здесь только чтобы не гонять заведомо плохую заявку. Ссылка — только
+ * «не пусто» и длина: формат/площадку смотрит человек при приёме.
  */
 export function validateSubmissionInput(input: SubmissionInput): SubmissionErrorKind | null {
   if (!input.video_url.trim()) return 'empty-url';
   if (!input.title.trim()) return 'empty-title';
-  const url = checkSubmissionUrl(input.video_url);
-  if (!url.ok) return url.kind;
   if (charLength(input.title.trim()) > SUBMISSION_TITLE_MAX) return 'title-too-long';
   if (charLength(input.video_url.trim()) > SUBMISSION_URL_MAX) return 'url-too-long';
   if (charLength(input.comment.trim()) > SUBMISSION_COMMENT_MAX) return 'comment-too-long';
@@ -145,8 +97,6 @@ function mapSubmissionError(err: unknown): SubmissionErrorKind {
   }
   if (low.includes('video url required')) return 'empty-url';
   if (low.includes('title required')) return 'empty-title';
-  if (low.includes('must be https')) return 'scheme';
-  if (low.includes('host not allowed')) return 'host';
   if (low.includes('title too long')) return 'title-too-long';
   if (low.includes('comment too long')) return 'comment-too-long';
   if (low.includes('video url too long')) return 'url-too-long';

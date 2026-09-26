@@ -210,8 +210,7 @@ const FIELD_CLASS =
 
   function markUrlError(kind: SubmissionErrorKind | null): void {
     if (!(urlInput instanceof HTMLInputElement)) return;
-    const bad =
-      kind === 'scheme' || kind === 'host' || kind === 'url-too-long' || kind === 'empty-url';
+    const bad = kind === 'url-too-long' || kind === 'empty-url';
     urlInput.classList.toggle('border-melon', bad);
     urlInput.classList.toggle('border-milk', !bad);
   }
