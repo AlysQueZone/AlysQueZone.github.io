@@ -74,7 +74,7 @@ chatters-sync *args:
 
 # Приём заявки на привет: id -> скачивание -> медиа -> карточка -> синк -> лот.
 # Безопасный первый заход: just submission 12 --check (скачает и покажет, стоп).
-# Полный проход: just submission 12
+# Полный проход: just submission 12; --force — осознанный обход дубль-гейта.
 submission *args:
     python3 scripts/submission.py {{args}}
 

@@ -11,6 +11,7 @@
   python3 scripts/submission.py fetch 12           # скачать и собрать медиа, СТОП
   python3 scripts/submission.py accept 12 --check  # то же (алиас fetch)
   python3 scripts/submission.py accept 12          # полный путь до лота на витрине
+  python3 scripts/submission.py accept 12 --force  # обойти дубль-гейт осознанно
   python3 scripts/submission.py reject 12                     # статус rejected
   python3 scripts/submission.py reject 12 --status duplicate  # статус duplicate
   python3 scripts/submission.py reward 12          # выплатить награду по принятой (идемпотентно)
@@ -18,10 +19,10 @@
 Шаги accept: заявка -> yt-dlp во временную папку -> ffmpeg-тройка по
 docs/agents/media-pipeline.md -> storage_upload.py в videos/<slug> -> [[lots]]
 в content/lots.toml -> lots_sync.py -> RPC accept_submission -> выплата награды
-(RPC pay_submission_reward). Заголовок берётся
-из заявки с резолвом ника по реестру content/chatters.toml; слаг — новый
-уникальный, привязан к номеру заявки (повторный прогон переиспользует свой).
-Отказ ничего не публикует и не платит.
+(RPC pay_submission_reward). Заголовок и ник автора берутся из заявки с
+резолвом по реестру content/chatters.toml; слаг — новый уникальный, привязан
+к номеру заявки (повторный прогон переиспользует свой). Дубль-гейт —
+авто-стоп, обходится флагом --force. Отказ ничего не публикует и не платит.
 
 Ключ и ref: env SUPABASE_SERVICE_ROLE_KEY (алиасы SUPABASE_SECRET_KEY,
 SERVICE_ROLE_KEY) и PUBLIC_SUPABASE_URL, иначе те же имена из .env файла.
@@ -251,6 +252,40 @@ def alias_hint(replaced, nick):
     )
 
 
+def resolve_author(login, registry):
+    """Канон ника автора заявки по его login из заявки (правило chatters.md).
+
+    Возвращает (nick, candidates): nick — канон из реестра; candidates —
+    список кандидатов, если совпадение неоднозначно (решает человек); при
+    отсутствии совпадений (None, []) — оставляем снимок ника из заявки
+    (server-side `accept_submission` его и подставит).
+    """
+    if not login:
+        return None, []
+    sq = squash(login)
+    exact = {}
+    for c in registry:
+        if any(squash(v) == sq for v in variants(c)):
+            exact[c["nick"]] = c
+    if len(exact) == 1:
+        return next(iter(exact.values()))["nick"], []
+    if len(exact) > 1:
+        return None, sorted(exact)
+
+    partial = {}
+    for c in registry:
+        for v in variants(c):
+            sv = squash(v)
+            if len(sv) >= 4 and sv in sq:
+                partial[c["nick"]] = c
+                break
+    if len(partial) == 1:
+        return next(iter(partial.values()))["nick"], []
+    if len(partial) > 1:
+        return None, sorted(partial)
+    return None, []
+
+
 # ---------------------------------------------------------------------------
 # Слаг
 # ---------------------------------------------------------------------------
@@ -275,14 +310,15 @@ def manifest_info(path):
     return out
 
 
-def choose_slug(explicit, sub, taken, manifest):
+def choose_slug(explicit, sub, taken):
     """Слаг привязан к заявке.
 
     Базовый слаг всегда включает id заявки, поэтому он уникален для заявки:
     повторный прогон ТОЙ ЖЕ заявки находит свой слаг в манифесте/БД и
     переиспользует его, а разные заявки (даже один автор с одинаковым
-    заголовком) получают разные лоты. Совпадение с уже существующим слагом
-    считаем прошлым прогоном этой же заявки, а не коллизией.
+    заголовком) получают разные лоты. Для явного `--slug` проверяем коллизию
+    и по БД (`taken` — слаги лотов), и по `content/lots.toml` (вызывающий
+    складывает оба источника в `taken`).
     """
     if explicit:
         if explicit in taken:
@@ -298,10 +334,33 @@ def choose_slug(explicit, sub, taken, manifest):
 # ---------------------------------------------------------------------------
 
 
+TRACKING_QUERY_KEYS = ("si", "igsh")
+
+
 def normalized_url(url):
+    """Сравнительный ключ ссылки — как серверная нормализация заявок.
+
+    Сервер (20260926130000_submissions.sql) хранит ссылку как lower-case host
+    без fragment, выкидывая из query только трекинг utm_*/si/igsh. Повторяем
+    это, а не выбрасываем query целиком: иначе разные видео YouTube
+    (watch?v=AAA и watch?v=BBB) считались бы одним клипом и дубль-гейт ложно
+    блокировал бы любые две такие заявки. Возвращает (host, path, query) или
+    (None, None, None) для пустой/неразбираемой ссылки.
+    """
     try:
-        parts = urllib.parse.urlsplit(url or "")
-        return (parts.scheme.lower(), parts.netloc.lower(), parts.path.rstrip("/"))
+        parts = urllib.parse.urlsplit((url or "").strip())
+        host = parts.hostname
+        if not parts.scheme or not host:
+            return (None, None, None)
+        kept = []
+        for pair in parts.query.split("&"):
+            if not pair:
+                continue
+            key = pair.split("=", 1)[0].lower()
+            if key == "" or key.startswith("utm_") or key in TRACKING_QUERY_KEYS:
+                continue
+            kept.append(pair)
+        return (host, parts.path.rstrip("/"), "&".join(kept))
     except ValueError:
         return (None, None, None)
 
@@ -537,12 +596,16 @@ def run_lots_sync(cfg):
         raise SystemExit("lots_sync.py завершился с кодом %d" % proc.returncode)
 
 
-def call_accept(cfg, sid, lot_id):
+def call_accept(cfg, sid, lot_id, author_login=None):
+    """RPC приёма; author_login — канон ника из реестра (None — снимок заявки)."""
+    payload = {"p_submission_id": sid, "p_lot_id": lot_id}
+    if author_login:
+        payload["p_author_login"] = author_login
     status, body = rest_request(
         cfg.key,
         "POST",
         "%s/rest/v1/rpc/accept_submission" % cfg.base,
-        {"p_submission_id": sid, "p_lot_id": lot_id},
+        payload,
     )
     if status not in (200, 204):
         raise SystemExit("accept_submission #%d: %s %s" % (sid, status, body))
@@ -593,10 +656,11 @@ def call_reject(cfg, sid, status_name):
 # ---------------------------------------------------------------------------
 
 
-def suggest_title(sub, explicit):
+def suggest_title(sub, explicit, registry=None):
     if explicit:
         return explicit, None, [], "manual", []
-    registry = load_registry(os.path.join(root_dir(), "content", "chatters.toml"))
+    if registry is None:
+        registry = load_registry(os.path.join(root_dir(), "content", "chatters.toml"))
     return resolve_title(sub.get("title") or "", registry)
 
 
@@ -606,34 +670,64 @@ def stop_ambiguous(candidates):
     return EXIT_GATE
 
 
+def stop_author_ambiguous(candidates):
+    say("STOP: ник автора неоднозначен — кандидаты: %s" % ", ".join(candidates))
+    say('Спроси человека и передай готовый ник: --author "…"')
+    return EXIT_GATE
+
+
+def duplicate_mark(other):
+    """Подпись решённой заявки для доклада о дубликате."""
+    return "принята" if other.get("status") == "accepted" else "отклонена как дубликат"
+
+
 def prepare(cfg, sub, args):
-    """Локальная подготовка: заголовок, слаг, скачивание, медиа-тройка."""
-    title, nick, candidates, kind, replaced = suggest_title(sub, args.title)
+    """Локальная подготовка: заголовок, автор, слаг, скачивание, медиа-тройка."""
+    registry = load_registry(os.path.join(cfg.root, "content", "chatters.toml"))
+    title, nick, candidates, kind, replaced = suggest_title(sub, args.title, registry)
     if candidates:
         return None, stop_ambiguous(candidates)
 
+    author = args.author
+    if not author:
+        author, author_candidates = resolve_author(
+            sub.get("author_login") or "", registry
+        )
+        if author_candidates:
+            return None, stop_author_ambiguous(author_candidates)
+
     existing = fetch_lots(cfg)
     dup_url, dup_title = find_duplicates(sub, existing)
-    if dup_url:
+    if dup_url and not args.force:
         say("STOP: этот клип уже на бирже — дубликат.")
         for lot in dup_url:
             say("  %s — %s" % (lot["slug"], lot["title"]))
         say("Откажи командой: just submission-reject %d --status duplicate" % sub["id"])
         return None, EXIT_GATE
+    if dup_url:
+        say("ВНИМАНИЕ: ссылка уже есть на бирже — публикую принудительно (--force):")
+        for lot in dup_url:
+            say("  %s — %s" % (lot["slug"], lot["title"]))
+
     dup_decided = find_decided_duplicates(
         sub, fetch_decided_submissions(cfg, sub["id"])
     )
-    if dup_decided:
+    if dup_decided and not args.force:
         say("STOP: на этот клип уже есть решённая заявка — дубликат.")
         for other in dup_decided:
-            mark = (
-                "принята"
-                if other.get("status") == "accepted"
-                else "отклонена как дубликат"
+            say(
+                "  заявка #%s — %s (%s)"
+                % (other["id"], other.get("title"), duplicate_mark(other))
             )
-            say("  заявка #%s — %s (%s)" % (other["id"], other.get("title"), mark))
         say("Откажи командой: just submission-reject %d --status duplicate" % sub["id"])
         return None, EXIT_GATE
+    if dup_decided:
+        say("ВНИМАНИЕ: на ссылку уже есть решённая заявка — публикую (--force):")
+        for other in dup_decided:
+            say(
+                "  заявка #%s — %s (%s)"
+                % (other["id"], other.get("title"), duplicate_mark(other))
+            )
     if dup_title:
         say("ВНИМАНИЕ: лот с точно таким названием уже есть — проверь на дубликат:")
         for lot in dup_title:
@@ -654,15 +748,29 @@ def prepare(cfg, sub, args):
     if hint:
         say(hint)
 
+    if args.author:
+        say("Автор: %s (задан вручную)" % author)
+    elif author:
+        say("Автор по реестру: %s" % author)
+    else:
+        say("Автор в реестре не найден — оставляю снимок из заявки.")
+
     manifest_path = os.path.join(cfg.root, "content", "lots.toml")
     manifest = manifest_info(manifest_path)
-    slug = choose_slug(args.slug, sub, {lot["slug"] for lot in existing}, manifest)
+    taken = {lot["slug"] for lot in existing} | set(manifest)
+    slug = choose_slug(args.slug, sub, taken)
     say("Слаг: %s" % slug)
 
     workdir = args.workdir or os.path.join("/tmp", "alysque-submission-%d" % sub["id"])
     source = download_video(sub["video_url"], workdir)
     triple = build_triple(source, workdir, slug)
-    return {"title": title, "slug": slug, "workdir": workdir, "triple": triple}, None
+    return {
+        "title": title,
+        "author": author,
+        "slug": slug,
+        "workdir": workdir,
+        "triple": triple,
+    }, None
 
 
 def print_review(ctx):
@@ -674,6 +782,8 @@ def print_review(ctx):
         say("  медиа:    %s (%.1f МБ)" % (path, size / (1 << 20)))
     say("  слаг:     %s" % ctx["slug"])
     say("  заголовок: %s" % ctx["title"])
+    if ctx.get("author"):
+        say("  автор:     %s" % ctx["author"])
     say()
     say("Посмотри клип. Если это привет и не дубликат — публикуй полным проходом")
     say("(just submission <id>). Если нет — откажи:")
@@ -730,7 +840,7 @@ def cmd_accept(cfg, args):
     append_lot(cfg, ctx["slug"], ctx["title"], args.price, video_url)
     run_lots_sync(cfg)
     lot_id = fetch_lot_id(cfg, ctx["slug"])
-    call_accept(cfg, sub["id"], lot_id)
+    call_accept(cfg, sub["id"], lot_id, ctx.get("author"))
     try:
         call_reward(cfg, sub["id"])
     except SystemExit as exc:
@@ -818,6 +928,14 @@ def build_parser():
         "--title", default=None, help="Заголовок вручную (обход резолва)"
     )
     p_accept.add_argument(
+        "--author", default=None, help="Ник автора вручную (обход резолва)"
+    )
+    p_accept.add_argument(
+        "--force",
+        action="store_true",
+        help="Обойти дубль-гейт осознанно (ссылка уже есть на бирже)",
+    )
+    p_accept.add_argument(
         "--check", action="store_true", help="Остановиться перед публикацией"
     )
     p_accept.set_defaults(func=cmd_accept)
@@ -827,6 +945,8 @@ def build_parser():
     p_fetch.add_argument("--price", type=int, default=DEFAULT_PRICE)
     p_fetch.add_argument("--slug", default=None)
     p_fetch.add_argument("--title", default=None)
+    p_fetch.add_argument("--author", default=None)
+    p_fetch.add_argument("--force", action="store_true")
     p_fetch.set_defaults(func=cmd_fetch)
 
     p_show = subs.add_parser("show", help="Показать заявку и заголовок (чтение)")

@@ -10,14 +10,15 @@
 -- Применить: мёрж в main применит сам; руками на прод НЕ накатывать.
 
 -- 1. Авторство привета на лоте: снимок из заявки в момент принятия.
---    Поле не публичное само по себе, но подпись на карточке — публична,
---    поэтому вью отдаёт login (uid вью не раскрывает).
+--    Подпись на карточке — публична. Таблица public.lots читается anon/
+--    authenticated, поэтому uid на ней виден так же, как owner_uid, а вью
+--    отдаёт только login.
 alter table public.lots add column if not exists suggested_by_uid uuid null;
 alter table public.lots add column if not exists suggested_by_login text null;
 
 -- 2. Вью цен: зеркало таблицы + автор привета. Формула next_price и остальные
 --    колонки — как в 20260910090100; добавлена только suggested_by_login
---    (uid остаётся на таблице для служебных выплат тикета 11).
+--    (uid остаётся на таблице: служебные выплаты тикета 11 читают его оттуда).
 --    ВАЖНО: только DROP + CREATE (CREATE OR REPLACE падает 42P16 на смене состава).
 drop view if exists public.lots_with_next_price;
 create view public.lots_with_next_price as
@@ -53,10 +54,14 @@ grant select on public.lots_with_next_price to service_role;
 --    RPC только для service_role (вызывает служебный скрипт приёма).
 --    Принять можно только открытую заявку ('new'): повторное принятие
 --    решённой — ошибка, а не молчаливая перезапись чужого решения
---    (docs/agents/submissions.md). Награда не начисляется — её добавит тикет 11.
+--    (docs/agents/submissions.md). p_author_login — канон ника из реестра
+--    ников, который передаёт агент; не null — переопределяет снимок
+--    author_login из заявки, null — оставляем снимок (US-24).
+--    Награда не начисляется — её добавит тикет 11.
 create or replace function public.accept_submission(
   p_submission_id bigint,
-  p_lot_id bigint
+  p_lot_id bigint,
+  p_author_login text default null
 )
 returns void language plpgsql
 security definer set search_path = ''
@@ -65,6 +70,7 @@ declare
   v_uid uuid;
   v_login text;
   v_status text;
+  v_author_login text;
 begin
   select s.author_uid, s.author_login, s.status into v_uid, v_login, v_status
     from public.submissions as s
@@ -82,9 +88,12 @@ begin
     raise exception 'lot % not found', p_lot_id;
   end if;
 
+  -- Канон ника из реестра важнее снимка: пустой/пробельный канон игнорируем.
+  v_author_login := coalesce(nullif(btrim(p_author_login), ''), v_login);
+
   update public.lots as l
     set suggested_by_uid = v_uid,
-        suggested_by_login = v_login
+        suggested_by_login = v_author_login
     where l.id = p_lot_id;
 
   update public.submissions as s
@@ -98,9 +107,9 @@ begin
   end if;
 end;
 $$;
-revoke all on function public.accept_submission(bigint, bigint)
+revoke all on function public.accept_submission(bigint, bigint, text)
   from public, anon, authenticated;
-grant execute on function public.accept_submission(bigint, bigint) to service_role;
+grant execute on function public.accept_submission(bigint, bigint, text) to service_role;
 
 -- 4. Отказ/дубликат: разрешены только эти два статуса, без выплат.
 --    Решать можно только открытую заявку ('new'): отклонять принятую нельзя
