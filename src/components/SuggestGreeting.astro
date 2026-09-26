@@ -120,8 +120,7 @@ const FIELD_CLASS =
       <div class="grid justify-items-start gap-3 border-2 border-pivko bg-void p-4">
         <p data-sg-success-title class="font-display text-sm leading-relaxed"></p>
         <p class="text-sm font-bold">
-          Админ посмотрит видео и решит. Придёт принятие — награда капнет в Пивкойны. Статус заявок
-          на сайте пока не показываем — это отдельный разговор.
+          Если привет примут, начислим Пивкойны. Уведомление появится при следующем заходе.
         </p>
         <button type="button" data-sg-reset class="btn-arcade btn-arcade-ghost px-4 py-2 text-xs">
           Отправить ещё одну
@@ -244,7 +243,7 @@ const FIELD_CLASS =
   function showSuccess(id: number): void {
     clearFields();
     if (successTitle instanceof HTMLElement) {
-      successTitle.textContent = `Заявка #${id} улетела админу`;
+      successTitle.textContent = `Заявка #${id} отправлена`;
     }
     split?.classList.add('hidden');
     success?.classList.remove('hidden');
