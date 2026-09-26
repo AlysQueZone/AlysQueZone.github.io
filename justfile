@@ -83,6 +83,12 @@ submission *args:
 submission-reject *args:
     python3 scripts/submission.py reject {{args}}
 
+# Повторная выплата награды по уже принятой заявке: путь восстановления,
+# если выплата упала после приёма. Идемпотентно (сервер не платит дважды).
+# Пример: just submission-reward 12
+submission-reward *args:
+    python3 scripts/submission.py reward {{args}}
+
 # -------------------------------------
 # Релиз
 # -------------------------------------

@@ -14,6 +14,7 @@
 | `just submission <id> --title "…"` / `--slug …` / `--price N` | ручные переопределения (стартовая цена по умолчанию 800)                                  |
 | `just submission-reject <id>`                                 | статус `rejected`, без выплат                                                             |
 | `just submission-reject <id> --status duplicate`              | статус `duplicate`, без выплат                                                            |
+| `just submission-reward <id>`                                 | повторная выплата награды по уже принятой заявке; идемпотентно                            |
 
 Служебный скрипт — `scripts/submission.py` (см. `--help`); он берёт
 `SUPABASE_SERVICE_ROLE_KEY` и `PUBLIC_SUPABASE_URL` из окружения или `.env`,
@@ -44,7 +45,14 @@
 8. **Синк** `scripts/lots_sync.py` — лот появляется на витрине без деплоя.
 9. **Связь и статус** — RPC `accept_submission(id, lot_id)`: заявка получает
    `accepted`, `lot_id`, `decided_at`, а лот — `suggested_by_login`/`suggested_by_uid`.
-   Награду за принятый привет начисляет отдельный механизм (тикет 11).
+10. **Награда** — RPC `pay_submission_reward(id)`: автору +500 и роялти 3% с первых
+    трёх перекупов его лота (тикет 11). Выплата идемпотентна по
+    `submissions.rewarded_at`; отказ выплат не делает.
+
+Если приём прошёл, а выплата упала (сеть/5xx), повторный `just submission <id>`
+уже не пройдёт — заявка не `new`. Награду добирает `just submission-reward <id>`:
+он вызывает только `pay_submission_reward` и повторно не платит благодаря
+`rewarded_at`.
 
 После принятия страница лота `/lot/?id=<slug>` показывает «Привет добавил: <ник>»;
 в списках витрины подписи нет.
@@ -82,6 +90,5 @@
 
 ## Отложено
 
-- Награда +500 и роялти 3% (тикет 11) — в этот пайплайн ещё не входят.
 - SQL-проверки RPC против локального Supabase — централизованно, вместе с
   остальной схемой.

@@ -13,6 +13,7 @@
   python3 scripts/submission.py accept 12          # полный путь до лота на витрине
   python3 scripts/submission.py reject 12                     # статус rejected
   python3 scripts/submission.py reject 12 --status duplicate  # статус duplicate
+  python3 scripts/submission.py reward 12          # выплатить награду по принятой (идемпотентно)
 
 Шаги accept: заявка -> yt-dlp во временную папку -> ffmpeg-тройка по
 docs/agents/media-pipeline.md -> storage_upload.py в videos/<slug> -> [[lots]]
@@ -730,7 +731,18 @@ def cmd_accept(cfg, args):
     run_lots_sync(cfg)
     lot_id = fetch_lot_id(cfg, ctx["slug"])
     call_accept(cfg, sub["id"], lot_id)
-    call_reward(cfg, sub["id"])
+    try:
+        call_reward(cfg, sub["id"])
+    except SystemExit as exc:
+        # Заявка уже accepted, награда идемпотентна по rewarded_at: повторный
+        # accept упрётся в серверный предикат статуса, поэтому восстановление —
+        # отдельной командой reward.
+        say("Награда не выплачена: %s" % exc)
+        say(
+            "Лот и приём готовы. Выплата идемпотентна — повтори: "
+            "just submission-reward %d" % sub["id"]
+        )
+        return EXIT_FAIL
     say(
         "Готово: лот %s (id=%d) на витрине, заявка #%d принята"
         % (ctx["slug"], lot_id, sub["id"])
@@ -750,6 +762,27 @@ def cmd_reject(cfg, args):
         say("Заявка #%d уже решена (status=%s) — ничего не меняю" % (sub["id"], status))
         return 0
     call_reject(cfg, sub["id"], args.status)
+    return 0
+
+
+def cmd_reward(cfg, args):
+    """Идемпотентное восстановление: только выплата награды по принятой заявке.
+
+    Путь на случай, когда accept_submission прошёл, а pay_submission_reward
+    упал (сеть/5xx): повторный accept заблокирован серверным предикатом
+    статуса. Повтор вызова безопасен — сервер не платит дважды (rewarded_at).
+    """
+    sub = fetch_submission(cfg, args.submission_id)
+    report_submission(sub)
+    if sub.get("status") != "accepted":
+        return fail(
+            "заявка не принята (status=%s) — награда платится только после accept"
+            % sub.get("status")
+        )
+    try:
+        call_reward(cfg, sub["id"])
+    except SystemExit as exc:
+        return fail(str(exc))
     return 0
 
 
@@ -810,12 +843,18 @@ def build_parser():
     )
     p_reject.set_defaults(func=cmd_reject)
 
+    p_reward = subs.add_parser(
+        "reward", help="Выплатить награду по принятой заявке (идемпотентно)"
+    )
+    add_common(p_reward)
+    p_reward.set_defaults(func=cmd_reward)
+
     return parser
 
 
 def main(argv):
     argv = list(argv)
-    commands = {"accept", "fetch", "show", "reject"}
+    commands = {"accept", "fetch", "show", "reject", "reward"}
     # `just submission <id>` и `just submission <id> --check` — короткий вход.
     if argv and argv[0] not in commands and argv[0] not in ("-h", "--help"):
         argv = ["accept"] + argv

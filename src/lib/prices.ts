@@ -28,3 +28,28 @@ export function commissionFor(pricePaid: number): number {
   if (!Number.isFinite(pricePaid) || pricePaid <= 0) return 0;
   return Math.max(1, Math.ceil(pricePaid * COMMISSION_RATE));
 }
+
+/** Проценты комиссии для показа: комиссия, роялти автору и остаток, что сгорает. */
+export interface CommissionSplit {
+  commissionPct: number;
+  burnPct: number;
+  royaltyPct: number;
+}
+
+/**
+ * Единственный источник показа сплита комиссии (7% = 4% сгорает + 3% автору).
+ * Роялти-ветка срабатывает, только если у привета есть автор (принят по
+ * заявке): у лотов без автора сгорает вся комиссия. Только цифры — текст
+ * собирают места показа, чтобы формулировки не разъезжались с условием.
+ */
+export function commissionSplit(): CommissionSplit {
+  const commissionPct = Math.round(COMMISSION_RATE * 100);
+  const royaltyPct = Math.round(ROYALTY_RATE * 100);
+  return { commissionPct, burnPct: commissionPct - royaltyPct, royaltyPct };
+}
+
+/** Строка награды за принятый привет — зеркало public.pay_submission_reward(). */
+export function rewardLine(): string {
+  const { royaltyPct } = commissionSplit();
+  return `+${SUBMISSION_BONUS} сразу и ${royaltyPct}% с первых ${ROYALTY_PURCHASES} перекупов`;
+}
