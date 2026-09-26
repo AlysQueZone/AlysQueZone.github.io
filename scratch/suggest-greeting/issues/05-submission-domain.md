@@ -1,6 +1,6 @@
 # Домен и схема заявок: термины, статусы, приём файлов
 
-Status: open
+Status: claimed
 Type: grilling
 Blocked by: 02, 04
 
