@@ -87,11 +87,14 @@ function mapSubmissionError(err: unknown): SubmissionErrorKind {
   const raw = errorMessage(err);
   const low = raw.toLowerCase();
   if (low.includes('not authenticated')) return 'unauthenticated';
-  // Истёкшая сессия/снятые гранты: RLS, JWT и permission denied → перелогин.
+  // Истёкшая сессия/снятые гранты/удалённый аккаунт: RLS, JWT, permission denied
+  // и FK на auth.users (после локального db reset сессия указывает на стёртого
+  // пользователя) → перелогин.
   if (
     low.includes('permission denied') ||
     low.includes('row-level security') ||
-    low.includes('jwt')
+    low.includes('jwt') ||
+    low.includes('foreign key')
   ) {
     return 'session-expired';
   }

@@ -35,6 +35,8 @@ just db-stop     # остановить БД
 
 Уведомления в Telegram тоже работают локально: `TELEGRAM_BOT_TOKEN` и `TELEGRAM_ADMIN_CHAT_ID` из `.env` заливаются в локальный Vault (`just db-vault`; автоматически в `run-local` и после `db-reset`).
 
+После `just db-reset` локальные сессии устаревают (БД чистая) — выйди и войди через Twitch заново.
+
 ## Ещё команды
 
 ```bash
