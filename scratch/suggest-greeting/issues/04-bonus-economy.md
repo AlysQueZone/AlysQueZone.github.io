@@ -1,6 +1,6 @@
 # Экономика награды за принятую заявку
 
-Status: open
+Status: claimed
 Type: grilling
 Blocked by: none
 
