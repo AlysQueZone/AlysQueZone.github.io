@@ -33,6 +33,8 @@ just db-stop     # остановить БД
 
 Вход через Twitch работает и локально: в `.env` нужны `TWITCH_APP_CLIENT_ID` и `TWITCH_APP_CLIENT_SECRET`, а в Twitch-приложении — redirect `http://localhost:54321/auth/v1/callback`.
 
+Уведомления в Telegram тоже работают локально: `TELEGRAM_BOT_TOKEN` и `TELEGRAM_ADMIN_CHAT_ID` из `.env` заливаются в локальный Vault (`just db-vault`; автоматически в `run-local` и после `db-reset`).
+
 ## Ещё команды
 
 ```bash

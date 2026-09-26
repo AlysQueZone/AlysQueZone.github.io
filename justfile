@@ -7,6 +7,9 @@
 # -----------------------------------------------------------------------------
 
 set quiet
+# Читать корневой .env в переменные окружения рецептов (нужно db-vault для
+# TELEGRAM_*; SECRET/DSN-строки python-скрипты и так читают из .env сами).
+set dotenv-load
 
 # -----------------------------------------------------------------------------
 # Variables
@@ -105,13 +108,40 @@ db-stop:
 
 # Чистая локальная БД: миграции + сид из content/lots.toml (данные теряются).
 # --write-seed пишет только файл supabase/seed.sql; в локальную БД его заливает db reset.
+# Секреты Vault reset стирает — db-vault в конце их возвращает.
 db-reset: db-up
     python3 scripts/lots_sync.py --write-seed
     ./node_modules/.bin/supabase db reset
+    just db-vault
+
+# Залить Telegram-секреты в локальный Vault из .env (идемпотентно; пусто — no-op).
+# Значения идут в psql через stdin, не в argv; прод-Vault не затрагивается.
+db-vault:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_ADMIN_CHAT_ID:-}" ]; then
+      echo 'TELEGRAM_BOT_TOKEN/TELEGRAM_ADMIN_CHAT_ID не заданы в .env — локальные уведомления молчат' >&2
+      exit 0
+    fi
+    db_container=$(docker ps -q --filter 'name=supabase_db_' | head -1)
+    [ -n "$db_container" ] || { echo 'Локальный Supabase не поднят — сначала just db-up' >&2; exit 1; }
+    docker exec -i "$db_container" psql -U postgres -d postgres -v ON_ERROR_STOP=1 <<SQL
+    select vault.create_secret('$TELEGRAM_BOT_TOKEN', 'telegram_bot_token', 'local dev')
+      where not exists (select 1 from vault.secrets where name = 'telegram_bot_token');
+    select vault.update_secret(
+      (select id from vault.secrets where name = 'telegram_bot_token'), '$TELEGRAM_BOT_TOKEN')
+      where exists (select 1 from vault.secrets where name = 'telegram_bot_token');
+    select vault.create_secret('$TELEGRAM_ADMIN_CHAT_ID', 'telegram_admin_chat_id', 'local dev')
+      where not exists (select 1 from vault.secrets where name = 'telegram_admin_chat_id');
+    select vault.update_secret(
+      (select id from vault.secrets where name = 'telegram_admin_chat_id'), '$TELEGRAM_ADMIN_CHAT_ID')
+      where exists (select 1 from vault.secrets where name = 'telegram_admin_chat_id');
+    SQL
+    echo 'Локальный Vault: telegram-секреты обновлены'
 
 # Dev-сервер на локальной БД: вначале just db-up, затем astro против 127.0.0.1:54321.
 # `--force` заменяет уже запущенный astro dev (порт 4321 один) — этот сервер и должен победить.
-run-local: db-up
+run-local: db-up db-vault
     #!/usr/bin/env bash
     set -euo pipefail
     status_env=$(./node_modules/.bin/supabase status -o env)
