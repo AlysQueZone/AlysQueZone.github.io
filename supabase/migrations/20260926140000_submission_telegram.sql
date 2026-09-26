@@ -50,7 +50,7 @@ begin
   -- Формат из тикета 06; #id первым — админ пересылает номер агенту.
   v_text := format('🍺 Заявка #%s', new.id)
     || E'\n' || format('Название: %s', new.title)
-    || E'\n' || format('От: @%s', new.author_login)
+    || E'\n' || format('От: %s', new.author_login)  -- без @: Telegram делает из него упоминание
     || E'\n' || format('Ссылка: %s', new.video_url);
   -- Комментарий — строкой, только если он есть.
   if new.comment is not null and btrim(new.comment) <> '' then

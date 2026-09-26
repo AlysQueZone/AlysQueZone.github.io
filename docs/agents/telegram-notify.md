@@ -26,7 +26,7 @@
 ```
 🍺 Заявка #<id>
 Название: <title>
-От: @<author_login>
+От: <author_login>
 Ссылка: <video_url>
 💬 <comment>
 ```
