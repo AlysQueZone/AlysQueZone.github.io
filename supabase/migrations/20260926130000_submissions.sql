@@ -101,11 +101,14 @@ begin
   NEW.author_login := coalesce(v_login, v_uid::text);
 
   -- Служебные поля задаёт только админ/сервер: клиент их не контролирует.
+  -- created_at тоже серверное: иначе клиент подставит любое время и подделает
+  -- очередь/аудит (у колонки только default now(), его можно перебить значением).
   NEW.status := 'new';
   NEW.lot_id := null;
   NEW.rewarded_at := null;
   NEW.notified_at := null;
   NEW.decided_at := null;
+  NEW.created_at := now();
 
   -- Название обязательно; пустое после обрезки пробелов — отказ.
   if NEW.title is null then raise exception 'title required'; end if;

@@ -37,6 +37,7 @@ export const SUBMISSION_OPEN_LIMIT = 10;
 
 export type SubmissionErrorKind =
   | 'unauthenticated'
+  | 'session-expired'
   | 'empty-url'
   | 'empty-title'
   | 'scheme'
@@ -50,8 +51,9 @@ export type SubmissionErrorKind =
 
 /** Тексты для показа (тон сайта; финальная вычитка — за владельцем). */
 const ERROR_TEXT: Record<SubmissionErrorKind, string> = {
-  unauthenticated:
-    'Сначала войди через Twitch — иначе награду не начислить и авторство не получить. Поля никуда не денутся.',
+  // Вход уводит полным редиректом — поля не сохраняются, поэтому честно и коротко.
+  unauthenticated: 'Сначала войди через Twitch — вход нужен для награды и авторства.',
+  'session-expired': 'Сессия истекла — войди через Twitch заново.',
   'empty-url': 'Нужна ссылка на видео — без неё админу нечего смотреть.',
   'empty-title': 'Придумай название — по нему админ поймёт, о чём привет.',
   scheme: 'Ссылка должна начинаться с https://.',
@@ -132,13 +134,17 @@ function errorMessage(err: unknown): string {
 function mapSubmissionError(err: unknown): SubmissionErrorKind {
   const raw = errorMessage(err);
   const low = raw.toLowerCase();
+  if (low.includes('not authenticated')) return 'unauthenticated';
+  // Истёкшая сессия/снятые гранты: RLS, JWT и permission denied → перелогин.
   if (
-    low.includes('not authenticated') ||
+    low.includes('permission denied') ||
     low.includes('row-level security') ||
     low.includes('jwt')
   ) {
-    return 'unauthenticated';
+    return 'session-expired';
   }
+  if (low.includes('video url required')) return 'empty-url';
+  if (low.includes('title required')) return 'empty-title';
   if (low.includes('must be https')) return 'scheme';
   if (low.includes('host not allowed')) return 'host';
   if (low.includes('title too long')) return 'title-too-long';
