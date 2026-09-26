@@ -4,6 +4,8 @@
 
 ## Внесённые изменения
 
+## 2026-09-26 22:13 — Предложить привет и локальная разработка
+
 - Написать пайплайн в `just` для локальной разработки: поднять локальную БД, заполнить карточками и запустить локальный сервер против неё (разбить на `db-up` / `db-stop` / `db-rest` / `run-local`).
   → Рецепты `just db-up` (Supabase + до-накат миграций), `db-stop`, `db-reset`/`db-rest` (миграции + сид из `content/lots.toml`) и `run-local` (зовёт `db-up` и стартует dev с локальными `PUBLIC_SUPABASE_*`). Заодно локальный стек получил вход через Twitch (`[auth.external.twitch]` + `additional_redirect_urls`, секреты из `.env`) и наполнение локального Vault Telegram-секретами из `.env` (`just db-vault`; в `run-local` и после `db-reset`).
 
