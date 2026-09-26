@@ -14,8 +14,8 @@
                                        форма живёт на отдельной странице (URL можно расшарить).
     D «Инлайн-секция внизу витрины»  — раскрывающаяся секция под «Все лоты», форма в потоке в две
                                        колонки, без модалок.
-    E «Инлайн-секция: форма + инфо»  — постоянная секция под «Все лоты» (открыта по умолчанию):
-                                       слева форма, справа информация. Показывается при открытии.
+    E «Инлайн-секция: форма + инфо»  — тихая ссылка под «Все лоты» раскрывает секцию (по клику,
+                                       по умолчанию свёрнута): слева форма, справа информация.
 
   Набор полей во всех вариантах одинаков: название привета, ссылка на видео, опциональный
   комментарий, пометка про вход через Twitch рядом с кнопкой; состояния: загрузка / успех /
@@ -31,7 +31,8 @@
 
   Подсказки для смотрящего:
     «⚙ состояния» в нижней панели: гость / вошёл, ✔ успех, ⏳ отправка, ⚠ не вошёл,
-    ⚠ ссылка (чужой хост), ⟲ сброс. Триггер сам открывает форму текущего варианта.
+    ⚠ ссылка (чужой хост), ⟲ сброс. Триггер сам открывает форму текущего варианта
+    (в E — разворачивает секцию из-под тихой ссылки).
     «✔ успех» показывает финальное состояние «Заявка #12 улетела админу».
     Ссылку на конкретный вариант можно кинуть как #variant=E или #variant=C&who=chatter —
     состояние переживает перезагрузку и вставку хеша в тот же таб.
@@ -1190,7 +1191,7 @@
         {
           key: 'E',
           name: 'Инлайн-секция: форма слева, инфо справа',
-          entry: 'постоянная секция под «Все лоты», открыта всегда',
+          entry: 'тихая ссылка под «Все лоты», секция по клику (по умолчанию свёрнута)',
           surface: 'форма слева, информация справа, без модалки',
         },
       ];
@@ -1253,6 +1254,7 @@
         overlay: null, // 'a' | 'b' | 'rules'
         bStep: 1,
         dOpen: false,
+        eOpen: false,
         demoOpen: true,
         lastEvent: 'форма не открыта',
         focus: null,
@@ -1285,7 +1287,7 @@
         if (state.variant === 'B') return state.overlay === 'b' ? 'b' : null;
         if (state.variant === 'C') return state.route === 'suggest' ? 'c' : null;
         if (state.variant === 'D') return state.dOpen ? 'd' : null;
-        if (state.variant === 'E') return 'e';
+        if (state.variant === 'E') return state.eOpen ? 'e' : null;
         return null;
       }
 
@@ -1567,7 +1569,7 @@
         );
       }
 
-      // Вариант E: постоянная инлайн-секция под «Все лоты» — слева форма, справа информация.
+      // Вариант E: тихая ссылка под «Все лоты» раскрывает секцию — слева форма, справа информация.
       function infoColumnE() {
         const nick = state.who === 'chatter' ? '@nyanyachos' : '<ник>';
         return (
@@ -1579,6 +1581,7 @@
       }
 
       function inlineSectionE() {
+        const open = state.eOpen;
         const f = formOf('e');
         const body =
           f.status === 'success'
@@ -1588,7 +1591,14 @@
               `<aside class="sg-info" aria-label="Что важно знать о заявке">${infoColumnE()}</aside>` +
               '</div>';
         return (
-          '<section class="card-pixel inline-section" aria-label="Предложить привет">' +
+          '<p class="entry-row"><button type="button" class="quiet-link" data-toggle-e aria-expanded="' +
+          (open ? 'true' : 'false') +
+          '" aria-controls="sg-panel-e">' +
+          (open ? 'Не нашёл свой привет? Сверни ↑' : 'Не нашёл свой привет? Предложи →') +
+          '</button></p>' +
+          `<section id="sg-panel-e" class="card-pixel inline-section" aria-label="Предложить привет"${
+            open ? '' : ' hidden'
+          }>` +
           '<h3 class="display h3">Предложить привет</h3>' +
           `<div class="inline-body">${body}</div>` +
           '</section>'
@@ -1887,8 +1897,15 @@
         renderBar();
         syncUrl();
         if (state.focus) {
-          const sel = state.focus === 'success' ? '[data-success]' : '[data-notice]';
-          const el = document.querySelector(sel);
+          const sel =
+            state.focus === 'success'
+              ? '[data-success]'
+              : state.focus === 'notice'
+                ? '[data-notice]'
+                : state.focus === 'e-toggle'
+                  ? '[data-toggle-e]'
+                  : null;
+          const el = sel ? document.querySelector(sel) : null;
           if (el) el.focus();
           state.focus = null;
         }
@@ -1924,6 +1941,7 @@
         state.overlay = null;
         state.route = 'home';
         state.dOpen = false;
+        state.eOpen = false;
         state.bStep = 1;
         state.lastEvent = 'вариант из URL';
         resetForms();
@@ -1935,6 +1953,7 @@
         state.overlay = null;
         state.route = 'home';
         state.dOpen = false;
+        state.eOpen = false;
         state.bStep = 1;
         state.lastEvent = 'форма не закрыта — вход не тронут';
         state.focus = null;
@@ -1958,6 +1977,7 @@
           state.bStep = 2; // панель состояний открывает сразу форму, а не шаг «что считается приветом»
         } else if (state.variant === 'C') state.route = 'suggest';
         else if (state.variant === 'D') state.dOpen = true;
+        else if (state.variant === 'E') state.eOpen = true;
       }
 
       function openForm(prefix) {
@@ -2090,6 +2110,15 @@
         if (inline) {
           state.dOpen = !state.dOpen;
           state.lastEvent = state.dOpen ? 'форма раскрыта' : 'форма свёрнута';
+          render();
+          return;
+        }
+
+        const inlineE = hit('[data-toggle-e]');
+        if (inlineE) {
+          state.eOpen = !state.eOpen;
+          state.lastEvent = state.eOpen ? 'форма раскрыта' : 'форма свёрнута';
+          state.focus = 'e-toggle'; // render() пересобирает DOM — возвращаем фокус на ссылку
           render();
           return;
         }
