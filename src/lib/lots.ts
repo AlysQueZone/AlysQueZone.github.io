@@ -64,25 +64,9 @@ function fillCatalog(rows: unknown, uid: string | null): Map<string, LotState> {
 }
 
 const VIEW = 'lots_with_next_price';
-const LOTS = 'lots';
-// Полный набор включает автора заявки (`suggested_by_login`, миграции 150000):
-// его может ещё не быть в БД, если сайт задеплоен раньше, чем применилась
-// миграция (окно деплоя), или локальный dev смотрит в проект без новой схемы.
-// Поэтому на каждый объект есть легаси-набор без автора: витрина не гаснет, а
-// подпись на странице лота просто не показывается до применения миграции.
 const VIEW_COLUMNS =
   'slug,title,video_url,price,owner_login,owner_uid,suggested_by_login,next_price';
-const VIEW_COLUMNS_LEGACY = 'slug,title,video_url,price,owner_login,owner_uid,next_price';
 const TABLE_COLUMNS = 'slug,title,video_url,price,owner_login,owner_uid,suggested_by_login';
-const TABLE_COLUMNS_LEGACY = 'slug,title,video_url,price,owner_login,owner_uid';
-
-/** Порядок источников каталога/лота: вью с автором → вью без → таблица с → без. */
-const LOT_SOURCES: ReadonlyArray<readonly [string, string]> = [
-  [VIEW, VIEW_COLUMNS],
-  [VIEW, VIEW_COLUMNS_LEGACY],
-  [LOTS, TABLE_COLUMNS],
-  [LOTS, TABLE_COLUMNS_LEGACY],
-];
 
 /** Каталог + признак «ответ от БД получен»: пустой каталог ≠ ошибка. */
 export interface CatalogResult {
@@ -102,19 +86,21 @@ export async function fetchLotCatalogResult(uid: string | null): Promise<Catalog
   const empty = new Map<string, LotState>();
   const sb = getSupabase();
   if (!sb) return { ok: false, states: empty };
-  // Первый успешный ответ выигрывает; недоступная колонка/объект — следующий
-  // вариант (см. комментарий к константам выше).
-  for (const [from, columns] of LOT_SOURCES) {
-    try {
-      const res = await withAuthRetry(() => sb.from(from).select(columns));
-      if (!res.error && Array.isArray(res.data)) {
-        return { ok: true, states: fillCatalog(res.data, uid) };
-      }
-    } catch {
-      // объект/колонка недоступны — пробуем следующий вариант
+  try {
+    const fromView = await withAuthRetry(() => sb.from(VIEW).select(VIEW_COLUMNS));
+    if (!fromView.error && Array.isArray(fromView.data)) {
+      return { ok: true, states: fillCatalog(fromView.data, uid) };
     }
+  } catch {
+    // вью нет — фолбэк ниже
   }
-  return { ok: false, states: empty };
+  try {
+    const fromTable = await withAuthRetry(() => sb.from('lots').select(TABLE_COLUMNS));
+    if (fromTable.error || !Array.isArray(fromTable.data)) return { ok: false, states: empty };
+    return { ok: true, states: fillCatalog(fromTable.data, uid) };
+  } catch {
+    return { ok: false, states: empty };
+  }
 }
 
 /** Живой каталог; ошибка/ненастроенное хранилище → пустая карта. */
@@ -141,21 +127,28 @@ export async function fetchLotStateResult(
 ): Promise<LotStateResult> {
   const sb = getSupabase();
   if (!sb) return { ok: false, state: null };
-  for (const [from, columns] of LOT_SOURCES) {
-    try {
-      const res = await withAuthRetry(() =>
-        sb.from(from).select(columns).eq('slug', slug).maybeSingle()
-      );
-      // Ошибка — колонка/объект недоступны: пробуем следующий вариант.
-      if (res.error) continue;
-      const row = res.data;
-      // Успешный ответ без строки — «лота нет», а не недоступная БД.
-      return { ok: true, state: row ? toLotState(row as unknown as LotRow, uid) : null };
-    } catch {
-      // пробуем следующий вариант
+  try {
+    const fromView = await withAuthRetry(() =>
+      sb.from(VIEW).select(VIEW_COLUMNS).eq('slug', slug).maybeSingle()
+    );
+    if (!fromView.error && fromView.data) {
+      return { ok: true, state: toLotState(fromView.data as unknown as LotRow, uid) };
     }
+  } catch {
+    // вью нет — фолбэк ниже
   }
-  return { ok: false, state: null };
+  try {
+    const fromTable = await withAuthRetry(() =>
+      sb.from('lots').select(TABLE_COLUMNS).eq('slug', slug).maybeSingle()
+    );
+    if (!fromTable.error && fromTable.data) {
+      return { ok: true, state: toLotState(fromTable.data as unknown as LotRow, uid) };
+    }
+    if (!fromTable.error) return { ok: true, state: null };
+    return { ok: false, state: null };
+  } catch {
+    return { ok: false, state: null };
+  }
 }
 
 /** Состояние одного Лота; нет строки/ошибка/не настроено → null. */
