@@ -190,7 +190,9 @@ assertSupabaseConfigured();
       import { getSupabase, getSessionUid, isSupabaseConfigured } from '@/lib/supabase';
       import { fetchMyBalance, subscribeMyBalance } from '@/lib/balance';
       import { initOutbidNotice } from '@/lib/outbid-notice';
+      import { initSubmissionNotice } from '@/lib/submission-notice';
       initOutbidNotice();
+      initSubmissionNotice();
       // Бегущая строка-лог (ребаланс, тикет 06): последние ~10 сделок из
       // purchases (публичный SELECT) через realtime-подписку на INSERT.
       // В разметке — скелетон; лог (или правила, если сделок нет) приходит
