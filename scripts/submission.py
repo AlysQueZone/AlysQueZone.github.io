@@ -19,7 +19,8 @@ docs/agents/media-pipeline.md -> storage_upload.py в videos/<slug> -> [[lots]]
 в content/lots.toml -> lots_sync.py -> RPC accept_submission -> выплата награды
 (RPC pay_submission_reward). Заголовок берётся
 из заявки с резолвом ника по реестру content/chatters.toml; слаг — новый
-уникальный. Отказ ничего не публикует и не платит.
+уникальный, привязан к номеру заявки (повторный прогон переиспользует свой).
+Отказ ничего не публикует и не платит.
 
 Ключ и ref: env SUPABASE_SERVICE_ROLE_KEY (алиасы SUPABASE_SECRET_KEY,
 SERVICE_ROLE_KEY) и PUBLIC_SUPABASE_URL, иначе те же имена из .env файла.
@@ -126,6 +127,18 @@ def fetch_lots(cfg):
     return json.loads(body)
 
 
+def fetch_decided_submissions(cfg, sid):
+    """Заявки, уже решённые по ссылке (кроме текущей): accepted/duplicate."""
+    url = (
+        "%s/rest/v1/submissions?id=neq.%d&status=in.(accepted,duplicate)"
+        "&select=id,status,video_url,title" % (cfg.base, sid)
+    )
+    status, body = rest_request(cfg.key, "GET", url)
+    if status != 200:
+        raise SystemExit("GET submissions: %s %s" % (status, body))
+    return json.loads(body)
+
+
 def fetch_lot_id(cfg, slug):
     url = "%s/rest/v1/lots?slug=eq.%s&select=id" % (
         cfg.base,
@@ -163,25 +176,39 @@ def report_submission(sub):
 
 
 def replace_variants(title, chatter):
-    """Заменить все написания ника на канон (без учёта регистра)."""
+    """Заменить все написания ника на канон (без учёта регистра).
+
+    Возвращает (title, заменённые), где «заменённые» — реально встреченные
+    варианты, отличные от канона: их человеку нужно дописать в aliases
+    (docs/agents/chatters.md).
+    """
     names = sorted(
         {v for v in variants(chatter) if len(squash(v)) >= 3},
         key=len,
         reverse=True,
     )
     if not names:
-        return title
+        return title, []
     pattern = re.compile("|".join(re.escape(n) for n in names), re.IGNORECASE)
-    return pattern.sub(lambda _m: chatter["nick"], title)
+    replaced = []
+
+    def _sub(match):
+        found = match.group(0)
+        if squash(found) != squash(chatter["nick"]):
+            replaced.append(found)
+        return chatter["nick"]
+
+    return pattern.sub(_sub, title), replaced
 
 
 def resolve_title(title, registry):
     """Резолв ника в заголовке по реестру.
 
-    Возвращает (title, nick, candidates, kind), где kind:
+    Возвращает (title, nick, candidates, kind, replaced), где kind:
       exact/partial — ник найден и канонизирован;
       ambiguous     — кандидатов несколько, решает человек;
-      none          — совпадений нет (заголовок как есть, сверь руками).
+      none          — совпадений нет (заголовок как есть, сверь руками);
+    replaced — написания-варианты, заменённые на канон (для подсказки про aliases).
     """
     tokens = re.findall(r"[0-9A-Za-zА-Яа-яЁё_]+", title)
     exact = {}
@@ -190,9 +217,10 @@ def resolve_title(title, registry):
             exact[c["nick"]] = c
     if len(exact) == 1:
         c = next(iter(exact.values()))
-        return replace_variants(title, c), c["nick"], [], "exact"
+        canon, replaced = replace_variants(title, c)
+        return canon, c["nick"], [], "exact", replaced
     if len(exact) > 1:
-        return title, None, sorted(exact), "ambiguous"
+        return title, None, sorted(exact), "ambiguous", []
 
     sq = squash(title)
     partial = {}
@@ -204,10 +232,22 @@ def resolve_title(title, registry):
                 break
     if len(partial) == 1:
         c = next(iter(partial.values()))
-        return replace_variants(title, c), c["nick"], [], "partial"
+        canon, replaced = replace_variants(title, c)
+        return canon, c["nick"], [], "partial", replaced
     if len(partial) > 1:
-        return title, None, sorted(partial), "ambiguous"
-    return title, None, [], "none"
+        return title, None, sorted(partial), "ambiguous", []
+    return title, None, [], "none", []
+
+
+def alias_hint(replaced, nick):
+    """Подсказка дописать варианты в aliases реестра (реестр правит человек)."""
+    if not replaced or not nick:
+        return None
+    listed = ", ".join("'%s'" % r for r in dict.fromkeys(replaced))
+    return (
+        "Подсказка: допиши вариант %s в aliases ника '%s' в content/chatters.toml "
+        "(docs/agents/chatters.md)." % (listed, nick)
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -235,28 +275,21 @@ def manifest_info(path):
 
 
 def choose_slug(explicit, sub, taken, manifest):
-    """Новый уникальный слаг. Повторный запуск переиспользует свой (idempotent)."""
+    """Слаг привязан к заявке.
+
+    Базовый слаг всегда включает id заявки, поэтому он уникален для заявки:
+    повторный прогон ТОЙ ЖЕ заявки находит свой слаг в манифесте/БД и
+    переиспользует его, а разные заявки (даже один автор с одинаковым
+    заголовком) получают разные лоты. Совпадение с уже существующим слагом
+    считаем прошлым прогоном этой же заявки, а не коллизией.
+    """
     if explicit:
         if explicit in taken:
             raise SystemExit("Слаг уже занят: %s" % explicit)
         return explicit
 
-    base = "lot-sub-" + (slugify(sub.get("author_login")) or str(sub["id"]))
-    want_title = (sub.get("title") or "").strip().casefold()
-    # Частичный сбой: лот уже добавлен в манифест тем же заголовком — переиспользуем.
-    for slug in (base, "%s-%d" % (base, sub["id"])):
-        if slug in manifest and manifest[slug].strip().casefold() == want_title:
-            return slug
-
-    if base not in taken and base not in manifest:
-        return base
-    prefixed = "%s-%d" % (base, sub["id"])
-    if prefixed not in taken and prefixed not in manifest:
-        return prefixed
-    n = 2
-    while "%s-%d" % (prefixed, n) in taken or "%s-%d" % (prefixed, n) in manifest:
-        n += 1
-    return "%s-%d" % (prefixed, n)
+    # id заявки в слаге делает его нашим и разводит разные заявки.
+    return "lot-sub-%s-%d" % (slugify(sub.get("author_login")) or "author", sub["id"])
 
 
 # ---------------------------------------------------------------------------
@@ -287,6 +320,18 @@ def find_duplicates(sub, lots):
         if want_title and (lot.get("title") or "").strip().casefold() == want_title:
             by_title.append(lot)
     return by_url, by_title
+
+
+def find_decided_duplicates(sub, decided):
+    """Ранее решённые заявки (accepted/duplicate) на ту же нормализованную ссылку.
+
+    Нужны потому, что у опубликованных пайплайном лотов `lots.video_url` —
+    Storage-URL, а исходная ссылка осталась только в `submissions`.
+    """
+    want_url = normalized_url(sub.get("video_url"))
+    if want_url == (None, None, None):
+        return []
+    return [s for s in decided if normalized_url(s.get("video_url")) == want_url]
 
 
 # ---------------------------------------------------------------------------
@@ -549,7 +594,7 @@ def call_reject(cfg, sid, status_name):
 
 def suggest_title(sub, explicit):
     if explicit:
-        return explicit, None, [], "manual"
+        return explicit, None, [], "manual", []
     registry = load_registry(os.path.join(root_dir(), "content", "chatters.toml"))
     return resolve_title(sub.get("title") or "", registry)
 
@@ -562,7 +607,7 @@ def stop_ambiguous(candidates):
 
 def prepare(cfg, sub, args):
     """Локальная подготовка: заголовок, слаг, скачивание, медиа-тройка."""
-    title, nick, candidates, kind = suggest_title(sub, args.title)
+    title, nick, candidates, kind, replaced = suggest_title(sub, args.title)
     if candidates:
         return None, stop_ambiguous(candidates)
 
@@ -572,6 +617,20 @@ def prepare(cfg, sub, args):
         say("STOP: этот клип уже на бирже — дубликат.")
         for lot in dup_url:
             say("  %s — %s" % (lot["slug"], lot["title"]))
+        say("Откажи командой: just submission-reject %d --status duplicate" % sub["id"])
+        return None, EXIT_GATE
+    dup_decided = find_decided_duplicates(
+        sub, fetch_decided_submissions(cfg, sub["id"])
+    )
+    if dup_decided:
+        say("STOP: на этот клип уже есть решённая заявка — дубликат.")
+        for other in dup_decided:
+            mark = (
+                "принята"
+                if other.get("status") == "accepted"
+                else "отклонена как дубликат"
+            )
+            say("  заявка #%s — %s (%s)" % (other["id"], other.get("title"), mark))
         say("Откажи командой: just submission-reject %d --status duplicate" % sub["id"])
         return None, EXIT_GATE
     if dup_title:
@@ -590,6 +649,9 @@ def prepare(cfg, sub, args):
         )
     else:
         say("Заголовок задан вручную.")
+    hint = alias_hint(replaced, nick)
+    if hint:
+        say(hint)
 
     manifest_path = os.path.join(cfg.root, "content", "lots.toml")
     manifest = manifest_info(manifest_path)
@@ -620,7 +682,7 @@ def print_review(ctx):
 def cmd_show(cfg, args):
     sub = fetch_submission(cfg, args.submission_id)
     report_submission(sub)
-    title, nick, candidates, kind = suggest_title(sub, None)
+    title, nick, candidates, kind, replaced = suggest_title(sub, None)
     say("  заголовок:  %s" % title)
     if candidates:
         say("  ник:        неоднозначно — %s" % ", ".join(candidates))
@@ -628,6 +690,9 @@ def cmd_show(cfg, args):
         say("  ник:        %s (%s)" % (nick, kind))
     else:
         say("  ник:        в реестре не найден — сверь руками")
+    hint = alias_hint(replaced, nick)
+    if hint:
+        say("  %s" % hint)
     return 0
 
 
@@ -678,8 +743,12 @@ def cmd_reject(cfg, args):
         return fail("--status принимает только rejected или duplicate")
     sub = fetch_submission(cfg, args.submission_id)
     report_submission(sub)
-    if sub.get("status") == "accepted":
+    status = sub.get("status")
+    if status == "accepted":
         return fail("заявка уже принята — отказ не применяем")
+    if status in ("rejected", "duplicate"):
+        say("Заявка #%d уже решена (status=%s) — ничего не меняю" % (sub["id"], status))
+        return 0
     call_reject(cfg, sub["id"], args.status)
     return 0
 

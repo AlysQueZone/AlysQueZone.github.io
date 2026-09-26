@@ -45,10 +45,15 @@ alter view public.lots_with_next_price set (security_invoker = true);
 
 revoke all on public.lots_with_next_price from anon, authenticated;
 grant select on public.lots_with_next_price to anon, authenticated;
+-- DROP VIEW теряет грант service_role из 20260924120000_explicit_grants.sql:
+-- выдаём его здесь явно, иначе новая вью останется без гранта для сервиса.
+grant select on public.lots_with_next_price to service_role;
 
 -- 3. Принятие: заявка -> status 'accepted', связь с лотом, автор на лоте.
 --    RPC только для service_role (вызывает служебный скрипт приёма).
---    Награда не начисляется — её добавит тикет 11.
+--    Принять можно только открытую заявку ('new'): повторное принятие
+--    решённой — ошибка, а не молчаливая перезапись чужого решения
+--    (docs/agents/submissions.md). Награда не начисляется — её добавит тикет 11.
 create or replace function public.accept_submission(
   p_submission_id bigint,
   p_lot_id bigint
@@ -59,13 +64,18 @@ as $$
 declare
   v_uid uuid;
   v_login text;
+  v_status text;
 begin
-  select s.author_uid, s.author_login into v_uid, v_login
+  select s.author_uid, s.author_login, s.status into v_uid, v_login, v_status
     from public.submissions as s
     where s.id = p_submission_id
     for update;
   if not found then
     raise exception 'submission % not found', p_submission_id;
+  end if;
+  if v_status <> 'new' then
+    raise exception 'submission % is not new (status=%)',
+      p_submission_id, v_status;
   end if;
 
   if not exists (select 1 from public.lots as l where l.id = p_lot_id) then
@@ -81,7 +91,11 @@ begin
     set status = 'accepted',
         lot_id = p_lot_id,
         decided_at = now()
-    where s.id = p_submission_id;
+    where s.id = p_submission_id and s.status = 'new';
+  if not found then
+    raise exception 'submission % is not new (status changed mid-call)',
+      p_submission_id;
+  end if;
 end;
 $$;
 revoke all on function public.accept_submission(bigint, bigint)
@@ -89,6 +103,9 @@ revoke all on function public.accept_submission(bigint, bigint)
 grant execute on function public.accept_submission(bigint, bigint) to service_role;
 
 -- 4. Отказ/дубликат: разрешены только эти два статуса, без выплат.
+--    Решать можно только открытую заявку ('new'): отклонять принятую нельзя
+--    (лот уже на витрине), повторный отказ по решённой — ошибка. Идемпотентным
+--    повторный вызов делает клиент (docs/agents/submissions.md), сервер строгий.
 create or replace function public.reject_submission(
   p_submission_id bigint,
   p_status text
@@ -96,17 +113,32 @@ create or replace function public.reject_submission(
 returns void language plpgsql
 security definer set search_path = ''
 as $$
+declare
+  v_status text;
 begin
   if p_status is null or p_status not in ('rejected', 'duplicate') then
     raise exception 'invalid reject status: % (allowed: rejected, duplicate)', p_status;
   end if;
 
+  select s.status into v_status
+    from public.submissions as s
+    where s.id = p_submission_id
+    for update;
+  if not found then
+    raise exception 'submission % not found', p_submission_id;
+  end if;
+  if v_status <> 'new' then
+    raise exception 'submission % is not new (status=%)',
+      p_submission_id, v_status;
+  end if;
+
   update public.submissions as s
     set status = p_status,
         decided_at = now()
-    where s.id = p_submission_id;
+    where s.id = p_submission_id and s.status = 'new';
   if not found then
-    raise exception 'submission % not found', p_submission_id;
+    raise exception 'submission % is not new (status changed mid-call)',
+      p_submission_id;
   end if;
 end;
 $$;
