@@ -5,8 +5,9 @@
 // свёрнута. Запись — прямой INSERT в submissions под RLS (lib/submissions.ts),
 // автора/статус/связи ставит BEFORE-триггер. Гость может заполнить поля, но
 // вместо отправки видит вход через Twitch (нужен для награды и авторства).
-const INFO_LEAD =
-  'Предлагаемое видео должно быть по смыслу похоже на уже существующие приветы — то, что не стыдно показать всему чату.';
+import { rewardLine } from '@/lib/prices';
+
+const INFO_LEAD = 'Предлагаемое видео должно быть по смыслу похоже на уже существующие приветы.';
 const NOTICE_CLASS = 'border-2 border-milk bg-void px-3 py-2 text-sm font-bold';
 const FIELD_CLASS =
   'min-h-11 w-full rounded border-2 border-milk bg-cream px-3 py-2 text-milk disabled:opacity-60';
@@ -44,7 +45,7 @@ const FIELD_CLASS =
             type="text"
             maxlength="80"
             autocomplete="off"
-            placeholder="Массовый привет"
+            placeholder="Привет NXVER_EXISTD"
             class={FIELD_CLASS}
           />
         </label>
@@ -104,7 +105,7 @@ const FIELD_CLASS =
       <aside aria-label="Что важно знать о заявке" class="grid content-start gap-4">
         <p class="text-sm font-bold">{INFO_LEAD}</p>
         <div class="rounded border-2 border-milk bg-void px-3 py-2 text-sm font-bold">
-          🍺 За принятый привет начисляются Пивкойны.
+          🍺 За принятый привет — {rewardLine()}.
         </div>
         <div class="rounded border-2 border-milk bg-void px-3 py-2 text-sm font-bold">
           ✍️ В карточке лота будешь указан как „Привет добавил:{' '}
