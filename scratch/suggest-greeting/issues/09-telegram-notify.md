@@ -15,3 +15,8 @@ Blocked by: 08
 - [ ] Ошибка отправки не откатывает заявку; локально без секретов уведомление тихо не отправляется.
 - [ ] Человеческий шаг выполнен: бот создан, `/start` нажат, chat_id получен, секреты в Vault.
 - [ ] Проверено: живая заявка → сообщение в Telegram; при недоступном Telegram заявка остаётся в базе.
+
+## Comments
+
+- Реализовано в коммите `2426d5c`: миграция `supabase/migrations/20260926140000_submission_telegram.sql` (pg_net в `extensions`, схема `private`, `security definer`-функция `private.notify_submission_telegram()` с `search_path = ''`, `after insert`-триггер `trg_submissions_notify_telegram`; формат из тикета 06, превью ссылки отключено, сбой — `warning` без отката заявки, без секретов — тихий no-op) и runbook `docs/agents/telegram-notify.md`.
+- Человеческий шаг остаётся за владельцем: завести бота у @BotFather, нажать `/start`, получить chat_id и положить `telegram_bot_token` + `telegram_admin_chat_id` в Vault — без этого уведомления молчат. Проверка живой заявкой против прод-Telegram не выполнялась (интеграция БД проверяется централизованно позже, как и в тикете 08).
