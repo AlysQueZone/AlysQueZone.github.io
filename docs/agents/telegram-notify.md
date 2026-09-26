@@ -17,7 +17,7 @@
    select vault.create_secret('<chat_id>', 'telegram_admin_chat_id', 'Admin chat for submission notifications');
    ```
 
-   Значения в миграцию и репозиторий не писать. Имена фиксированы: функция читает `telegram_bot_token` и `telegram_admin_chat_id` (алиас chat_id — `telegram_chat_id`).
+   Значения в миграцию и репозиторий не писать. Имена фиксированы: функция читает ровно `telegram_bot_token` и `telegram_admin_chat_id`, алиасов нет. Скопированные из BotFather/`getUpdates` значения обрезайте от пробелов и переводов строк: лишний `\n` в токене или chat_id → Telegram ответит `400 Bad Request`, а ретраев нет — сообщение потеряно без следов.
 
 ## Проверка живьём
 
@@ -38,7 +38,12 @@ select * from net._http_response order by created desc limit 5;
 -- ошибки: where status_code >= 400 or error_msg is not null
 ```
 
-Успех — `status_code = 200` и `content` с `"ok":true`.
+Успех — `status_code = 200` и `content` с `"ok":true`. Если таблица пуста, а сообщения нет — возможно, лёг воркер pg_net: тогда запрос из очереди не отправляется и сообщение теряется молча. Перезапустить и дождаться готовности:
+
+```sql
+select net.worker_restart();
+select net.wait_until_running();
+```
 
 ## Ротация токена
 
@@ -52,6 +57,8 @@ select * from net._http_response order by created desc limit 5;
    ```
 
    Либо отредактировать значение в Dashboard → Vault. chat_id при этом не меняется.
+
+3. Проверить новый токен: `https://api.telegram.org/bot<NEW_TOKEN>/getMe` → `"ok":true`. Иначе следующий POST молча вернёт ошибку Telegram.
 
 ## Оговорки
 

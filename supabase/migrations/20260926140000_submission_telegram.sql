@@ -34,14 +34,12 @@ declare
   v_chat text;
   v_text text;
 begin
-  v_token := (select decrypted_secret from vault.decrypted_secrets
-                where name = 'telegram_bot_token' limit 1);
-  -- Канонично — telegram_admin_chat_id (research/решения); telegram_chat_id — алиас.
-  v_chat := coalesce(
-    (select decrypted_secret from vault.decrypted_secrets
-       where name = 'telegram_admin_chat_id' limit 1),
-    (select decrypted_secret from vault.decrypted_secrets
-       where name = 'telegram_chat_id' limit 1));
+  -- Имена секретов каноничны и фиксированы (research/решения): telegram_bot_token,
+  -- telegram_admin_chat_id. Одним проходом по vault.decrypted_secrets.
+  select max(decrypted_secret) filter (where name = 'telegram_bot_token'),
+         max(decrypted_secret) filter (where name = 'telegram_admin_chat_id')
+    into v_token, v_chat
+    from vault.decrypted_secrets;
 
   -- Локально/не настроено: уведомление тихо молчит, заявка сохраняется.
   if v_token is null or v_chat is null then
