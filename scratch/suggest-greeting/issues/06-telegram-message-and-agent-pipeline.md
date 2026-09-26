@@ -1,6 +1,6 @@
 # Сообщение в Telegram и пайплайн агента «id → карточка»
 
-Status: open
+Status: claimed
 Type: grilling
 Blocked by: 01, 05
 
