@@ -35,7 +35,8 @@
   --color-legend: #b3127a;
   --color-cream: #fffbea;
   /* Пивное золото, затемнено для контраста: на панели 5.0:1, на void 5.5:1.
-     В коде только как текст (bg-pivko не используется). */
+     В коде — текст (цена) и бейдж «ТВОЙ» поверх кадра (фон pivko + текст
+     cream, ~5:1); других подложек нет. */
   --color-pivko: #7a5f00;
   /* Бренд-фиолетовый Twitch (кнопка входа) */
   --color-twitch: #9146ff;
@@ -105,6 +106,17 @@ html[data-plaska='on'] main {
 
   .card-pixel-accent {
     box-shadow: 6px 6px 0 var(--color-legend);
+  }
+
+  /* Рамка кадра лота (карточка витрины и страница лота): пропорцию задаёт
+     утилита рядом (`aspect-[77/136]` — карточка, `aspect-square` — лот).
+     Один класс на оба места: геометрия кадра не разъезжается. */
+  .lot-media-frame {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    border: 2px solid var(--color-milk);
+    background-color: black;
   }
 
   .btn-arcade {

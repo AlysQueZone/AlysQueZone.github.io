@@ -1,9 +1,13 @@
 ---
-// Разметка карточки лота для сетки биржи — шаблон: витрина целиком рисуется
-// клиентом из БД (см. docs/adr/0002), полей-данных здесь нет. Скрипт витрины
-// клонирует шаблон и заполняет data-слоты (заголовок/владелец/цена/бейдж/
-// видео/кнопка). Владелец NULL — бейджа нет, кнопка активна (первый
-// покупатель — первый владелец). Видео — общий компонент LotVideo.
+// Разметка карточки лота для сетки биржи — раскладка A2 из прототипа
+// scratch/lot-cards/prototype/lot-cards.html: название сверху, кадр в
+// пропорции «телефонных» видео (77/136 ≈ 308×544, как kubic_lego.mp4),
+// владелец — тёмный бейдж поверх кадра, цена — только в кнопке (у неактивной
+// она остаётся в надписи). Шаблон: витрина целиком рисуется клиентом из БД
+// (см. docs/adr/0002), полей-данных здесь нет. Скрипт витрины клонирует
+// шаблон и заполняет data-слоты (заголовок/бейдж владельца/бейдж «Твой»/
+// видео/кнопка). Владелец NULL — бейдж показывает «свободен». Видео — общий
+// компонент LotVideo (кадру задана портретная пропорция).
 import LotVideo from './LotVideo.astro';
 
 const base = import.meta.env.BASE_URL;
@@ -18,25 +22,28 @@ const base = import.meta.env.BASE_URL;
       <span data-lot-title></span>
     </a>
   </h3>
-  <LotVideo videoUrl={null} title="" />
-  <p class="text-sm text-mist">
-    владелец: <span data-shared-owner>—</span>{' '}
-    <span data-mine-badge class="hidden font-bold text-pivko">
-      {' '}
-      · ТВОЙ{' '}
+  <LotVideo videoUrl={null} title="" aspect="portrait">
+    <span
+      data-owner-badge
+      class="badge-pixel absolute top-2 left-2 hidden max-w-[85%] truncate bg-milk text-cream"
+    >
+      👑
     </span>
-  </p>
-  <p data-shared-price class="text-xl font-black text-pivko">
-    — 🍺
-  </p>
+    <span data-free-badge class="badge-pixel absolute top-2 left-2 bg-bar text-mist">
+      свободен
+    </span>
+    <span data-mine-badge class="badge-pixel absolute top-2 right-2 hidden bg-pivko text-cream">
+      Твой
+    </span>
+  </LotVideo>
   <div class="mt-auto pt-2">
     <button
       type="button"
-      class="btn-arcade btn-arcade-primary px-4 py-3 text-sm"
+      class="btn-arcade btn-arcade-primary w-full px-4 py-3 text-sm"
       data-buy-lot
       disabled
     >
-      ▶ Купить
+      ▶ Забрать
     </button>
   </div>
 </article>

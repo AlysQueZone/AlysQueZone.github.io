@@ -160,7 +160,8 @@ export async function fetchLotState(slug: string, uid: string | null): Promise<L
  * Заполнить кнопку покупки данными Лота — контракт с BuyModal (`data-buy-lot*`).
  * Одно место на витрину и страницу лота: правка формы тут меняет оба экрана.
  * `balance` — зеркало серверного гейта: N известна и баланс меньше — кнопка
- * гаснет с честной надписью (истину всё равно считает сервер).
+ * гаснет с честной надписью. Цена остаётся в надписи и у погашенной кнопки
+ * («Не хватает · N 🍺»), чтобы сумма не пропадала вместе с возможностью купить.
  */
 export function fillBuyButton(
   btn: Element | null,
@@ -183,10 +184,10 @@ export function fillBuyButton(
   btn.textContent = st.mine
     ? 'Твой привет'
     : short
-      ? 'Не хватает Пивкойнов'
+      ? `Не хватает · ${st.nextPrice} 🍺`
       : st.nextPrice !== null
-        ? `Забрать за ${st.nextPrice} 🍺`
-        : 'Забрать за … 🍺';
+        ? `▶ Забрать за ${st.nextPrice} 🍺`
+        : '▶ Забрать за … 🍺';
   btn.classList.toggle('opacity-50', off);
 }
 

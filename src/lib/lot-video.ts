@@ -24,6 +24,18 @@ export function videoSources(videoUrl: string | null | undefined): VideoSources 
   return { webm, mp4, poster };
 }
 
+/**
+ * Пропорция кадра лота (доменное понятие, а не строка Tailwind):
+ * `square` — страница лота; `portrait` — «телефонный» кадр карточки витрины
+ * (77/136 ≈ 0.566 — kubic_lego.mp4 = 308×544). Классы — литералами, иначе
+ * Tailwind не увидит их при сканировании.
+ */
+export type MediaAspect = 'square' | 'portrait';
+
+export function mediaAspectClass(aspect: MediaAspect): string {
+  return aspect === 'portrait' ? 'aspect-[77/136]' : 'aspect-square';
+}
+
 function isWebmUrl(url: string): boolean {
   return WEBM_RE.test(url);
 }
@@ -71,8 +83,13 @@ function playInlineVideo(root: HTMLElement): void {
     video.appendChild(el);
   }
   video.addEventListener('error', restorePoster);
-  root.innerHTML = '';
-  root.appendChild(video);
+  // Кадр не чистим целиком: оверлеи-слоты (бейдж владельца, метка «Твой») —
+  // тоже дети корня, они должны остаться поверх играющего видео. Убираем
+  // только постер и кнопку «смотреть».
+  root
+    .querySelectorAll('[data-lot-video-poster], [data-lot-video-play]')
+    .forEach((el) => el.remove());
+  root.insertBefore(video, root.firstChild);
 }
 
 /**

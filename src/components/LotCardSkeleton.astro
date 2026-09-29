@@ -1,15 +1,17 @@
 ---
-// Скелетон карточки лота для витрины: та же геометрия, что у LotCard
-// (заголовок → медиа → владелец → цена → кнопка), вместо данных — бары.
-// Витрина целиком рисует клиент из БД (см. docs/adr/0002), поэтому сервер
-// отдаёт только скелетоны; скрипт страницы сносит их после первого ответа.
+// Скелетон карточки лота для витрины: та же геометрия, что у LotCard в
+// раскладке A2 (название → портретный кадр → кнопка), вместо данных — бары.
+// Пропорция кадра — из lib/lot-video (один источник с LotVideo). Витрина
+// целиком рисует клиент из БД (см. docs/adr/0002), поэтому сервер отдаёт
+// только скелетоны; скрипт страницы сносит их после первого ответа.
 // aria-hidden: для скринридера состояние объявляет отдельный role="status".
+import { mediaAspectClass } from '@/lib/lot-video';
 ---
 
 <article data-lot-skeleton class="card-pixel flex flex-col gap-2 p-4" aria-hidden="true">
   <div class="skeleton-block h-5 w-3/4"></div>
-  <div class="skeleton-block aspect-square w-full"></div>
-  <div class="skeleton-block h-4 w-2/3"></div>
-  <div class="skeleton-block h-6 w-1/3"></div>
-  <div class="skeleton-block mt-auto h-11 w-32"></div>
+  <div class:list={['lot-media-frame', mediaAspectClass('portrait')]}>
+    <div class="skeleton-block skeleton-block-cream absolute top-2 left-2 h-5 w-24"></div>
+  </div>
+  <div class="skeleton-block mt-auto h-11 w-full"></div>
 </article>
