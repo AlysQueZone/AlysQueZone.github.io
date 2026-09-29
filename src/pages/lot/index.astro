@@ -93,7 +93,6 @@ const base = import.meta.env.BASE_URL;
   import { fetchLotStateResult, subscribeLots, onBought, type LotState } from '@/lib/lots';
   import { fillLot } from '@/lib/lot-view';
   import { fetchMyBalance, onBalance } from '@/lib/balance';
-  import { initLotVideos } from '@/lib/lot-video';
 
   const slug = (new URLSearchParams(window.location.search).get('id') ?? '').trim();
 
@@ -153,7 +152,6 @@ const base = import.meta.env.BASE_URL;
     // (широкое — во всю ширину, портрет/квадрат — «телефонная») читает
     // global.css по data-media-orientation.
     fillLot(view, st, { balance: myBalance });
-    initLotVideos(document);
     // Автор привета — только в подробностях лота, в списках подписи нет.
     if (suggestedEl instanceof HTMLElement) {
       suggestedEl.classList.toggle('hidden', !st.suggested_by_login);

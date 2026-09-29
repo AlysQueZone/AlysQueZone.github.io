@@ -18,7 +18,7 @@
  * страница Лота, сортировка и reconcile — витрина.
  */
 import { setTitleEmotes } from './emotes';
-import { fillVideo, type MediaOrientation } from './lot-video';
+import { fillVideo, initLotVideos, type MediaOrientation } from './lot-video';
 import { buyAvailability, formatStaged, writeBuyIntent } from './buy-intent';
 import type { LotState } from './lots';
 
@@ -60,6 +60,9 @@ export function fillLot(root: Element | null, st: LotState, opts: LotViewOptions
 
   fillOwnerBadges(root, st);
   fillBuyButton(root.querySelector('[data-buy-intent]'), st, opts.balance ?? null);
+  // «Смотреть» — часть представления: поверхность не помнит второй шаг
+  // (initLotVideos идемпотентен и не трогает уже навешенный клик).
+  initLotVideos(root);
 }
 
 /**
@@ -112,7 +115,7 @@ function removeSquareBlur(frame: HTMLElement): void {
  * показан светлый «свободен»; «Твой» — по флагу mine. Отдельной строки с
  * владельцем нет: как на витрине, так и в подробностях.
  */
-export function fillOwnerBadges(root: ParentNode | null, st: LotState): void {
+function fillOwnerBadges(root: ParentNode | null, st: LotState): void {
   if (!root) return;
   const owned = Boolean(st.owner_login);
   const owner = root.querySelector('[data-owner-badge]');
@@ -136,11 +139,7 @@ export function fillOwnerBadges(root: ParentNode | null, st: LotState): void {
  * покупка невозможна), N неизвестна — «…» (намерение несёт price: null,
  * сервер посчитает сам).
  */
-export function fillBuyButton(
-  btn: Element | null,
-  st: LotState,
-  balance: number | null = null
-): void {
+function fillBuyButton(btn: Element | null, st: LotState, balance: number | null = null): void {
   if (!(btn instanceof HTMLButtonElement)) return;
   const intent = {
     slug: st.slug,

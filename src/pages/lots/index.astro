@@ -70,7 +70,6 @@ import BrandHeadline from '@/components/BrandHeadline.astro';
   import { fetchLotCatalogResult, subscribeLots, onBought, type LotState } from '@/lib/lots';
   import { fillLot, lotUrl } from '@/lib/lot-view';
   import { fetchMyBalance, onBalance } from '@/lib/balance';
-  import { initLotVideos } from '@/lib/lot-video';
 
   const GUEST_TEXT = 'Войди через Twitch — тут будут твои приветы';
   const EMPTY_TEXT = 'Пока пусто — забери первый привет ниже';
@@ -179,8 +178,6 @@ import BrandHeadline from '@/components/BrandHeadline.astro';
       fillCard(created, st);
       insertSorted(grid, created, states);
     }
-
-    initLotVideos(grid);
   }
 
   // Витрина — от дешёвых к дорогим (новичок первым делом видит доступные лоты).

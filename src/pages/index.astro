@@ -125,7 +125,6 @@ const base = import.meta.env.BASE_URL;
   import { getSessionUid, isSupabaseConfigured } from '@/lib/supabase';
   import { fetchLotCatalogResult, onBought, type LotState } from '@/lib/lots';
   import { fillLot } from '@/lib/lot-view';
-  import { initLotVideos } from '@/lib/lot-video';
   import { fetchMyBalance, onBalance } from '@/lib/balance';
 
   const slot = document.querySelector('[data-random-lots]');
@@ -175,7 +174,6 @@ const base = import.meta.env.BASE_URL;
     const cards: HTMLElement[] = [];
     rendered = new Map();
     for (const st of pool.slice(0, PICK)) {
-      if (!Number.isFinite(st.price)) continue;
       const fresh = tpl.content.firstElementChild;
       if (!(fresh instanceof HTMLElement)) break;
       const card = fresh.cloneNode(true) as HTMLElement;
@@ -184,7 +182,6 @@ const base = import.meta.env.BASE_URL;
       cards.push(card);
     }
     slot.replaceChildren(...cards);
-    initLotVideos(slot);
   }
 
   async function renderRandom(): Promise<void> {
@@ -205,12 +202,14 @@ const base = import.meta.env.BASE_URL;
     setStatus(msg ?? '');
   }
 
-  /** После своей покупки — свежий снапшот и перекраска тех же карточек. */
+  /** После своей покупки — свежий снапшот и перекраска тех же карточек.
+   *  Неудачное перечитывание не затирает последнее хорошее (как витрина). */
   async function refreshCards(): Promise<void> {
     if (!isSupabaseConfigured()) return;
     const uid = await getSessionUid();
     myBalance = await fetchMyBalance();
-    const { states } = await fetchLotCatalogResult(uid);
+    const { ok, states } = await fetchLotCatalogResult(uid);
+    if (!ok) return;
     lastStates = states;
     refill();
   }
