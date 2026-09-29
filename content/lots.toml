@@ -122,10 +122,22 @@ price = 800
 video_url = "https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-axel.webm"
 
 [[lots]]
+slug = "lot-privet-bradhi"
+title = "Привет Bradhi"
+price = 800
+video_url = "https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-bradhi.webm"
+
+[[lots]]
 slug = "lot-privet-coolbeback"
 title = "Привет coolbeback"
 price = 800
 video_url = "https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-coolbeback.webm"
+
+[[lots]]
+slug = "lot-privet-kubiclego"
+title = "Привет KubicLego"
+price = 800
+video_url = "https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-kubiclego.webm"
 
 [[lots]]
 slug = "lot-privet-evilzerg57-double"
