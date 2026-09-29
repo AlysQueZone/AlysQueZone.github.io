@@ -181,6 +181,19 @@ const FIELD_CLASS =
         : 'Не нашёл свой привет? Предложи →';
     }
     toggle?.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (open) scrollToPanel();
+  }
+
+  /* Секция в хвосте страницы: без прокрутки её легко не заметить. Ведём экран
+     к форме, оставляя запас под липкую шапку (её высота меняется при переносе
+     строк). Анимацию уважаем — при prefers-reduced-motion прыгаем мгновенно. */
+  function scrollToPanel(): void {
+    if (!(panel instanceof HTMLElement)) return;
+    const header = document.querySelector('header');
+    const headerHeight = header instanceof HTMLElement ? header.getBoundingClientRect().height : 0;
+    const top = panel.getBoundingClientRect().top + window.scrollY - headerHeight - 12;
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    window.scrollTo({ top, behavior: reduceMotion ? 'auto' : 'smooth' });
   }
 
   function setNotice(mode: 'hidden' | 'loading' | 'error', text = ''): void {
