@@ -1,7 +1,8 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import RulesModal from '@/components/RulesModal.astro';
-import { ALYSQUE_WAUW, ALYSQUE_PIVO } from '@/lib/emotes';
+import BrandHeadline from '@/components/BrandHeadline.astro';
+import { ALYSQUE_WAUW } from '@/lib/emotes';
 
 const base = import.meta.env.BASE_URL;
 // Случайные приветы — 4 лота наугад из живого каталога БД, выбор в браузере
@@ -15,23 +16,9 @@ const base = import.meta.env.BASE_URL;
     <div class="flex flex-col items-start gap-8 md:flex-row md:items-center">
       <div class="min-w-0 flex-1">
         <p class="badge-pixel animate-blink bg-stream text-cream">▶ стрим включился, а ты?</p>
-        <h1 class="font-display mt-5 text-base leading-loose uppercase sm:text-2xl sm:leading-loose">
-          BEER<span class="normal-case">жа</span>{' '}
-          <!-- Эмоут декоративный (название — в title): вставка в слово.
-               -my / align держат строку пиксельного заголовка ровной. -->
-          <img
-            src={ALYSQUE_PIVO}
-            alt=""
-            title="Pivo"
-            width="24"
-            height="24"
-            loading="eager"
-            class="-my-[0.15em] inline-block h-[1.25em] w-auto object-contain align-[-0.2em]"
-          />{' '}
-          (баржа) приветов.
-          <br />
+        <BrandHeadline class="font-display mt-5 text-base leading-loose uppercase sm:text-2xl sm:leading-loose">
           Стрим включился, <span class="text-ember">а ты?</span>
-        </h1>
+        </BrandHeadline>
         <p class="mt-4 max-w-xl text-base text-mist sm:text-lg">
           Привет стримера — это ценность. Выбирай лот, жми «купить» и забирай, пока чат не разобрал
         </p>

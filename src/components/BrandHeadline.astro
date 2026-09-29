@@ -1,0 +1,30 @@
+---
+// Общая вывеска-заголовок: «BEERжа [Pivo] (баржа) приветов.» + вторая строка
+// из слота. Один источник на hero главной и витрину — правка в одном месте.
+// `class` несёт размеры/типографику, они у страниц разные.
+import { ALYSQUE_PIVO } from '@/lib/emotes';
+
+interface Props {
+  class?: string;
+}
+
+const { class: className } = Astro.props;
+---
+
+<h1 class={className}>
+  BEER<span class="normal-case">жа</span>{' '}
+  <!-- Эмоут декоративный (название — в title): вставка в слово.
+       -my / align держат строку пиксельного заголовка ровной. -->
+  <img
+    src={ALYSQUE_PIVO}
+    alt=""
+    title="Pivo"
+    width="24"
+    height="24"
+    loading="eager"
+    class="-my-[0.15em] inline-block h-[1.25em] w-auto object-contain align-[-0.2em]"
+  />{' '}
+  (баржа) приветов.
+  <br />
+  <slot />
+</h1>

@@ -120,24 +120,33 @@ export function stashPendingBuy(lotId: string): void {
   }
 }
 
-/** Забрать и стереть запомненный Лот (одноразово). */
-export function takePendingBuy(): string | null {
+/** Прочитать запомненный Лот, не стирая его: возврат ждёт появления кнопки
+ *  (витрина/страница рисуют карточку из БД уже после загрузки). */
+export function peekPendingBuy(): string | null {
   let fromStorage: string | null = null;
   try {
     fromStorage = sessionStorage.getItem(PENDING_BUY_KEY);
-    sessionStorage.removeItem(PENDING_BUY_KEY);
   } catch {
-    // приватный режим — возврат сработает через ?buy= в URL
+    // приватный режим — вернёмся через ?buy= в URL
   }
   if (typeof window === 'undefined') return fromStorage;
   const fromUrl = new URL(window.location.href).searchParams.get('buy');
-  const id = fromStorage ?? fromUrl;
-  if (fromUrl) {
-    const url = new URL(window.location.href);
+  return fromStorage ?? fromUrl;
+}
+
+/** Стереть запомненный Лот (после успешного возврата к нему) и убрать ?buy= из адреса. */
+export function clearPendingBuy(): void {
+  try {
+    sessionStorage.removeItem(PENDING_BUY_KEY);
+  } catch {
+    // приватный режим — чистить нечего
+  }
+  if (typeof window === 'undefined') return;
+  const url = new URL(window.location.href);
+  if (url.searchParams.has('buy')) {
     url.searchParams.delete('buy');
     window.history.replaceState(null, '', url.toString());
   }
-  return id;
 }
 
 /** URL возврата после логина: текущий адрес + ?buy=<lotId>. */

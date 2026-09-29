@@ -4,7 +4,7 @@ import LotCard from '@/components/LotCard.astro';
 import LotCardSkeleton from '@/components/LotCardSkeleton.astro';
 import BuyModal from '@/components/BuyModal.astro';
 import SuggestGreeting from '@/components/SuggestGreeting.astro';
-import { ALYSQUE_PIVO } from '@/lib/emotes';
+import BrandHeadline from '@/components/BrandHeadline.astro';
 
 // Витрина — каркас: карточек в HTML нет, сетку целиком рисует клиент из БД
 // (см. docs/adr/0002). Шаблон карточки — единственный источник разметки.
@@ -14,23 +14,9 @@ import { ALYSQUE_PIVO } from '@/lib/emotes';
   title="AlysQueZone — БИРЖА ПРИВЕТОВ"
   description="Все лоты биржи приветов alysque: цены, владельцы и покупка за Пивкойны."
 >
-  <h1 class="font-display text-sm leading-loose uppercase sm:text-lg sm:leading-loose">
-    BEER<span class="normal-case">жа</span>{' '}
-    <!-- Эмоут декоративный (название — в title): вставка в слово.
-         -my / align держат строку пиксельного заголовка ровной. -->
-    <img
-      src={ALYSQUE_PIVO}
-      alt=""
-      title="Pivo"
-      width="24"
-      height="24"
-      loading="eager"
-      class="-my-[0.15em] inline-block h-[1.25em] w-auto object-contain align-[-0.2em]"
-    />{' '}
-    (баржа) приветов.
-    <br />
+  <BrandHeadline class="font-display text-sm leading-loose uppercase sm:text-lg sm:leading-loose">
     <span class="text-ember">Стрим включился, а ты?</span>
-  </h1>
+  </BrandHeadline>
   <p class="mt-3 text-mist">Выбирай лот, жми «купить» и забирай, пока чат не разобрал</p>
 
   <section aria-label="Мои приветы" class="mt-8">

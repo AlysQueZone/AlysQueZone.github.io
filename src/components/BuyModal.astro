@@ -85,7 +85,8 @@ const clapSound = s3Sound('clap.mp3');
     isSupabaseConfigured,
     signInWithTwitch,
     stashPendingBuy,
-    takePendingBuy,
+    peekPendingBuy,
+    clearPendingBuy,
     returnUrlForLot,
     fetchSharedHistory,
     getSessionUid,
@@ -647,19 +648,37 @@ const clapSound = s3Sound('clap.mp3');
     }
   });
 
-  // Возврат из логина (тикет 09): Чатерс залогинен — переоткрыть модалку того же Лота.
+  /** Ждать появления узла: витрина/страница рисуют карточку из БД после
+   *  загрузки, кнопки в DOM сразу нет. Без этого возврат из логина терялся. */
+  function waitForSelector(selector: string, timeoutMs: number): Promise<Element | null> {
+    const immediate = document.querySelector(selector);
+    if (immediate) return Promise.resolve(immediate);
+    return new Promise((resolve) => {
+      const started = Date.now();
+      const poll = window.setInterval(() => {
+        const el = document.querySelector(selector);
+        if (el || Date.now() - started >= timeoutMs) {
+          window.clearInterval(poll);
+          resolve(el);
+        }
+      }, 150);
+    });
+  }
+
+  // Возврат из логина (тикет 09): Чатерс залогинен — переоткрыть модалку того
+  // же Лота. Лот не стираем, пока кнопка не найдена, — иначе возврат теряется.
   void (async () => {
     if (!isSupabaseConfigured()) return;
     const sb = getSupabase();
     if (!sb) return;
     const { data } = await sb.auth.getSession();
     if (!data.session) return;
-    const id = takePendingBuy();
+    const id = peekPendingBuy();
     if (!id) return;
     const sel = `[data-buy-lot="${typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(id) : id}"]`;
-    const btn = document.querySelector(sel);
-    if (btn instanceof HTMLElement) {
-      window.setTimeout(() => btn.click(), 350);
-    }
+    const btn = await waitForSelector(sel, 8000);
+    if (!(btn instanceof HTMLElement)) return;
+    clearPendingBuy();
+    btn.click();
   })();
 </script>
