@@ -282,3 +282,14 @@ html[data-plaska='on'] main {
     }
   }
 }
+
+/* Инлайн-видео лота: в квадрате карточки кадр заполняет бокс (object-cover,
+   края обрезаны). В нативном полноэкранном режиме та же обрезка показывает
+   лишь центральную часть — там вписываем видео целиком. Unlayered: иначе
+   utility .object-cover из слоя utilities перебил бы правило. */
+video:fullscreen {
+  object-fit: contain;
+}
+video:-webkit-full-screen {
+  object-fit: contain;
+}
