@@ -51,9 +51,9 @@
    получает `accepted`, `lot_id`, `decided_at`, а лот — `suggested_by_login`
    (канон ника автора из реестра; не нашли — снимок из заявки) и
    `suggested_by_uid`.
-10. **Награда** — RPC `pay_submission_reward(id)`: автору +500 и роялти 3% с первых
-    трёх перекупов его лота (тикет 11). Выплата идемпотентна по
-    `submissions.rewarded_at`; отказ выплат не делает.
+10. **Награда** — RPC `pay_submission_reward(id)`: автору бонус и роялти с первых
+    перекупов его лота (ставки и условия — `docs/agents/economy.md`). Выплата
+    идемпотентна по `submissions.rewarded_at`; отказ выплат не делает.
 
 Если приём прошёл, а выплата упала (сеть/5xx), повторный `just submission <id>`
 уже не пройдёт — заявка не `new`. Награду добирает `just submission-reward <id>`:
