@@ -12,41 +12,12 @@
  *
  * Гость в БД не ходит вообще: сначала uid из сессии, и только для своего —
  * один select под RLS («вижу только свои»). Окошки живут в общем углу
- * уведомлений (ensureCorner из outbid-notices.ts): тот же card-pixel-стиль и
- * стек, что у перекупов, — колокольчик и его окна не задеваем.
+ * уведомлений (showCornerNotice из lib/notice.ts): тот же card-pixel-стиль
+ * и стек, что у перекупов, — колокольчик и его окна не задеваем.
  */
 
 import { getSessionUid, getSupabase, isSupabaseConfigured, withAuthRetry } from './supabase';
-import { MAX_NOTICES, ensureCorner } from './outbid-notices';
-
-const NOTICE_TTL_MS = 30000;
-const LEAVE_TTL_MS = 3000;
-
-/** Окошко одной принятой заявки: card-pixel, крестик, авто-скрытие с hover-hold. */
-function showNotice(corner: HTMLElement, id: number): void {
-  const box = document.createElement('div');
-  box.className = 'card-pixel';
-  box.style.padding = '10px 12px';
-  box.style.fontSize = '14px';
-  const text = document.createElement('span');
-  // Только textContent: номер серверный, но innerHTML здесь ни к чему.
-  text.textContent = `🎉 Твоя заявка #${id} принята — привет на бирже!`;
-  const cross = document.createElement('button');
-  cross.type = 'button';
-  cross.setAttribute('aria-label', 'Закрыть');
-  cross.className = 'btn-arcade btn-arcade-ghost mt-2 px-3 py-1 text-sm';
-  cross.textContent = '✕';
-  cross.addEventListener('click', () => box.remove());
-  box.append(text, document.createElement('br'), cross);
-  corner.appendChild(box);
-  while (corner.children.length > MAX_NOTICES) corner.firstChild?.remove();
-  let timer = window.setTimeout(() => box.remove(), NOTICE_TTL_MS);
-  box.addEventListener('mouseenter', () => window.clearTimeout(timer));
-  box.addEventListener('mouseleave', () => {
-    window.clearTimeout(timer);
-    timer = window.setTimeout(() => box.remove(), LEAVE_TTL_MS);
-  });
-}
+import { MAX_NOTICES, showCornerNotice } from './notice';
 
 async function run(): Promise<void> {
   if (!isSupabaseConfigured()) return;
@@ -73,8 +44,13 @@ async function run(): Promise<void> {
       .filter((id) => Number.isFinite(id) && id > 0);
     if (ids.length === 0) return;
 
-    const corner = ensureCorner();
-    for (const id of ids) showNotice(corner, id);
+    for (const id of ids) {
+      showCornerNotice({
+        // Только textContent: номер серверный, но innerHTML здесь ни к чему.
+        text: `🎉 Твоя заявка #${id} принята — привет на бирже!`,
+        closable: true,
+      });
+    }
     // Показ состоялся — сразу гасим серверной меткой. Не прошло (офлайн) —
     // метка пуста, окошко честно вернётся в следующий заход.
     await withAuthRetry(() => sb.rpc('mark_submissions_notified', { p_ids: ids }));

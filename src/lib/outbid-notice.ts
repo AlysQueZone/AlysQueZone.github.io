@@ -30,13 +30,8 @@ import { subscribeLive } from './live';
 import { readBuyIntent, updateBuyIntentPrice } from './buy-intent';
 import { sellerLine, type OutbidEvent } from './outbid-event';
 import { playOutbidSound } from './outbid-sound';
-import {
-  MAX_NOTICES,
-  ensureCorner,
-  makeRebuyButton,
-  rebuyLabel,
-  showNotice,
-} from './outbid-notices';
+import { makeRebuyButton, rebuyLabel, showOutbidNotice } from './outbid-notices';
+import { closeNotices, MAX_NOTICES } from './notice';
 
 const MAX_HISTORY = 10;
 const BELL_ID = 'outbid-bell';
@@ -55,7 +50,6 @@ export function initOutbidNotice(): void {
   if (document.documentElement.dataset.outbidInit === '1') return;
   document.documentElement.dataset.outbidInit = '1';
 
-  const corner = ensureCorner();
   let interacted = false;
   let uid: string | null = null;
   const mine = new Set<string>();
@@ -313,14 +307,14 @@ export function initOutbidNotice(): void {
       missed.push(ev);
       return;
     }
-    showNotice(corner, ev, liveNext);
+    showOutbidNotice(ev, liveNext);
   }
 
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) {
       // показать накопленное, пока вкладка спала (свежие, до лимита)
       const fresh = missed.splice(0).slice(-MAX_NOTICES);
-      for (const ev of fresh) showNotice(corner, ev, liveNext);
+      for (const ev of fresh) showOutbidNotice(ev, liveNext);
       void refreshMine();
       void refreshPrices();
       void catchUpOffline();
@@ -433,9 +427,7 @@ export function initOutbidNotice(): void {
       unread = Math.max(0, unread - (before - history.length));
       renderBell();
       if (bellPanel && bellPanel.style.display !== 'none') renderPanel();
-      corner.querySelectorAll('[data-outbid-slug]').forEach((box) => {
-        if (box instanceof HTMLElement && box.dataset.outbidSlug === id) box.remove();
-      });
+      closeNotices(id);
     });
   })();
 }

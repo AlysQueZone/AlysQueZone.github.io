@@ -64,12 +64,6 @@ const clapSound = s3Sound('clap.mp3');
   </div>
 </div>
 
-<div
-  id="buy-notice"
-  class="card-pixel fixed bottom-16 left-1/2 z-50 hidden max-w-[calc(100vw-2rem)] -translate-x-1/2 px-8 py-4 text-center text-xl font-black break-words"
-  role="status"
-></div>
-
 <script>
   // Денег в клиенте нет: гейт «хватит/не хватит» — серверный (`insufficient
   // funds`), итог — price_paid сервера, N — из живого каталога БД (lots.ts).
@@ -87,6 +81,7 @@ const clapSound = s3Sound('clap.mp3');
     readBuyIntent,
     type BuyIntent,
   } from '@/lib/buy-intent';
+  import { showSpotNotice } from '@/lib/notice';
   import {
     getSupabase,
     isSupabaseConfigured,
@@ -105,10 +100,8 @@ const clapSound = s3Sound('clap.mp3');
   const noteEl = document.getElementById('buy-note');
   const yesBtn = document.getElementById('buy-modal-yes');
   const noBtn = document.getElementById('buy-modal-no');
-  const notice = document.getElementById('buy-notice');
 
   let pending: BuyIntent | null = null;
-  let noticeTimer: number | undefined;
   let pauseTimer: number | undefined;
   /** Сколько секунд паузы осталось на кнопке (0 — кнопка свободна). */
   let pauseLeft = 0;
@@ -189,121 +182,23 @@ const clapSound = s3Sound('clap.mp3');
   }): void {
     closeModal();
     boom();
+    const text = `ЗАБРАЛ! Привет твой: ${entry.title} — ушло ${entry.price} Пивкойнов`;
     if (entry.video) {
-      showNotice(
-        `ЗАБРАЛ! Привет твой: ${entry.title} — ушло ${entry.price} Пивкойнов`,
-        true,
-        entry.video
-      );
+      showSpotNotice({
+        text,
+        tone: 'ok',
+        video: { src: entry.video, onError: playClapFallback },
+        dismissOnOutside: true,
+      });
     } else {
       playClapFallback();
-      showNotice(`ЗАБРАЛ! Привет твой: ${entry.title} — ушло ${entry.price} Пивкойнов`, true);
+      showSpotNotice({
+        text,
+        tone: 'ok',
+        image: { src: ALYSQUE_CLAP_DARK, alt: 'alysqueCLAP' },
+      });
     }
     announceBought({ id: entry.id, price: entry.price });
-  }
-
-  /** Прервать/скрыть уведомление: остановить видео, снять таймер, спрятать. */
-  function dismissNotice(): void {
-    if (!notice) return;
-    window.clearTimeout(noticeTimer);
-    const video = notice.querySelector('video');
-    if (video) {
-      try {
-        video.pause();
-      } catch {
-        // видео уже остановлено — не мешаем закрытию
-      }
-    }
-    notice.classList.add('hidden');
-  }
-
-  function showNotice(text: string, ok: boolean, videoUrl?: string): void {
-    if (!notice) return;
-    notice.innerHTML = '';
-    delete notice.dataset.video;
-    let videoEl: HTMLVideoElement | null = null;
-    // Сброс варианта: текстовый — плашка снизу, с видео — большое окно по центру.
-    notice.classList.remove(
-      'max-w-lg',
-      'flex-col',
-      'items-start',
-      'gap-2',
-      'text-base',
-      'text-lg',
-      'top-1/2',
-      '-translate-y-1/2'
-    );
-    notice.classList.add('bottom-16');
-    const span = document.createElement('span');
-    span.textContent = text;
-    if (videoUrl) {
-      // Видео-вариант: большое окно строго по центру экрана. Окно остаётся
-      // `fixed` (не `relative`) — иначе центрирование ломается.
-      notice.classList.remove('bottom-16');
-      notice.classList.add(
-        'max-w-lg',
-        'flex-col',
-        'items-start',
-        'gap-2',
-        'text-lg',
-        'top-1/2',
-        '-translate-y-1/2'
-      );
-      // Метка для клика-вне: прерывать можно только воспроизведение.
-      notice.dataset.video = '1';
-      // Крестик — в потоке шапки (не absolute): всегда внутри карточки.
-      const row = document.createElement('div');
-      row.className = 'flex w-full items-start justify-between gap-2';
-      const close = document.createElement('button');
-      close.type = 'button';
-      close.setAttribute('aria-label', 'Закрыть');
-      close.className = 'btn-arcade btn-arcade-ghost min-w-11 shrink-0 px-3 py-1 text-sm';
-      close.textContent = '✕';
-      close.addEventListener('click', () => dismissNotice());
-      row.append(span, close);
-      notice.appendChild(row);
-      const video = document.createElement('video');
-      video.src = videoUrl;
-      video.controls = true;
-      video.autoplay = true;
-      video.playsInline = true;
-      video.setAttribute('playsinline', '');
-      video.preload = 'auto';
-      video.className = 'mt-1 w-full border-2 border-milk';
-      notice.appendChild(video);
-      try {
-        const p = video.play();
-        if (p && typeof p.catch === 'function') p.catch(() => playClapFallback());
-      } catch {
-        playClapFallback();
-      }
-      video.addEventListener('error', () => playClapFallback());
-      // Окно живёт до конца видео (или до крестика/клика-вне); 30с — страховка,
-      // если 'ended' не выстрелит.
-      video.addEventListener('ended', () => dismissNotice());
-      videoEl = video;
-    } else {
-      notice.appendChild(span);
-      if (ok) {
-        const img = document.createElement('img');
-        img.src = ALYSQUE_CLAP_DARK;
-        img.alt = 'alysqueCLAP';
-        img.width = 28;
-        img.height = 28;
-        img.loading = 'eager';
-        img.className = 'ml-2 inline h-7 w-7 object-contain';
-        notice.appendChild(img);
-        notice.classList.add('flex', 'items-center');
-      } else {
-        notice.classList.remove('flex', 'items-center');
-      }
-    }
-    notice.classList.remove('hidden', 'border-pivko', 'border-melon');
-    notice.classList.add(ok ? 'border-pivko' : 'border-melon');
-    window.clearTimeout(noticeTimer);
-    // С видео окно не прячем через 2.6с — его закроет 'ended' (+2.5с); 30с — страховка.
-    const ttl = videoEl ? 30000 : 2600;
-    noticeTimer = window.setTimeout(() => notice.classList.add('hidden'), ttl);
   }
 
   /** Единая точка правды для кнопки: транзит/лимит/пауза/нехватка/цена.
@@ -364,7 +259,10 @@ const clapSound = s3Sound('clap.mp3');
     let left = sec > 0 ? sec : PAUSE_SEC;
     pauseLeft = left;
     renderBuyButton();
-    showNotice(`Подожди ${left} с — этот лот можно забрать повторно через ${left} с.`, false);
+    showSpotNotice({
+      text: `Подожди ${left} с — этот лот можно забрать повторно через ${left} с.`,
+      tone: 'bad',
+    });
     pauseTimer = window.setInterval(() => {
       left -= 1;
       pauseLeft = left;
@@ -534,11 +432,17 @@ const clapSound = s3Sound('clap.mp3');
     // `insufficient funds`, покажем честно. Без настроенного хранилища
     // покупать нечего — честная ошибка, деньги целы.
     if (!isSupabaseConfigured()) {
-      showNotice('Хранилище не настроено — покупка не записана, Пивкойны целы.', false);
+      showSpotNotice({
+        text: 'Хранилище не настроено — покупка не записана, Пивкойны целы.',
+        tone: 'bad',
+      });
       return;
     }
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      showNotice('Офлайн: покупка не записана, Пивкойны целы. Вернись с сетью.', false);
+      showSpotNotice({
+        text: 'Офлайн: покупка не записана, Пивкойны целы. Вернись с сетью.',
+        tone: 'bad',
+      });
       return;
     }
     // Сессия могла кончиться после открытия модалки — в логин с возвратом к Лоту.
@@ -560,7 +464,10 @@ const clapSound = s3Sound('clap.mp3');
       result = await buyLot(id);
     } catch {
       restoreBuyButton();
-      showNotice('Не записалось в общее хранилище — Пивкойны целы, попробуй ещё.', false);
+      showSpotNotice({
+        text: 'Не записалось в общее хранилище — Пивкойны целы, попробуй ещё.',
+        tone: 'bad',
+      });
       return;
     }
     if (result.status === 'ok') {
@@ -574,16 +481,19 @@ const clapSound = s3Sound('clap.mp3');
     }
     if (result.kind === 'rate-limit') {
       showLimit();
-      showNotice('Лимит: 10 покупок за 10 минут — приходи позже, Пивкойны целы.', false);
+      showSpotNotice({
+        text: 'Лимит: 10 покупок за 10 минут — приходи позже, Пивкойны целы.',
+        tone: 'bad',
+      });
       return;
     }
     restoreBuyButton();
     if (result.kind === 'insufficient-funds') {
       closeModal();
-      showNotice(
-        'Не хватает Пивкойнов — пойжем жоско в гамбу или забери Ежедневный вход, а этот привет подождёт.',
-        false
-      );
+      showSpotNotice({
+        text: 'Не хватает Пивкойнов — пойжем жоско в гамбу или забери Ежедневный вход, а этот привет подождёт.',
+        tone: 'bad',
+      });
       return;
     }
     if (result.kind === 'unauthenticated') {
@@ -593,22 +503,31 @@ const clapSound = s3Sound('clap.mp3');
     }
     switch (result.kind) {
       case 'own-lot':
-        showNotice('Этот привет уже твой — перекупать нечего.', false);
+        showSpotNotice({ text: 'Этот привет уже твой — перекупать нечего.', tone: 'bad' });
         break;
       case 'missing-lot':
-        showNotice(
-          'Лот ещё не переехал в общее хранилище — покупка не записана, Пивкойны целы.',
-          false
-        );
+        showSpotNotice({
+          text: 'Лот ещё не переехал в общее хранилище — покупка не записана, Пивкойны целы.',
+          tone: 'bad',
+        });
         break;
       case 'price-cap':
-        showNotice('Цена упёрлась в потолок — дальше некуда, Пивкойны целы.', false);
+        showSpotNotice({
+          text: 'Цена упёрлась в потолок — дальше некуда, Пивкойны целы.',
+          tone: 'bad',
+        });
         break;
       case 'offline':
-        showNotice('Сеть упала: покупка не записана, Пивкойны целы. Попробуй ещё.', false);
+        showSpotNotice({
+          text: 'Сеть упала: покупка не записана, Пивкойны целы. Попробуй ещё.',
+          tone: 'bad',
+        });
         break;
       default:
-        showNotice('Не записалось в общее хранилище — Пивкойны целы, попробуй ещё.', false);
+        showSpotNotice({
+          text: 'Не записалось в общее хранилище — Пивкойны целы, попробуй ещё.',
+          tone: 'bad',
+        });
         break;
     }
   });
@@ -622,18 +541,10 @@ const clapSound = s3Sound('clap.mp3');
     balance = value;
     renderBuyButton();
   });
-  // Клик-вне окна воспроизведения — прервать мем. Крестик внутри — свой обработчик.
-  document.addEventListener('click', (e) => {
-    if (!notice || notice.dataset.video !== '1' || notice.classList.contains('hidden')) return;
-    const target = e.target as Node | null;
-    if (target && notice.contains(target)) return;
-    dismissNotice();
-  });
+  // Клик-вне и Escape окошка воспроизведения — забота lib/notice.ts
+  // (dismissOnOutside у видео-варианта).
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      closeModal();
-      dismissNotice();
-    }
+    if (e.key === 'Escape') closeModal();
   });
 
   /** Ждать появления кнопки покупки Лота: витрина/страница рисуют карточку

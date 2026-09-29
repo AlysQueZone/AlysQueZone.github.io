@@ -1,19 +1,16 @@
 /**
- * DOM окошек «твой лот перекупили» (правый нижний угол).
+ * Окошки «твой лот перекупили» (правый нижний угол).
  *
- * Выделено из outbid-notice.ts (карта code-quality, распил монолита):
- * максимум 3 окошка, старые вытесняются, висят 20с, hover удерживает.
- * Состояние подписок и история — в outbid-notice.ts, сюда прилетают
- * готовое событие и карта живых цен.
+ * Адаптер поверхности колокола к общему модулю уведомлений (lib/notice.ts):
+ * собирает строку с раскрытой комиссией и кнопку возврата, показ — стек
+ * showCornerNotice (максимум 3 окошка, старые вытесняются, hover удерживает).
+ * Состояние подписок и история — в outbid-notice.ts, сюда прилетают готовое
+ * событие и карта живых цен.
  */
 
 import { sellerLine, type OutbidEvent } from './outbid-event';
 import { formatStaged, writeBuyIntent } from './buy-intent';
-
-export const MAX_NOTICES = 3;
-const NOTICE_TTL_MS = 20000;
-const LEAVE_TTL_MS = 3000;
-const CORNER_ID = 'outbid-corner';
+import { showCornerNotice } from './notice';
 
 /** Живая N из каталога БД (src/lib/lots.ts): slug → следующая цена. */
 export type LivePrices = Map<string, number>;
@@ -50,56 +47,15 @@ export function makeRebuyButton(ev: OutbidEvent, liveNext: LivePrices): HTMLButt
   return btn;
 }
 
-export function ensureCorner(): HTMLElement {
-  let corner = document.getElementById(CORNER_ID);
-  if (corner instanceof HTMLElement) return corner;
-  corner = document.createElement('div');
-  corner.id = CORNER_ID;
-  corner.setAttribute('aria-live', 'polite');
-  corner.style.position = 'fixed';
-  corner.style.right = '12px';
-  corner.style.bottom = '12px';
-  corner.style.display = 'flex';
-  corner.style.flexDirection = 'column';
-  corner.style.gap = '8px';
-  corner.style.maxWidth = '320px';
-  corner.style.zIndex = '60';
-  document.body.appendChild(corner);
-  return corner;
-}
-
-export function showNotice(corner: HTMLElement, ev: OutbidEvent, liveNext: LivePrices): void {
-  const box = document.createElement('div');
-  box.dataset.outbidSlug = ev.slug;
-  // Окошко — карточка стиля C (фон/рамка/тень из .card-pixel),
-  // раскладка прежняя.
-  box.className = 'card-pixel';
-  box.style.padding = '10px 12px';
-  box.style.fontSize = '14px';
-  const head = document.createElement('b');
-  head.className = 'font-display';
-  head.style.display = 'block';
-  head.style.fontSize = '10px';
-  head.style.textTransform = 'uppercase';
-  head.style.marginBottom = '4px';
-  head.textContent = '▶ Твой лот перекупили!';
-  const text = document.createElement('span');
-  // Факт уплаченной цены сервера + раскрытая комиссия продавца (тикет 05);
-  // живая N — на кнопке возврата ниже.
-  text.textContent = sellerLine(ev);
-  const btn = makeRebuyButton(ev, liveNext);
-  btn.addEventListener('click', () => {
-    window.setTimeout(() => box.remove(), 0);
-  });
-  box.append(head, text, document.createElement('br'), btn);
-  corner.appendChild(box);
-  while (corner.children.length > MAX_NOTICES) corner.firstChild?.remove();
-  let timer = window.setTimeout(() => box.remove(), NOTICE_TTL_MS);
-  box.addEventListener('mouseenter', () => {
-    window.clearTimeout(timer);
-  });
-  box.addEventListener('mouseleave', () => {
-    window.clearTimeout(timer);
-    timer = window.setTimeout(() => box.remove(), LEAVE_TTL_MS);
+/** Показать окошко перекупа: шапка + строка продавца + кнопка возврата.
+ *  Ключ — slug: выкуп обратно гасит окошки этого лота (closeNotices). */
+export function showOutbidNotice(ev: OutbidEvent, liveNext: LivePrices): void {
+  showCornerNotice({
+    header: '▶ Твой лот перекупили!',
+    // Факт уплаченной цены сервера + раскрытая комиссия продавца (тикет 05);
+    // живая N — на кнопке возврата.
+    text: sellerLine(ev),
+    action: makeRebuyButton(ev, liveNext),
+    key: ev.slug,
   });
 }
