@@ -1,0 +1,955 @@
+<!doctype html>
+<!--
+  ПРОТОТИП (throwaway) — правила ленты витрины `/lots/`.
+
+  Вопрос: как раскладывать карточки, если видео разной пропорции?
+    1. Портрет (≈9:16, большинство) — как сейчас, ячейка в сетке.
+    2. Широкое (16:9) — занимает целую строку одной большой карточкой,
+       а не мелкую ячейку 1/3.
+    3. Квадрат — ? (тумблер: обычная ячейка / две колонки).
+
+  Варианты (переключатель внизу, ?variant=):
+    0 «Как сейчас»          — правила нет: все карточки в ячейках 1/3, широкое
+                              вписывается в свою ячейку (мелко).
+    A «Полоса: медиа слева» — широкое = полоса во всю строку: медиа слева,
+                              инфо (владелец/название/кнопка) справа.
+    B «Полоса: медиа сверху»— широкое = полоса: широкий кадр-баннер сверху,
+                              инфо-строка под ним.
+
+  Тумблеры сверху:
+    - «Квадрат»: обычная ячейка / две колонки (проверить, надо ли выделять).
+    - «Дыры»:   как есть / плотно (dense) — широкая карточка оставляет пустые
+                ячейки в конце предыдущего ряда; dense подтягивает туда
+                следующие мелкие карточки (ценой порядка по цене).
+
+  Оговорка throwaway (как в scratch/buy-guest, scratch/lot-cards):
+    - НЕ часть сборки, отдельный HTML вне Astro;
+    - токены/шрифты/классы повторены вручную; данные — реальные (title,
+      постер, цена из content/lots.toml), владельцы — фейковые;
+    - кнопки декоративные, ничего не покупают; постеры — хотлинком.
+-->
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Прототип · Правила ленты — AlysQueZone</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rubik:wght@400;700;800;900&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --color-void: #fff6bf;
+        --color-panel: #ffe6ac;
+        --color-bar: #ffe4a6;
+        --color-card: #f0c46c;
+        --color-milk: #422006;
+        --color-mist: #744210;
+        --color-stream: #c2187b;
+        --color-ctahover: #9e145f;
+        --color-ember: #ff9e2c;
+        --color-legend: #b3127a;
+        --color-cream: #fffbea;
+        --color-pivko: #7a5f00;
+        --font-display: 'Press Start 2P', 'Rubik', system-ui, sans-serif;
+        --font-sans: 'Rubik', system-ui, -apple-system, sans-serif;
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background-color: var(--color-void);
+        color: var(--color-milk);
+        font-family: var(--font-sans);
+        -webkit-font-smoothing: antialiased;
+        min-height: 100vh;
+        padding-bottom: 7rem;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      :focus-visible {
+        outline: 3px solid #ff00bc;
+        outline-offset: 2px;
+      }
+
+      .wrap {
+        max-width: 72rem;
+        margin: 0 auto;
+        padding: 1rem 1rem 2rem;
+      }
+
+      .topbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        border-bottom: 3px solid var(--color-milk);
+        padding-bottom: 0.75rem;
+        margin-bottom: 0.75rem;
+      }
+
+      .brand {
+        font-family: var(--font-display);
+        font-size: 14px;
+        line-height: 1.7;
+        text-transform: uppercase;
+      }
+
+      .tag {
+        font-family: var(--font-display);
+        font-size: 9px;
+        line-height: 1.7;
+        text-transform: uppercase;
+        background: var(--color-legend);
+        color: var(--color-cream);
+        padding: 4px 8px;
+        border-radius: 2px;
+        margin-left: 0.5rem;
+      }
+
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        align-items: center;
+      }
+
+      .control {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+      }
+
+      .control > .label {
+        font-weight: 900;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+      }
+
+      .seg {
+        display: inline-flex;
+      }
+
+      .seg button {
+        font: inherit;
+        font-weight: 900;
+        font-size: 0.75rem;
+        border: 3px solid var(--color-milk);
+        background: var(--color-panel);
+        color: var(--color-milk);
+        padding: 0.4rem 0.6rem;
+        min-height: 40px;
+        cursor: pointer;
+      }
+
+      .seg button + button {
+        border-left: 0;
+      }
+
+      .seg button:first-child {
+        border-radius: 4px 0 0 4px;
+      }
+
+      .seg button:last-child {
+        border-radius: 0 4px 4px 0;
+      }
+
+      .seg button[aria-pressed='true'] {
+        background: var(--color-stream);
+        color: var(--color-cream);
+      }
+
+      .hint {
+        font-size: 0.85rem;
+        color: var(--color-mist);
+        margin: 0 0 1rem;
+      }
+
+      /* ---- лента ---------------------------------------------------------- */
+      .feed {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1rem;
+        align-items: start;
+      }
+
+      .feed.dense {
+        grid-auto-flow: dense;
+      }
+
+      @media (max-width: 900px) {
+        .feed {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 620px) {
+        .feed {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      /* Ячейка сетки: одинаковая высота ряда, кнопка прижата к низу. */
+      .card {
+        background: var(--color-panel);
+        border: 3px solid var(--color-milk);
+        box-shadow: 6px 6px 0 var(--color-milk);
+        border-radius: 4px;
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        min-width: 0;
+      }
+
+      .title {
+        font-size: 1rem;
+        font-weight: 900;
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+      }
+
+      .media {
+        position: relative;
+        width: 100%;
+        overflow: hidden;
+        border: 2px solid var(--color-milk);
+        background: #000;
+      }
+
+      .media img {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      .play {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgb(0 0 0 / 35%);
+        border: 0;
+        cursor: pointer;
+        padding: 0;
+      }
+
+      .badge {
+        position: absolute;
+        top: 0.5rem;
+        left: 0.5rem;
+        pointer-events: none;
+        display: inline-block;
+        font-family: var(--font-display);
+        font-size: 9px;
+        line-height: 1.7;
+        padding: 4px 8px;
+        border-radius: 2px;
+        text-transform: uppercase;
+        max-width: 85%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .badge-owner {
+        background: var(--color-milk);
+        color: var(--color-cream);
+      }
+
+      .badge-free {
+        background: var(--color-bar);
+        color: var(--color-mist);
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.25rem;
+        min-height: 44px;
+        width: 100%;
+        border: 3px solid var(--color-milk);
+        box-shadow: 4px 4px 0 var(--color-milk);
+        border-radius: 4px;
+        font: inherit;
+        font-weight: 900;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        cursor: pointer;
+        padding: 0.5rem 1rem;
+        background: var(--color-stream);
+        color: var(--color-cream);
+        text-align: center;
+      }
+
+      .btn-s {
+        min-height: 0;
+        font-size: 0.7rem;
+        padding: 0.5rem 0.75rem;
+      }
+
+      .cta {
+        margin-top: auto;
+        padding-top: 0.5rem;
+      }
+
+      /* квадрат в две колонки (тумблер) */
+      .card.span2 {
+        grid-column: span 2;
+      }
+
+      @media (max-width: 900px) {
+        .card.span2 {
+          grid-column: auto;
+        }
+      }
+
+      /* ---- широкая полоса ------------------------------------------------- */
+      .card.wide {
+        grid-column: 1 / -1;
+      }
+
+      /* A: медиа слева, инфо справа */
+      .card.wide-a {
+        flex-direction: row;
+        gap: 1rem;
+        align-items: stretch;
+      }
+
+      .wa-media {
+        position: relative;
+        flex: 0 0 58%;
+        aspect-ratio: 16 / 9;
+        overflow: hidden;
+        border: 2px solid var(--color-milk);
+        background: #000;
+      }
+
+      .wa-media img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .wa-info {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+
+      .ratio-note {
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: var(--color-mist);
+      }
+
+      /* B: широкий кадр-баннер сверху, инфо-строка снизу */
+      .card.wide-b {
+        padding: 0;
+        overflow: hidden;
+      }
+
+      .wb-cover {
+        position: relative;
+        width: 100%;
+        height: min(38vh, 340px);
+        overflow: hidden;
+        background: #000;
+        border-bottom: 3px solid var(--color-milk);
+      }
+
+      .wb-cover img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .wb-bar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 1rem;
+      }
+
+      .wb-bar .title {
+        flex: 1;
+        min-width: 12rem;
+      }
+
+      .wb-bar .cta {
+        margin: 0;
+        padding: 0;
+        flex: 0 0 auto;
+      }
+
+      .wb-bar .btn {
+        width: auto;
+      }
+
+      @media (max-width: 760px) {
+        .card.wide-a {
+          flex-direction: column;
+        }
+
+        .wa-media {
+          flex: 0 0 auto;
+          aspect-ratio: 16 / 9;
+        }
+      }
+
+      /* ---- переключатель вариантов ---------------------------------------- */
+      .switcher {
+        position: fixed;
+        left: 50%;
+        bottom: 1rem;
+        transform: translateX(-50%);
+        z-index: 60;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: var(--color-milk);
+        color: var(--color-cream);
+        border-radius: 999px;
+        padding: 0.4rem 0.5rem;
+        box-shadow: 0 6px 0 rgb(0 0 0 / 25%);
+        max-width: calc(100vw - 1rem);
+      }
+
+      .switcher button {
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: 999px;
+        border: 0;
+        background: var(--color-cream);
+        color: var(--color-milk);
+        font-size: 1.1rem;
+        font-weight: 900;
+        cursor: pointer;
+        flex: 0 0 auto;
+      }
+
+      .switcher .slabel {
+        font-family: var(--font-display);
+        font-size: 9px;
+        line-height: 1.7;
+        text-align: center;
+        min-width: 15rem;
+        text-transform: uppercase;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      @media (max-width: 520px) {
+        .switcher .slabel {
+          min-width: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="topbar">
+        <div class="brand">Правила ленты<span class="tag">throwaway</span></div>
+        <div class="controls">
+          <div class="control">
+            <span class="label">Квадрат</span>
+            <div class="seg" id="square-seg">
+              <button type="button" data-square="cell" aria-pressed="true">Ячейка</button>
+              <button type="button" data-square="span2" aria-pressed="false">2 колонки</button>
+            </div>
+          </div>
+          <div class="control">
+            <span class="label">Дыры</span>
+            <div class="seg" id="dense-seg">
+              <button type="button" data-dense="off" aria-pressed="true">Как есть</button>
+              <button type="button" data-dense="on" aria-pressed="false">Плотно</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p class="hint" id="hint"></p>
+      <div class="feed" id="feed"></div>
+    </div>
+
+    <div class="switcher" role="group" aria-label="Переключение вариантов">
+      <button type="button" id="prev" aria-label="Предыдущий вариант">←</button>
+      <div class="slabel" id="slabel"></div>
+      <button type="button" id="next" aria-label="Следующий вариант">→</button>
+    </div>
+
+    <script>
+      // ---- данные (реальные title/постер/цена из content/lots.toml, владельцы фейковые) ----
+      const LOTS = [
+        {
+          title: 'Второй повторный привет',
+          price: 650,
+          owner: null,
+          w: 192,
+          h: 352,
+          poster:
+            'https://cdns.memealerts.com/p/672ba6a81135f4340a61a4d0/debfc8c4-16a3-45b0-89ed-9b81f92100e6/alert_orig.webp',
+        },
+        {
+          title: 'Привет сразу всем (оптом)',
+          price: 700,
+          owner: 'FEISTYMAN333',
+          w: 176,
+          h: 304,
+          poster:
+            'https://cdns.memealerts.com/p/672ba6a81135f4340a61a4d0/6e47bcfc-453d-47da-8b6f-958c2a25bc4a/alert_orig.webp',
+        },
+        {
+          title: 'Привет для remololpro',
+          price: 750,
+          owner: '4DELI',
+          w: 336,
+          h: 464,
+          poster:
+            'https://cdns.memealerts.com/p/66961426e904cc2377372321/0acec35f-0179-466e-a2ca-7995d46328ea/alert_orig.webp',
+        },
+        {
+          title: 'Привет для CaJIaToB',
+          price: 750,
+          owner: null,
+          w: 208,
+          h: 368,
+          poster:
+            'https://cdns.memealerts.com/p/672ba6a81135f4340a61a4d0/fe6b3373-284a-438a-b6f7-041394b31c77/alert_orig.webp',
+        },
+        {
+          title: 'o7 arhion24',
+          price: 800,
+          owner: 'gedo0',
+          w: 352,
+          h: 608,
+          poster:
+            'https://cdns.memealerts.com/p/69bcde52b57c1c9b432af084/0fcaba76-262b-4768-be63-9ae9daa7a390/alert_orig.webp',
+        },
+        {
+          title: 'Виртуальный помощник',
+          price: 800,
+          owner: 'GLASS_9RADIENT',
+          w: 512,
+          h: 512,
+          poster:
+            'https://cdns.memealerts.com/p/64ceae64bde979e95d878442/30feb2e2-3eed-4878-8f80-895746b46d32/alert_orig.webp',
+        },
+        {
+          title: 'Привет avrora_666',
+          price: 800,
+          owner: null,
+          w: 512,
+          h: 291,
+          poster:
+            'https://cdns.memealerts.com/p/67192f892e1f470e296d67ca/7fb39f55-2e3a-42aa-80fd-95a0835d3e09/alert_orig.webp',
+        },
+        {
+          title: 'Грубый привет от Bradhi',
+          price: 800,
+          owner: 'DYADYAPOG',
+          w: 254,
+          h: 254,
+          poster:
+            'https://cdns.memealerts.com/p/64ceae64bde979e95d878442/708a27b8-3213-4b8d-aead-2190c17ad493/alert_orig.webp',
+        },
+        {
+          title: 'Привет foxindique и INexizI',
+          price: 800,
+          owner: 'sooblonde',
+          w: 448,
+          h: 816,
+          poster:
+            'https://cdns.memealerts.com/p/672ba6a81135f4340a61a4d0/9ccdb2ec-b274-4a0a-8fe9-34604a7779e5/alert_orig.webp',
+        },
+        {
+          title: 'Массовый привет (коты одобряют)',
+          price: 800,
+          owner: null,
+          w: 468,
+          h: 586,
+          poster:
+            'https://cdns.memealerts.com/p/64f8378906d68898c5b8e508/2d11fea1-bda2-493a-9774-510e15c6a589/alert_orig.webp',
+        },
+        {
+          title: 'Доброе утро 77moHax777',
+          price: 800,
+          owner: 'DVADVAPOG',
+          w: 240,
+          h: 432,
+          poster:
+            'https://cdns.memealerts.com/p/694ade20c4649c766c8e3d80/70c03e18-173a-4d8e-8cb3-22b7507dce86/alert_orig.webp',
+        },
+        {
+          title: 'Привет я не мем',
+          price: 800,
+          owner: 'FEISTYMAN333',
+          w: 512,
+          h: 512,
+          poster:
+            'https://cdns.memealerts.com/p/64ceae64bde979e95d878442/d9700c9e-e658-49b6-ae98-8ca1b3da9350/alert_orig.webp',
+        },
+        {
+          title: 'Покупаю avrora_666',
+          price: 800,
+          owner: null,
+          w: 512,
+          h: 291,
+          poster:
+            'https://cdns.memealerts.com/p/67192f892e1f470e296d67ca/3bc7c111-2d9e-4d3b-aa09-4c6bc6bc1feb/alert_orig.webp',
+        },
+        {
+          title: 'Привет 4Deli',
+          price: 800,
+          owner: 'FOXINDIQUE',
+          w: 252,
+          h: 460,
+          poster:
+            'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-4deli.webp',
+        },
+        {
+          title: 'Привет AkseLWalkerQuE',
+          price: 800,
+          owner: 'gedo0',
+          w: 290,
+          h: 504,
+          poster:
+            'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-axel.webp',
+        },
+        {
+          title: 'Привет Bradhi',
+          price: 800,
+          owner: null,
+          w: 294,
+          h: 544,
+          poster:
+            'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-bradhi.webp',
+        },
+        {
+          title: 'Привет coolbeback',
+          price: 800,
+          owner: 'SHIDOUQUE',
+          w: 266,
+          h: 468,
+          poster:
+            'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-coolbeback.webp',
+        },
+        {
+          title: 'Привет KubicLego',
+          price: 800,
+          owner: 'DYADYAPOG',
+          w: 308,
+          h: 544,
+          poster:
+            'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-kubiclego.webp',
+        },
+        {
+          title: 'Двойной привет evilzerg57',
+          price: 800,
+          owner: null,
+          w: 1230,
+          h: 658,
+          poster:
+            'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-evilzerg57-double.webp',
+        },
+        {
+          title: 'Покупка olyacaramel',
+          price: 800,
+          owner: 'VandalQuE',
+          w: 258,
+          h: 484,
+          poster:
+            'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-olyacaramel.webp',
+        },
+        {
+          title: 'Привет Onghanntto',
+          price: 800,
+          owner: 'DVADVAPOG',
+          w: 366,
+          h: 650,
+          poster:
+            'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-onghanntto.webp',
+        },
+        {
+          title: 'Привет Revixit',
+          price: 800,
+          owner: null,
+          w: 290,
+          h: 504,
+          poster:
+            'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-revixit.webp',
+        },
+        {
+          title: 'Привет sooblonde',
+          price: 800,
+          owner: '4DELI',
+          w: 260,
+          h: 458,
+          poster:
+            'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-sooblonde.webp',
+        },
+        {
+          title: 'Привет spiritbanbanban',
+          price: 800,
+          owner: 'FOXINDIQUE',
+          w: 290,
+          h: 504,
+          poster:
+            'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-spirit.webp',
+        },
+        {
+          title: 'Привет VandaLQuE',
+          price: 800,
+          owner: null,
+          w: 290,
+          h: 504,
+          poster:
+            'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-vandalque.webp',
+        },
+        {
+          title: 'Привет Virratu',
+          price: 800,
+          owner: 'GLASS_9RADIENT',
+          w: 260,
+          h: 480,
+          poster:
+            'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-virratu.webp',
+        },
+        {
+          title: 'Привет для quevizariks',
+          price: 850,
+          owner: 'SHIDOUQUE',
+          w: 512,
+          h: 592,
+          poster:
+            'https://cdns.memealerts.com/p/649b210acfd0d2a8f427e00f/5d46287f-92a9-4897-a7cb-dbd4449e8d15/alert_orig.webp',
+        },
+        {
+          title: 'Привет evilzerg57',
+          price: 900,
+          owner: null,
+          w: 352,
+          h: 448,
+          poster:
+            'https://cdns.memealerts.com/p/66961426e904cc2377372321/cdd80a79-9dd9-4a44-a5a7-016de293f8d6/alert_orig.webp',
+        },
+        {
+          title: 'Миф о бесплатном пивете',
+          price: 1000,
+          owner: 'sooblonde',
+          w: 512,
+          h: 667,
+          poster:
+            'https://cdns.memealerts.com/p/649b210acfd0d2a8f427e00f/1870f6b6-c0d7-45c9-b39f-f7c00c5220b7/alert_orig.webp',
+        },
+        {
+          title: 'Здраствуйте, nyanyachos',
+          price: 1200,
+          owner: 'VandalQuE',
+          w: 416,
+          h: 608,
+          poster:
+            'https://cdns.memealerts.com/p/66961426e904cc2377372321/a24b3e2f-5f63-42bc-b40a-346eb305464d/alert_orig.webp',
+        },
+      ];
+
+      const STATE = { square: 'cell', dense: 'off' };
+      const esc = (s) =>
+        String(s).replace(
+          /[&<>"]/g,
+          (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]
+        );
+      const next = (p) => Math.ceil(p * 1.1);
+
+      function kindOf(l) {
+        const r = l.w / l.h;
+        if (r >= 1.2) return 'wide';
+        if (r >= 0.9) return 'square';
+        return 'portrait';
+      }
+
+      function ownerBadge(l) {
+        return l.owner
+          ? `<span class="badge badge-owner">👑 ${esc(l.owner)}</span>`
+          : `<span class="badge badge-free">свободен</span>`;
+      }
+
+      function playBtn() {
+        return `<button class="play" type="button" aria-label="Смотреть привет"><span class="btn btn-s">▶ смотреть</span></button>`;
+      }
+
+      // Обычная ячейка: портрет 77:136 + заполнение; квадрат/широкое (вариант 0) — своя пропорция.
+      function cellCard(l) {
+        const k = kindOf(l);
+        const portraitStyle = k === 'portrait' ? '77 / 136' : `${l.w} / ${l.h}`;
+        const fit = k === 'portrait' ? 'cover' : 'contain';
+        const span2 = k === 'square' && STATE.square === 'span2' ? ' span2' : '';
+        return `<article class="card${span2}">
+          <h3 class="title">${esc(l.title)}</h3>
+          <div class="media" style="aspect-ratio:${portraitStyle}">
+            <img src="${l.poster}" alt="" loading="lazy" style="object-fit:${fit}" />
+            ${playBtn()}
+            ${ownerBadge(l)}
+          </div>
+          <div class="cta"><button class="btn" type="button">▶ Забрать за ${next(l.price)} 🍺</button></div>
+        </article>`;
+      }
+
+      // Полоса A: медиа слева, инфо справа.
+      function wideA(l) {
+        return `<article class="card wide wide-a">
+          <div class="wa-media">
+            <img src="${l.poster}" alt="" loading="lazy" />
+            ${playBtn()}
+            ${ownerBadge(l)}
+          </div>
+          <div class="wa-info">
+            <h3 class="title">${esc(l.title)}</h3>
+            <p class="ratio-note">широкое ${l.w}×${l.h} · вся строка</p>
+            <div class="cta"><button class="btn" type="button">▶ Забрать за ${next(l.price)} 🍺</button></div>
+          </div>
+        </article>`;
+      }
+
+      // Полоса B: широкий кадр-баннер сверху, инфо-строка снизу.
+      function wideB(l) {
+        return `<article class="card wide wide-b">
+          <div class="wb-cover">
+            <img src="${l.poster}" alt="" loading="lazy" />
+            ${playBtn()}
+            ${ownerBadge(l)}
+          </div>
+          <div class="wb-bar">
+            <h3 class="title">${esc(l.title)}</h3>
+            <div class="cta"><button class="btn" type="button">▶ Забрать за ${next(l.price)} 🍺</button></div>
+          </div>
+        </article>`;
+      }
+
+      const VARIANTS = [
+        {
+          key: '0',
+          name: 'Как сейчас',
+          desc: 'Правила нет: все карточки в ячейках 1/3; широкое вписывается в свою ячейку (мелко).',
+          render: (l) => cellCard(l),
+        },
+        {
+          key: 'A',
+          name: 'Полоса: медиа слева',
+          desc: 'Широкое (16:9) — полоса во всю строку: медиа слева, владелец/название/кнопка справа.',
+          render: (l) => (kindOf(l) === 'wide' ? wideA(l) : cellCard(l)),
+        },
+        {
+          key: 'B',
+          name: 'Полоса: медиа сверху',
+          desc: 'Широкое — полоса: кадр-баннер во всю ширину сверху, инфо-строка (название + кнопка) снизу.',
+          render: (l) => (kindOf(l) === 'wide' ? wideB(l) : cellCard(l)),
+        },
+      ];
+
+      const feed = document.getElementById('feed');
+      const hint = document.getElementById('hint');
+      const slabel = document.getElementById('slabel');
+
+      function render(key) {
+        const v = VARIANTS.find((x) => x.key === key) ?? VARIANTS[0];
+        const counts = LOTS.reduce((a, l) => ((a[kindOf(l)] = (a[kindOf(l)] || 0) + 1), a), {});
+        hint.textContent = `Вариант ${v.key} «${v.name}»: ${v.desc} Всего ${LOTS.length} лотов — портрет ${counts.portrait || 0}, квадрат ${counts.square || 0}, широкое ${counts.wide || 0}.`;
+        slabel.textContent = `${v.key} · ${v.name}`;
+        feed.classList.toggle('dense', STATE.dense === 'on');
+        feed.innerHTML = LOTS.map(v.render).join('');
+      }
+
+      function currentKey() {
+        const k = new URLSearchParams(location.search).get('variant');
+        return VARIANTS.some((v) => v.key === k) ? k : 'A';
+      }
+
+      let active = currentKey();
+      function setVariant(key) {
+        active = key;
+        try {
+          const url = new URL(location.href);
+          url.searchParams.set('variant', key);
+          history.replaceState(null, '', url);
+        } catch {
+          /* file:// — просто отрисуем */
+        }
+        render(key);
+      }
+
+      function cycle(step) {
+        const i = VARIANTS.findIndex((v) => v.key === active);
+        setVariant(VARIANTS[(i + step + VARIANTS.length) % VARIANTS.length].key);
+      }
+
+      document.getElementById('prev').addEventListener('click', () => cycle(-1));
+      document.getElementById('next').addEventListener('click', () => cycle(1));
+      document.addEventListener('keydown', (e) => {
+        const t = e.target;
+        if (
+          t instanceof HTMLElement &&
+          (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)
+        )
+          return;
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          cycle(-1);
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          cycle(1);
+        }
+      });
+
+      document.addEventListener('click', (e) => {
+        if (e.target.closest('.play, .btn')) e.preventDefault();
+      });
+
+      document.getElementById('square-seg').addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-square]');
+        if (!btn) return;
+        STATE.square = btn.dataset.square;
+        document
+          .querySelectorAll('#square-seg button')
+          .forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+        render(active);
+      });
+
+      document.getElementById('dense-seg').addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-dense]');
+        if (!btn) return;
+        STATE.dense = btn.dataset.dense;
+        document
+          .querySelectorAll('#dense-seg button')
+          .forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+        render(active);
+      });
+
+      setVariant(active);
+    </script>
+  </body>
+</html>
