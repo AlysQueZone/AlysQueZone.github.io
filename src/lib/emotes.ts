@@ -21,6 +21,10 @@ const cdn = (id: string): string => `https://cdn.7tv.app/emote/${id}/2x.webp`;
  *  кнопка «гамба на пивкойны» в шапке и спин в GambaModal. */
 export const GAMBA_EMOTE_URL = cdn('01FJT4HEXG000FZHS49NWQT5DZ');
 
+/** 7TV-эмоут Pivo канала (ID сверен 2026-09-29 через 7TV API сета):
+ *  вставка в слово «BEERжа» в hero главной. */
+export const ALYSQUE_PIVO = cdn('01H32XFQTR000BXX005J6Z48FN');
+
 /** Токен заголовка → 7TV-эмоут канала (ID сверен 2026-09-15 по сету alysque). */
 const TITLE_EMOTES: Record<string, { src: string; name: string }> = {
   o7: { src: cdn('01KD6VPC2JC6Q7RCT4S6D6ZTWQ'), name: 'o7' },
