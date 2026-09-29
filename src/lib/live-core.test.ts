@@ -3,8 +3,8 @@
  * веер payload'ов, честный null при отказе транспорта.
  *
  * Гоняются с fake-транспортом — без сети, DOM и Supabase; проверяют ровно те
- * баги, из-за которых кандидат выбран: дубль канала на одинаковые подписки и
- * брошенную отписку.
+ * баги, из-за которых кандидат выбран: общий канал на одинаковые подписки и
+ * отписку, которая не должна трогать чужие доли.
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -12,7 +12,7 @@ import {
   type LivePayload,
   type LiveSubscription,
   type LiveTransport,
-} from './live';
+} from './live-core';
 
 interface FakeChannel {
   spec: LiveSubscription;
@@ -85,6 +85,28 @@ describe('createLiveRegistry', () => {
     expect(channels[0].closed).toBe(true);
   });
 
+  it('один и тот же колбэк дважды — две доли: отписка одной не закрывает канал', () => {
+    const { transport, channels } = fakeTransport();
+    const registry = createLiveRegistry(transport);
+    let calls = 0;
+    const cb = (): void => {
+      calls += 1;
+    };
+
+    const unsubscribeA = registry.subscribe(LOTS, cb);
+    const unsubscribeB = registry.subscribe(LOTS, cb);
+    channels[0].emit({ new: { slug: 'lot-a' } });
+    expect(calls).toBe(2);
+
+    unsubscribeA?.();
+    expect(channels[0].closed).toBe(false);
+    channels[0].emit({ new: { slug: 'lot-a' } });
+    expect(calls).toBe(3);
+
+    unsubscribeB?.();
+    expect(channels[0].closed).toBe(true);
+  });
+
   it('отписка идемпотентна: повторный вызов канал не закрывает дважды', () => {
     const { transport, channels } = fakeTransport();
     const registry = createLiveRegistry(transport);
@@ -116,6 +138,18 @@ describe('createLiveRegistry', () => {
     refuse.on = false;
     expect(registry.subscribe(LOTS, () => {})).not.toBeNull();
     expect(channels).toHaveLength(1);
+  });
+
+  it('бросающий транспорт — null, а не исключение наружу', () => {
+    const throwing: LiveTransport = {
+      open() {
+        throw new Error('транспорт сломан');
+      },
+    };
+    const registry = createLiveRegistry(throwing);
+
+    expect(() => registry.subscribe(LOTS, () => {})).not.toThrow();
+    expect(registry.subscribe(LOTS, () => {})).toBeNull();
   });
 
   it('исключение в слушателе не глушит доставку остальным', () => {

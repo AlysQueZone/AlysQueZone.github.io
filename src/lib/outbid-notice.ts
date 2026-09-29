@@ -387,11 +387,13 @@ export function initOutbidNotice(): void {
   /** Канал колокола — через общий реестр живых подписок (lib/live.ts). */
   function ensureSubscribed(): void {
     if (subscribed || uid === null) return;
-    const ok = subscribeLive({ table: 'lots', event: 'UPDATE' }, (payload) => {
+    // Отписку не держим: колокол живёт до перезагрузки страницы (этап 3
+    // перестроит события). Нужна лишь проверка, что канал открылся.
+    const unsubscribe = subscribeLive({ table: 'lots', event: 'UPDATE' }, (payload) => {
       handleRow(payload.new ?? {}, payload.old ?? null);
     });
     // Realtime недоступен — тихий noop, попробуем снова при смене сессии
-    if (!ok) return;
+    if (!unsubscribe) return;
     subscribed = true;
   }
 
