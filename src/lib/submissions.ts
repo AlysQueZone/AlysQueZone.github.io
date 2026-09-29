@@ -10,6 +10,7 @@
  * дружелюбные тексты; источник истины — сервер, обход браузера ничего не даёт.
  */
 import { getSupabase } from './supabase';
+import { errorText, isNoAuthError, isOfflineError } from './errors';
 
 export const SUBMISSION_TITLE_MAX = 80;
 export const SUBMISSION_COMMENT_MAX = 500;
@@ -74,28 +75,15 @@ export function validateSubmissionInput(input: SubmissionInput): SubmissionError
 export type SubmitResult =
   { status: 'ok'; id: number } | { status: 'error'; kind: SubmissionErrorKind };
 
-function errorMessage(err: unknown): string {
-  if (err instanceof Error) return err.message;
-  if (typeof err === 'object' && err !== null && 'message' in err) {
-    return String((err as { message: unknown }).message);
-  }
-  return String(err);
-}
-
 /** Маппинг ошибок триггера/сети на виды (тексты — ERROR_TEXT). */
 function mapSubmissionError(err: unknown): SubmissionErrorKind {
-  const raw = errorMessage(err);
+  const raw = errorText(err);
   const low = raw.toLowerCase();
   if (low.includes('not authenticated')) return 'unauthenticated';
   // Истёкшая сессия/снятые гранты/удалённый аккаунт: RLS, JWT, permission denied
   // и FK на auth.users (после локального db reset сессия указывает на стёртого
   // пользователя) → перелогин.
-  if (
-    low.includes('permission denied') ||
-    low.includes('row-level security') ||
-    low.includes('jwt') ||
-    low.includes('foreign key')
-  ) {
+  if (isNoAuthError(err) || low.includes('permission denied') || low.includes('foreign key')) {
     return 'session-expired';
   }
   if (low.includes('video url required')) return 'empty-url';
@@ -104,14 +92,7 @@ function mapSubmissionError(err: unknown): SubmissionErrorKind {
   if (low.includes('comment too long')) return 'comment-too-long';
   if (low.includes('video url too long')) return 'url-too-long';
   if (low.includes('too many open submissions')) return 'limit';
-  if (
-    low.includes('failed to fetch') ||
-    low.includes('networkerror') ||
-    low.includes('network error') ||
-    low.includes('load failed') ||
-    low.includes('offline') ||
-    err instanceof TypeError
-  ) {
+  if (isOfflineError(err)) {
     return 'offline';
   }
   return 'write-error';

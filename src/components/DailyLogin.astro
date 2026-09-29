@@ -26,6 +26,7 @@
   import { boom } from '@/lib/confetti';
   import { paintBalance } from '@/lib/balance';
   import { trapFocus, releaseFocus } from '@/lib/modal-focus';
+  import { errorText } from '@/lib/errors';
 
   /** Окно ежедневного входа: по центру, карточка стиля C, confetti при успехе.
    *  Закрытие: «Ок» / крестик / клик по затемнению / Escape. Без автотаймера,
@@ -124,12 +125,7 @@
       // Понятная серверная ошибка «no account» (счёта нет): показать тем же
       // окном без confetti; день НЕ отмечаем — повтор при следующем
       // заходе. Остальные ошибки — как раньше молча (деньги целы).
-      const raw =
-        err instanceof Error
-          ? err.message
-          : typeof err === 'object' && err !== null && 'message' in err
-            ? String((err as { message: unknown }).message)
-            : String(err);
+      const raw = errorText(err);
       if (raw.toLowerCase().includes('no account')) {
         showDailyWindow(raw, false);
       }

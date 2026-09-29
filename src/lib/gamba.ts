@@ -16,6 +16,7 @@
  */
 
 import { getSupabase } from './supabase';
+import { errorText, isNoAuthError, isOfflineError } from './errors';
 
 /** Фиксированная ставка Гамбы — display-mirror, source of truth — DB (c_stake в spin_gamba). */
 export const GAMBA_STAKE = 100;
@@ -111,23 +112,11 @@ export interface GambaErrorInfo {
   raw: string;
 }
 
-function gambaErrorMessage(err: unknown): string {
-  if (err instanceof Error) return err.message;
-  if (typeof err === 'object' && err !== null && 'message' in err) {
-    return String((err as { message: unknown }).message);
-  }
-  return String(err);
-}
-
 /** Маппинг ошибок RPC/транспорта на честные виды (матч по тексту сервера). */
 export function mapGambaError(err: unknown): GambaErrorInfo {
-  const raw = gambaErrorMessage(err);
+  const raw = errorText(err);
   const low = raw.toLowerCase();
-  if (
-    low.includes('not authenticated') ||
-    low.includes('row-level security') ||
-    low.includes('jwt')
-  ) {
+  if (isNoAuthError(err)) {
     return { kind: 'unauthenticated', raw };
   }
   if (low.includes('insufficient funds') || low.includes('insufficient_funds')) {
@@ -139,14 +128,7 @@ export function mapGambaError(err: unknown): GambaErrorInfo {
   if (low.includes('daily limit')) {
     return { kind: 'daily-limit', raw };
   }
-  if (
-    low.includes('failed to fetch') ||
-    low.includes('networkerror') ||
-    low.includes('network error') ||
-    low.includes('load failed') ||
-    low.includes('offline') ||
-    err instanceof TypeError
-  ) {
+  if (isOfflineError(err)) {
     return { kind: 'offline', raw };
   }
   return { kind: 'write-error', raw };

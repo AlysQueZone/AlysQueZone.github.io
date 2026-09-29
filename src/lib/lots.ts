@@ -1,6 +1,7 @@
 import { getSupabase, withAuthRetry, buyLotShared } from './supabase';
 import { subscribeLive } from './live';
 import { buyAvailability, formatStaged, writeBuyIntent } from './buy-intent';
+import { errorText, isNoAuthError, isOfflineError } from './errors';
 
 /**
  * Живое состояние Лота: каталог + прайс-фид + флаг «мой» за один запрос.
@@ -261,14 +262,6 @@ interface BuyErrorInfo {
 /** Запасная пауза, если текст триггера не распарсился (в миграции — 30с). */
 const BUY_COOLDOWN_FALLBACK_SEC = 30;
 
-function buyErrorMessage(err: unknown): string {
-  if (err instanceof Error) return err.message;
-  if (typeof err === 'object' && err !== null && 'message' in err) {
-    return String((err as { message: unknown }).message);
-  }
-  return String(err);
-}
-
 function parseCooldownSec(msg: string): number {
   const hms = msg.match(/(\d+):(\d{2}):(\d{2})/);
   if (hms) {
@@ -289,7 +282,7 @@ function parseCooldownSec(msg: string): number {
  * not authenticated (см. enforce_purchase_rules в миграциях).
  */
 function mapBuyError(err: unknown): BuyErrorInfo {
-  const raw = buyErrorMessage(err);
+  const raw = errorText(err);
   const low = raw.toLowerCase();
   if (low.includes('cooldown')) {
     return { kind: 'cooldown', retryAfterSec: parseCooldownSec(raw), raw };
@@ -300,12 +293,7 @@ function mapBuyError(err: unknown): BuyErrorInfo {
   if (low.includes('already yours')) {
     return { kind: 'own-lot', raw };
   }
-  if (
-    low.includes('not authenticated') ||
-    low.includes('row-level security') ||
-    low.includes('jwt') ||
-    low.includes('no twitch identity')
-  ) {
+  if (isNoAuthError(err)) {
     return { kind: 'unauthenticated', raw };
   }
   if (low.includes('not found')) {
@@ -319,14 +307,7 @@ function mapBuyError(err: unknown): BuyErrorInfo {
   if (low.includes('insufficient funds') || low.includes('insufficient_funds')) {
     return { kind: 'insufficient-funds', raw };
   }
-  if (
-    low.includes('failed to fetch') ||
-    low.includes('networkerror') ||
-    low.includes('network error') ||
-    low.includes('load failed') ||
-    low.includes('offline') ||
-    err instanceof TypeError
-  ) {
+  if (isOfflineError(err)) {
     return { kind: 'offline', raw };
   }
   return { kind: 'write-error', raw };
