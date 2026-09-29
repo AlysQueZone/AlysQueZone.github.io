@@ -31,28 +31,27 @@ const base = import.meta.env.BASE_URL;
   <article class="card-pixel mt-4 hidden p-5 sm:p-8" data-lot-view>
     <h1 class="mt-4 text-2xl font-black sm:text-3xl" data-lot-title></h1>
     <div class="mt-4 w-full">
-      <LotVideo videoUrl={null} title="" aspect={LOT_DETAIL_ASPECT} />
+      <LotVideo videoUrl={null} title="" aspect={LOT_DETAIL_ASPECT}>
+        <span
+          data-owner-badge
+          class="badge-pixel absolute top-2 left-2 hidden max-w-[85%] truncate bg-milk text-cream"
+        >
+          👑
+        </span>
+        <span data-free-badge class="badge-pixel absolute top-2 left-2 bg-bar text-mist">
+          свободен
+        </span>
+        <span data-mine-badge class="badge-pixel absolute top-2 right-2 hidden bg-pivko text-cream">
+          Твой
+        </span>
+      </LotVideo>
     </div>
-    <p class="mt-2 text-sm text-mist">
-      владелец:{' '}
-      <b data-lot-owner data-shared-owner class="text-mist">
-        {' '}
-        —{' '}
-      </b>{' '}
-      <span data-mine-badge class="hidden font-bold text-pivko">
-        {' '}
-        · ТВОЙ{' '}
-      </span>
-    </p>
-    <p data-lot-suggested class="mt-1 hidden text-sm text-mist">
+    <p data-lot-suggested class="mt-2 hidden text-sm text-mist">
       Привет добавил:{' '}
       <b data-lot-suggested-login class="text-mist">
         {' '}
         —{' '}
       </b>
-    </p>
-    <p data-shared-price class="mt-3 text-2xl font-black text-pivko">
-      — 🍺
     </p>
 
     <div class="mt-5">
@@ -115,8 +114,8 @@ const base = import.meta.env.BASE_URL;
   const history = document.querySelector('[data-lot-history]');
   const titleEl = document.querySelector('[data-lot-title]');
   const videoRoot = document.querySelector('[data-lot-video-root]');
-  const ownerEl = document.querySelector('[data-lot-owner]');
-  const priceEl = document.querySelector('[data-shared-price]');
+  const ownerBadge = document.querySelector('[data-owner-badge]');
+  const freeBadge = document.querySelector('[data-free-badge]');
   const mineBadge = document.querySelector('[data-mine-badge]');
   const suggestedEl = document.querySelector('[data-lot-suggested]');
   const suggestedLoginEl = document.querySelector('[data-lot-suggested-login]');
@@ -174,14 +173,20 @@ const base = import.meta.env.BASE_URL;
       root.dataset.mediaOrientation = orientation;
     });
     initLotVideos(document);
-    if (ownerEl) ownerEl.textContent = st.owner_login ?? '—';
+    // Владелец — как на витрине: тёмный бейдж поверх кадра, у свободного лота
+    // светлый «свободен». Цена — только в кнопке (fillBuyButton).
+    const owned = Boolean(st.owner_login);
+    if (ownerBadge) {
+      ownerBadge.textContent = owned ? `👑 ${st.owner_login}` : '';
+      ownerBadge.classList.toggle('hidden', !owned);
+    }
+    if (freeBadge) freeBadge.classList.toggle('hidden', owned);
+    if (mineBadge instanceof HTMLElement) mineBadge.classList.toggle('hidden', !st.mine);
     // Автор привета — только в подробностях лота, в списках подписи нет.
     if (suggestedEl instanceof HTMLElement) {
       suggestedEl.classList.toggle('hidden', !st.suggested_by_login);
       if (suggestedLoginEl) suggestedLoginEl.textContent = st.suggested_by_login ?? '—';
     }
-    if (priceEl) priceEl.textContent = `${st.price} 🍺`;
-    if (mineBadge instanceof HTMLElement) mineBadge.classList.toggle('hidden', !st.mine);
     lastState = st;
     fillBuyButton(buyBtn, st, myBalance);
   }
