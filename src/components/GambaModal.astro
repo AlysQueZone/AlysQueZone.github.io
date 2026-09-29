@@ -6,6 +6,8 @@
 //
 // Использование: положить <GambaModal /> в layout; кнопка в шапке с
 // атрибутом data-gamba-button сама откроет модалку (скрипт делегированный).
+// Цикл окна (Escape / клик по затемнению / фокус) — общий lib/modal.ts;
+// крутка отменяется в onClose, показ — в onOpen.
 //
 // Звуки — публичный бакет media (тикет 10, §3 спеки): абсолютные S3-URL без ${base}.
 import { s3Sound } from '@/lib/media';
@@ -86,6 +88,7 @@ const LOSE_POOL = GAMBA_LOSE_SOUNDS.map((f) => s3Sound(f)).join(',');
       <button
         id="gamba-close"
         type="button"
+        data-modal-close
         class="btn-arcade btn-arcade-ghost px-4 py-3 text-sm text-mist"
       >
         Не, пойду на стрим
@@ -107,7 +110,7 @@ const LOSE_POOL = GAMBA_LOSE_SOUNDS.map((f) => s3Sound(f)).join(',');
     spinGambaWithRetry,
     type GambaOutcome,
   } from '@/lib/gamba';
-  import { trapFocus, releaseFocus } from '@/lib/modal-focus';
+  import { createModal } from '@/lib/modal';
 
   /** Токены палитры (design-system/alysquezone/MASTER.md) — canvas их не видит,
       поэтому читаем значения из :root один раз. */
@@ -180,7 +183,6 @@ const LOSE_POOL = GAMBA_LOSE_SOUNDS.map((f) => s3Sound(f)).join(',');
   const canvas = document.getElementById('gamba-wheel');
   const result = document.getElementById('gamba-result');
   const spinBtn = document.getElementById('gamba-spin');
-  const closeBtn = document.getElementById('gamba-close');
 
   const GATE_TEXT = 'На ставку не хватает — нужно 100 Пивкойнов 🍺';
   const GUEST_TEXT = 'Гамба только для своих — войди через Twitch, и пойжем вместе 🍺';
@@ -449,51 +451,49 @@ const LOSE_POOL = GAMBA_LOSE_SOUNDS.map((f) => s3Sound(f)).join(',');
     raf = requestAnimationFrame(frame);
   }
 
-  function open(): void {
-    if (!modal || spinning) return;
-    // Повторное открытие снимает лок дня и паузу rate-limit. Если запрос
-    // ещё в полёте — кнопку не включаем (иначе клик молча проглотится).
-    if (lockTimer) {
-      clearTimeout(lockTimer);
-      lockTimer = undefined;
-    }
-    setBusy(pending);
-    if (result) result.textContent = '';
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-    trapFocus(modal);
-    draw(0);
-    preloadPools();
-    // Гейт заранее: при балансе меньше ставки — понятная подсказка,
-    // а не ошибка после клика.
-    void (async () => {
-      if (!isSupabaseConfigured()) return;
-      try {
-        const balance = await fetchMyBalance();
-        if (balance !== null && balance < GAMBA_STAKE && result && result.textContent === '') {
-          result.textContent = GATE_TEXT;
-        }
-      } catch {
-        // гейт — best effort, правда придёт с сервера
+  const gamba = createModal(modal, {
+    onOpen() {
+      // Повторное открытие снимает лок дня и паузу rate-limit. Если запрос
+      // ещё в полёте — кнопку не включаем (иначе клик молча проглотится).
+      if (lockTimer) {
+        clearTimeout(lockTimer);
+        lockTimer = undefined;
       }
-    })();
-  }
+      setBusy(pending);
+      if (result) result.textContent = '';
+      draw(0);
+      preloadPools();
+      // Гейт заранее: при балансе меньше ставки — понятная подсказка,
+      // а не ошибка после клика.
+      void (async () => {
+        if (!isSupabaseConfigured()) return;
+        try {
+          const balance = await fetchMyBalance();
+          if (balance !== null && balance < GAMBA_STAKE && result && result.textContent === '') {
+            result.textContent = GATE_TEXT;
+          }
+        } catch {
+          // гейт — best effort, правда придёт с сервера
+        }
+      })();
+    },
+    onClose() {
+      if (spinning) {
+        spinning = false;
+        cancelAnimationFrame(raf);
+        stopAll();
+      }
+      if (lockTimer) {
+        clearTimeout(lockTimer);
+        lockTimer = undefined;
+      }
+      setBusy(false);
+    },
+  });
 
-  function close(): void {
-    if (spinning) {
-      spinning = false;
-      cancelAnimationFrame(raf);
-      stopAll();
-    }
-    if (lockTimer) {
-      clearTimeout(lockTimer);
-      lockTimer = undefined;
-    }
-    if (!modal) return;
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
-    releaseFocus(modal);
-    setBusy(false);
+  function open(): void {
+    if (spinning) return;
+    gamba?.open();
   }
 
   async function spin(): Promise<void> {
@@ -595,13 +595,6 @@ const LOSE_POOL = GAMBA_LOSE_SOUNDS.map((f) => s3Sound(f)).join(',');
   });
   spinBtn?.addEventListener('click', () => {
     void spin();
-  });
-  closeBtn?.addEventListener('click', close);
-  modal?.addEventListener('click', (e) => {
-    if (e.target === modal) close();
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') close();
   });
 
   draw(0);

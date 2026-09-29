@@ -4,7 +4,8 @@
 // вызывает claim_daily (см. src/lib/daily.ts) — один раз в день: сначала
 // сверка со статусом/датой последнего клейма, лишних вызовов нет. Факт
 // выдачи показывает окно ежедневного входа «+N, день M (из 7)» с confetti:
-// кнопка «Ок» + крестик + клик вне + Escape, без автотаймера.
+// кнопка «Ок» + крестик + клик вне + Escape, без автотаймера; цикл окна —
+// общий lib/modal.ts (окно строится динамически и живёт до закрытия).
 // Гость без сессии ничего не получает и не видит. Серверный claim_daily
 // не меняется.
 //
@@ -25,7 +26,7 @@
   } from '@/lib/daily';
   import { boom } from '@/lib/confetti';
   import { paintBalance } from '@/lib/balance';
-  import { trapFocus, releaseFocus } from '@/lib/modal-focus';
+  import { createModal } from '@/lib/modal';
   import { errorText } from '@/lib/errors';
 
   /** Окно ежедневного входа: по центру, карточка стиля C, confetti при успехе.
@@ -53,6 +54,7 @@
     cross.setAttribute('aria-label', 'Закрыть');
     cross.className = 'btn-arcade btn-arcade-ghost min-w-11 shrink-0 px-3 py-1 text-sm';
     cross.textContent = '✕';
+    cross.setAttribute('data-modal-close', '');
     headRow.append(title, cross);
     const body = document.createElement('p');
     body.className = 'mt-3 text-lg font-black break-words whitespace-normal';
@@ -61,34 +63,25 @@
     ok.type = 'button';
     ok.className = 'btn-arcade btn-arcade-primary mt-4 px-8 py-2 text-sm';
     ok.textContent = 'Ок';
+    ok.setAttribute('data-modal-close', '');
     box.append(headRow, body, ok);
     overlay.appendChild(box);
     document.body.appendChild(overlay);
-    function detach(): void {
-      document.removeEventListener('click', onOutside, true);
-      document.removeEventListener('keydown', onKey);
-      releaseFocus(overlay);
-      overlay.remove();
-    }
-    function onOutside(e: MouseEvent): void {
-      if (e.target === overlay) detach();
-    }
-    function onKey(e: KeyboardEvent): void {
-      if (e.key === 'Escape') detach();
-    }
-    cross.addEventListener('click', detach);
-    ok.addEventListener('click', detach);
-    // Отложка на тик: текущий клик (если он и запустил флоу) не должен
-    // тут же закрыть окно через onOutside.
-    window.setTimeout(() => {
-      if (overlay.isConnected) {
-        document.addEventListener('click', onOutside, true);
-        document.addEventListener('keydown', onKey);
-      }
-    }, 0);
+    // Окно живёт до закрытия: Escape, клик-вне и ловушка фокуса — общий
+    // lib/modal.ts; после закрытия узел убираем. Слушатели модуля висят на
+    // самом оверлее, поэтому клик, которым открыли окно, его не закроет —
+    // отложка на тик не нужна.
+    const daily = createModal(overlay, {
+      onOpen() {
+        // Фокус — на главное действие, а не на крестик.
+        ok.focus();
+      },
+      onClose() {
+        overlay.remove();
+      },
+    });
     if (withConfetti) boom();
-    trapFocus(overlay);
-    ok.focus();
+    daily?.open();
   }
 
   let busy = false;

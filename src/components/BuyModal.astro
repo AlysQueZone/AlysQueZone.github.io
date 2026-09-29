@@ -11,6 +11,8 @@
 // Twitch», без принудительного редиректа; после входа модалка вернётся к лоту.
 // После покупки — announceBought({ id, price }) из lib/lots.ts
 // (типизированный announce/listen; слушают витрина, страница лота, колокол).
+// Цикл окна (Escape / клик по затемнению / фокус) — общий lib/modal.ts:
+// показ и живые проекции — в onOpen, снятие состояния — в onClose.
 import { ALYSQUE_CLAP_DARK } from '@/lib/emotes';
 import { s3Sound } from '@/lib/media';
 
@@ -56,6 +58,7 @@ const clapSound = s3Sound('clap.mp3');
       <button
         id="buy-modal-no"
         type="button"
+        data-modal-close
         class="btn-arcade btn-arcade-ghost px-4 py-3 text-sm text-mist"
       >
         Не, пойду на стрим
@@ -71,7 +74,7 @@ const clapSound = s3Sound('clap.mp3');
   // подтверждать нечему — говорим честно.
   import { boom } from '@/lib/confetti';
   import { ALYSQUE_CLAP_DARK } from '@/lib/emotes';
-  import { trapFocus, releaseFocus } from '@/lib/modal-focus';
+  import { createModal } from '@/lib/modal';
   import { fetchLotState, subscribeLots, buyLot, announceBought } from '@/lib/lots';
   import { fetchMyBalance, onBalance } from '@/lib/balance';
   import {
@@ -353,45 +356,49 @@ const clapSound = s3Sound('clap.mp3');
     }
   }
 
+  // Цикл окна — общий модуль (Escape, клик-вне, фокус); здесь только показ
+  // содержимого и живые проекции, а на закрытии — снятие своего состояния.
+  const buyModal = createModal(modal, {
+    onOpen() {
+      if (!pending) return;
+      if (modalTitle) modalTitle.textContent = pending.title;
+      if (modalText) modalText.textContent = modalTextFor(pending.price, pending.owner);
+      stopLotProjection();
+      restoreBuyButton();
+      applyGuestUi();
+      // Баланс — зеркало серверного гейта: не хватает — «Да, забираю» гаснет.
+      void (async () => {
+        balance = await fetchMyBalance();
+        renderBuyButton();
+      })();
+      // Живые проекции: пауза (моя последняя покупка этого лота) + цена (N из БД).
+      const lotId = pending.slug;
+      try {
+        lotUnsub = subscribeLots(() => {
+          void refreshPauseProjection(lotId);
+          void refreshPriceProjection(lotId);
+        }, lotId);
+      } catch {
+        lotUnsub = null;
+      }
+      void refreshPauseProjection(lotId);
+      void refreshPriceProjection(lotId);
+    },
+    onClose() {
+      stopLotProjection();
+      pending = null;
+      guest = false;
+      restoreBuyButton();
+      applyGuestUi();
+    },
+  });
+
   function openModal(): void {
-    if (!modal || !pending || !modalText || !modalTitle) return;
-    modalTitle.textContent = pending.title;
-    modalText.textContent = modalTextFor(pending.price, pending.owner);
-    stopLotProjection();
-    restoreBuyButton();
-    applyGuestUi();
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-    trapFocus(modal);
-    // Баланс — зеркало серверного гейта: не хватает — «Да, забираю» гаснет.
-    void (async () => {
-      balance = await fetchMyBalance();
-      renderBuyButton();
-    })();
-    // Живые проекции: пауза (моя последняя покупка этого лота) + цена (N из БД).
-    const lotId = pending.slug;
-    try {
-      lotUnsub = subscribeLots(() => {
-        void refreshPauseProjection(lotId);
-        void refreshPriceProjection(lotId);
-      }, lotId);
-    } catch {
-      lotUnsub = null;
-    }
-    void refreshPauseProjection(lotId);
-    void refreshPriceProjection(lotId);
+    buyModal?.open();
   }
 
   function closeModal(): void {
-    stopLotProjection();
-    pending = null;
-    guest = false;
-    restoreBuyButton();
-    applyGuestUi();
-    if (!modal) return;
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
-    releaseFocus(modal);
+    buyModal?.close();
   }
 
   document.addEventListener('click', async (e) => {
@@ -532,19 +539,10 @@ const clapSound = s3Sound('clap.mp3');
     }
   });
 
-  noBtn?.addEventListener('click', closeModal);
-  modal?.addEventListener('click', (e) => {
-    if (e.target === modal) closeModal();
-  });
   // Живой баланс из BaseLayout: не хватает — кнопка гаснет/оттаивает.
   onBalance((value) => {
     balance = value;
     renderBuyButton();
-  });
-  // Клик-вне и Escape окошка воспроизведения — забота lib/notice.ts
-  // (dismissOnOutside у видео-варианта).
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeModal();
   });
 
   /** Ждать появления кнопки покупки Лота: витрина/страница рисуют карточку

@@ -7,7 +7,8 @@
 //
 // Использование: положить <RulesModal /> на страницу с hero и повесить
 // data-rules-button на кнопку открытия — скрипт ниже делегированный.
-// Закрытие: «Понятно» / крестик / клик по затемнению / Escape.
+// Цикл (Escape / клик по затемнению / фокус) — общий lib/modal.ts; кнопки
+// «Понятно» и крестик носят data-modal-close.
 import { GAMBA_DAILY_LIMIT, GAMBA_PAYTABLE } from '@/lib/gamba';
 import { commissionSplit, rewardLine, ROYALTY_PURCHASES } from '@/lib/prices';
 
@@ -36,7 +37,7 @@ const REWARD_LINE = rewardLine();
       </h3>
       <button
         type="button"
-        data-rules-close
+        data-modal-close
         aria-label="Закрыть правила"
         class="btn-arcade btn-arcade-ghost min-w-11 shrink-0 px-3 py-1 text-sm"
       >
@@ -98,7 +99,7 @@ const REWARD_LINE = rewardLine();
     </ul>
     <button
       type="button"
-      data-rules-close
+      data-modal-close
       class="btn-arcade btn-arcade-primary mt-5 w-full px-4 py-3 text-sm"
     >
       Понятно
@@ -108,7 +109,7 @@ const REWARD_LINE = rewardLine();
 
 <script>
   import { fetchGambaPaytable, type GambaPayRow } from '@/lib/gamba';
-  import { trapFocus, releaseFocus } from '@/lib/modal-focus';
+  import { createModal } from '@/lib/modal';
 
   const modal = document.getElementById('rules-modal');
   const gambaList = modal?.querySelector('[data-rules-gamba]');
@@ -125,42 +126,21 @@ const REWARD_LINE = rewardLine();
     }
   }
 
-  function open(): void {
-    if (!modal) return;
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-    trapFocus(modal);
-    void (async () => {
-      try {
-        const live = await fetchGambaPaytable();
-        if (live) paintGamba(live);
-      } catch {
-        // фолбэк уже запечён в разметке
-      }
-    })();
-  }
-
-  function close(): void {
-    if (!modal) return;
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
-    releaseFocus(modal);
-  }
+  const rules = createModal(modal, {
+    onOpen() {
+      void (async () => {
+        try {
+          const live = await fetchGambaPaytable();
+          if (live) paintGamba(live);
+        } catch {
+          // фолбэк уже запечён в разметке
+        }
+      })();
+    },
+  });
 
   document.addEventListener('click', (e) => {
     const target = e.target as HTMLElement | null;
-    if (target?.closest?.('[data-rules-button]')) {
-      open();
-      return;
-    }
-    if (target?.closest?.('[data-rules-close]')) {
-      close();
-    }
-  });
-  modal?.addEventListener('click', (e) => {
-    if (e.target === modal) close();
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') close();
+    if (target?.closest?.('[data-rules-button]')) rules?.open();
   });
 </script>
