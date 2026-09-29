@@ -1,0 +1,494 @@
+<!doctype html>
+<!--
+  ПРОТОТИП (throwaway) — «Вход при покупке» для гостя.
+
+  Вопрос: как улучшить путь гостя, который жмёт «Забрать за N 🍺».
+  Сейчас: красная плашка-ошибка мигает и сразу редирект на Twitch (согласия нет).
+
+  Переключатель вверху:
+    1 «Сейчас»      — гость: красная плашка снизу, затем редирект (плашку не видно);
+    2 «Предлагаю»   — гость: открывается та же модалка, но CTA — «▶ Войти через Twitch»,
+                      человек сам решает; после входа модалка вернётся к подтверждению;
+    3 «После входа» — как сейчас у вошедшего, для сравнения (кнопка «Да, забираю»).
+
+  Оговорка throwaway:
+    - НЕ часть сборки, отдельный HTML;
+    - токены/шрифты как в проде; кнопки декоративные, без сети;
+    - эмоуты (clap, WAUW) — хотлинком с CDN канала.
+-->
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Прототип · Вход при покупке — AlysQueZone</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rubik:wght@400;700;800;900&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --color-void: #fff6bf;
+        --color-panel: #ffe6ac;
+        --color-bar: #ffe4a6;
+        --color-card: #f0c46c;
+        --color-milk: #422006;
+        --color-mist: #744210;
+        --color-stream: #c2187b;
+        --color-ctahover: #9e145f;
+        --color-ember: #ff9e2c;
+        --color-melon: #c21d3b;
+        --color-legend: #b3127a;
+        --color-cream: #fffbea;
+        --color-pivko: #7a5f00;
+        --color-twitch: #9146ff;
+        --font-display: 'Press Start 2P', 'Rubik', system-ui, sans-serif;
+        --font-sans: 'Rubik', system-ui, -apple-system, sans-serif;
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background-color: var(--color-void);
+        color: var(--color-milk);
+        font-family: var(--font-sans);
+        -webkit-font-smoothing: antialiased;
+        min-height: 100vh;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      :focus-visible {
+        outline: 3px solid var(--color-blush, #ff00bc);
+        outline-offset: 2px;
+      }
+
+      .display {
+        font-family: var(--font-display);
+      }
+
+      .panel {
+        max-width: 72rem;
+        margin-inline: auto;
+        padding: 1rem 1rem 2rem;
+      }
+
+      .switcher {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 0;
+        position: sticky;
+        top: 0;
+        z-index: 40;
+        background: var(--color-void);
+        border-bottom: 3px solid var(--color-milk);
+        margin-bottom: 1rem;
+      }
+
+      .switcher h1 {
+        font-family: var(--font-display);
+        font-size: 10px;
+        line-height: 1.8;
+        text-transform: uppercase;
+        margin-right: 0.5rem;
+      }
+
+      .tab {
+        border: 3px solid var(--color-milk);
+        box-shadow: 3px 3px 0 var(--color-milk);
+        border-radius: 4px;
+        background: var(--color-panel);
+        color: var(--color-milk);
+        font: inherit;
+        font-weight: 900;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        padding: 0.5rem 0.75rem;
+        cursor: pointer;
+      }
+
+      .tab[aria-pressed='true'] {
+        background: var(--color-stream);
+        color: var(--color-cream);
+      }
+
+      .tab:active {
+        transform: translate(2px, 2px);
+        box-shadow: 1px 1px 0 var(--color-milk);
+      }
+
+      .hint {
+        font-size: 0.8125rem;
+        font-weight: 700;
+        color: var(--color-mist);
+        margin-bottom: 1.25rem;
+      }
+
+      .hint b {
+        color: var(--color-melon);
+      }
+
+      /* ── Компоненты стиля C ── */
+      .card-pixel {
+        background-color: var(--color-panel);
+        border: 3px solid var(--color-milk);
+        box-shadow: 6px 6px 0 var(--color-milk);
+        border-radius: 4px;
+      }
+
+      .badge {
+        display: inline-block;
+        font-family: var(--font-display);
+        font-size: 9px;
+        line-height: 1.7;
+        padding: 4px 8px;
+        border-radius: 2px;
+        text-transform: uppercase;
+        background: var(--color-stream);
+        color: var(--color-cream);
+      }
+
+      .btn-arcade {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.25rem;
+        min-height: 2.75rem;
+        padding: 0.75rem 1rem;
+        border: 3px solid var(--color-milk);
+        box-shadow: 4px 4px 0 var(--color-milk);
+        border-radius: 4px;
+        font: inherit;
+        font-weight: 900;
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        cursor: pointer;
+      }
+
+      .btn-arcade:active {
+        transform: translate(3px, 3px);
+        box-shadow: 1px 1px 0 var(--color-milk);
+      }
+
+      .btn-primary {
+        background-color: var(--color-stream);
+        color: var(--color-cream);
+      }
+
+      .btn-twitch {
+        background-color: var(--color-twitch);
+        color: #fff;
+      }
+
+      .btn-ghost {
+        background-color: transparent;
+        color: var(--color-mist);
+      }
+
+      /* ── Карточка лота (контекст под оверлеем) ── */
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+        gap: 1rem;
+      }
+
+      .lot {
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+
+      .lot h3 {
+        font-size: 1rem;
+        font-weight: 800;
+      }
+
+      .lot .owner {
+        font-size: 0.875rem;
+        color: var(--color-mist);
+      }
+
+      .lot .price {
+        font-size: 1.25rem;
+        font-weight: 900;
+        color: var(--color-pivko);
+      }
+
+      .lot .thumb {
+        aspect-ratio: 1;
+        border: 2px solid var(--color-milk);
+        background: color-mix(in srgb, var(--color-milk) 12%, transparent);
+        display: grid;
+        place-items: center;
+        font-family: var(--font-display);
+        font-size: 9px;
+        color: var(--color-mist);
+      }
+
+      /* ── Сцена: оверлей модалки / плашка ── */
+      .scene {
+        position: relative;
+        min-height: 34rem;
+        border: 3px dashed color-mix(in srgb, var(--color-milk) 35%, transparent);
+        border-radius: 6px;
+        overflow: hidden;
+        padding: 1rem;
+      }
+
+      .scrim {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        z-index: 20;
+      }
+
+      .scene[data-state='guest'] .scrim.guest,
+      .scene[data-state='authed'] .scrim.authed {
+        display: flex;
+      }
+
+      .modal {
+        width: 100%;
+        max-width: 24rem;
+        padding: 1.25rem;
+      }
+
+      .modal .row {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+
+      .modal .row img {
+        height: 3.5rem;
+        width: 3.5rem;
+        flex-shrink: 0;
+        border: 2px solid var(--color-milk);
+        object-fit: contain;
+      }
+
+      .modal h3 {
+        font-family: var(--font-display);
+        font-size: 11px;
+        line-height: 1.7;
+        text-transform: uppercase;
+      }
+
+      .modal .text {
+        margin-top: 0.5rem;
+        font-size: 0.875rem;
+        font-weight: 700;
+        color: var(--color-mist);
+      }
+
+      .modal .note {
+        margin-top: 0.5rem;
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: var(--color-mist);
+      }
+
+      .modal .actions {
+        margin-top: 1rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+      }
+
+      /* Плашка-уведомление снизу (как #buy-notice в проде). */
+      .notice {
+        position: absolute;
+        bottom: 2rem;
+        left: 50%;
+        transform: translateX(-50%);
+        max-width: calc(100% - 2rem);
+        padding: 1rem 2rem;
+        text-align: center;
+        font-size: 1.25rem;
+        font-weight: 900;
+        border: 3px solid var(--color-milk);
+        border-radius: 4px;
+        box-shadow: 6px 6px 0 var(--color-milk);
+        background: var(--color-panel);
+        z-index: 30;
+      }
+
+      .notice.error {
+        border-color: var(--color-melon);
+      }
+
+      .notice .small {
+        display: block;
+        margin-top: 0.5rem;
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: var(--color-mist);
+      }
+
+      .redirect {
+        position: absolute;
+        inset: 0;
+        display: none;
+        place-items: center;
+        text-align: center;
+        background: rgba(0, 0, 0, 0.6);
+        color: var(--color-cream);
+        z-index: 35;
+        padding: 1rem;
+      }
+
+      .scene[data-state='now'] .notice.inner {
+        display: block;
+      }
+
+      .scene[data-state='redirect'] .redirect {
+        display: grid;
+      }
+
+      .scene .notice.inner {
+        display: none;
+      }
+
+      .redirect p {
+        font-family: var(--font-display);
+        font-size: 11px;
+        line-height: 1.9;
+        text-transform: uppercase;
+        max-width: 22rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="panel">
+      <div class="switcher">
+        <h1>Прототип · Вход при покупке</h1>
+        <button class="tab" type="button" data-tab="now" aria-pressed="true">1 · Сейчас</button>
+        <button class="tab" type="button" data-tab="guest" aria-pressed="false">
+          2 · Предлагаю
+        </button>
+        <button class="tab" type="button" data-tab="authed" aria-pressed="false">
+          3 · После входа
+        </button>
+        <button class="tab" type="button" data-tab="redirect" aria-pressed="false">
+          4 · Что видно дальше
+        </button>
+      </div>
+
+      <p class="hint">
+        Гость жмёт «Забрать за 3200 🍺» на карточке. Сейчас —
+        <b>красная плашка и немедленный редирект</b>; плашку прочитать нельзя, согласия спросить
+        тоже. Предлагаю вместо этого ту же модалку с кнопкой входа.
+      </p>
+
+      <div class="scene" data-state="now">
+        <!-- Фон: сетка лотов -->
+        <div class="grid">
+          <article class="card-pixel lot">
+            <h3>Привет NXVER_EXISTD</h3>
+            <div class="thumb">видео</div>
+            <p class="owner">владелец: —</p>
+            <p class="price">3200 🍺</p>
+            <button class="btn-arcade btn-primary" type="button">Забрать за 3200 🍺</button>
+          </article>
+          <article class="card-pixel lot">
+            <h3>Привет Салату</h3>
+            <div class="thumb">видео</div>
+            <p class="owner">владелец: quevizar</p>
+            <p class="price">1450 🍺</p>
+            <button class="btn-arcade btn-primary" type="button" disabled style="opacity: 0.5">
+              Твой привет
+            </button>
+          </article>
+          <article class="card-pixel lot">
+            <h3>Массовый привет (коты одобряют)</h3>
+            <div class="thumb">видео</div>
+            <p class="owner">владелец: remolol</p>
+            <p class="price">900 🍺</p>
+            <button class="btn-arcade btn-primary" type="button">Забрать за 900 🍺</button>
+          </article>
+        </div>
+
+        <!-- 1 · Сейчас: мигающая красная плашка перед редиректом -->
+        <div class="notice error inner">
+          СТРИМ ВКЛЮЧИЛСЯ, А ТЫ? Сначала вход через Twitch — потом вернём к лоту.
+          <span class="small">(в проде эта плашка живёт 2.6 с, но редирект уводит раньше)</span>
+        </div>
+
+        <!-- 2 · Предлагаю: гостевая модалка -->
+        <div class="scrim guest">
+          <div class="card-pixel modal">
+            <div class="row">
+              <img
+                src="https://static-cdn.jtvnw.net/emoticons/v2/emotesv2_1075070639054e5d8cacb8a0ef4872d7/default/dark/3.0"
+                alt="alysqueCLAP"
+              />
+              <h3>Привет NXVER_EXISTD</h3>
+            </div>
+            <p class="text">Цена: 3200 Пивкойнов. Владелец: —</p>
+            <p class="note">
+              🔒 Войди через Twitch, чтобы забрать привет — вернёмся к нему после входа.
+            </p>
+            <div class="actions">
+              <button class="btn-arcade btn-twitch" type="button">▶ Войти через Twitch</button>
+              <button class="btn-arcade btn-ghost" type="button">Не, пойду на стрим</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3 · После входа: обычная модалка -->
+        <div class="scrim authed">
+          <div class="card-pixel modal">
+            <div class="row">
+              <img
+                src="https://static-cdn.jtvnw.net/emoticons/v2/emotesv2_1075070639054e5d8cacb8a0ef4872d7/default/dark/3.0"
+                alt="alysqueCLAP"
+              />
+              <h3>Купить привет?</h3>
+            </div>
+            <p class="text">Потратить 3200 Пивкойнов? Владелец: —</p>
+            <div class="actions">
+              <button class="btn-arcade btn-primary" type="button">Да, забираю</button>
+              <button class="btn-arcade btn-ghost" type="button">Не, пойду на стрим</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4 · Что видно дальше -->
+        <div class="redirect">
+          <p>Переносим на Twitch для входа…<br />(плашку гость так и не увидел)</p>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const scene = document.querySelector('.scene');
+      const tabs = [...document.querySelectorAll('.tab')];
+      tabs.forEach((tab) => {
+        tab.addEventListener('click', () => {
+          const state = tab.dataset.tab;
+          scene.dataset.state = state;
+          tabs.forEach((t) => t.setAttribute('aria-pressed', String(t === tab)));
+        });
+      });
+    </script>
+  </body>
+</html>

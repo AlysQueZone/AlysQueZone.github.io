@@ -7,6 +7,8 @@
 // data-lot-owner="<owner>" data-lot-video="<video_url>".
 // При покупке играет видео лота со звуком (видимо, в уведомлении); без video_url — clap с S3.
 // Клик по такой кнопке сам откроет модалку — скрипт ниже делегированный.
+// Гость (нет сессии): модалка открывается в гостевом режиме — CTA «Войти через
+// Twitch», без принудительного редиректа; после входа модалка вернётся к лоту.
 // После покупки — announceBought({ id, price }) из lib/lots.ts
 // (типизированный announce/listen; слушают витрина, страница лота, колокол).
 import { ALYSQUE_CLAP_DARK } from '@/lib/emotes';
@@ -40,6 +42,9 @@ const clapSound = s3Sound('clap.mp3');
       </h3>
     </div>
     <p id="buy-modal-text" class="mt-2 text-sm font-bold text-mist"></p>
+    <p id="buy-note" class="mt-2 hidden text-xs font-bold text-mist">
+      🔒 Войди через Twitch, чтобы забрать привет — вернёмся к нему после входа.
+    </p>
     <div class="mt-4 flex flex-wrap gap-3">
       <button
         id="buy-modal-yes"
@@ -89,6 +94,7 @@ const clapSound = s3Sound('clap.mp3');
   const modal = document.getElementById('buy-modal');
   const modalText = document.getElementById('buy-modal-text');
   const modalTitle = document.getElementById('buy-modal-title');
+  const noteEl = document.getElementById('buy-note');
   const yesBtn = document.getElementById('buy-modal-yes');
   const noBtn = document.getElementById('buy-modal-no');
   const notice = document.getElementById('buy-notice');
@@ -106,6 +112,9 @@ const clapSound = s3Sound('clap.mp3');
   /** Баланс — зеркало серверного гейта; `busy` — транзитное «идёт покупка». */
   let balance: number | null = null;
   let busy = false;
+  /** Гость: модалка открыта не для покупки, а для входа через Twitch.
+   *  CTA — «▶ Войти через Twitch», цена показана справочно, без редиректа. */
+  let guest = false;
 
   // display-mirror, source of truth — DB (c_cooldown/c_max_per_window/c_window в enforce_purchase_rules).
   const PAUSE_SEC = 30;
@@ -114,6 +123,32 @@ const clapSound = s3Sound('clap.mp3');
 
   function buyLabel(price: number): string {
     return `Забрать за ${price} 🍺`;
+  }
+
+  /** Текст окна: у гостя — «Цена: …» справочно, у своих — приглашение потратить. */
+  function modalTextFor(price: number | null, owner: string): string {
+    const n = price === null ? '…' : String(price);
+    return guest
+      ? `Цена: ${n} Пивкойнов. Владелец: ${owner}`
+      : `Потратить ${n} Пивкойнов? Владелец: ${owner}`;
+  }
+
+  /** Оформление гостевого режима: твичевая CTA + пояснение про вход. */
+  function applyGuestUi(): void {
+    if (yesBtn instanceof HTMLButtonElement) {
+      yesBtn.classList.toggle('btn-arcade-primary', !guest);
+      yesBtn.classList.toggle('bg-twitch', guest);
+      yesBtn.classList.toggle('text-white', guest);
+    }
+    noteEl?.classList.toggle('hidden', !guest);
+  }
+
+  /** Переключить уже открытую модалку в гостевой режим (нет сессии/кончилась). */
+  function enterGuestMode(): void {
+    guest = true;
+    if (modalText && pending) modalText.textContent = modalTextFor(pending.price, pending.owner);
+    restoreBuyButton();
+    applyGuestUi();
   }
 
   function pauseLabel(left: number): string {
@@ -268,6 +303,12 @@ const clapSound = s3Sound('clap.mp3');
    *  Раньше метка ставилась в четырёх местах — рассинхрон ловился глазами. */
   function renderBuyButton(): void {
     if (!(yesBtn instanceof HTMLButtonElement)) return;
+    // Гость: кнопка — вход через Twitch, гейты цены/паузы не применяются.
+    if (guest) {
+      yesBtn.disabled = false;
+      yesBtn.textContent = '▶ Войти через Twitch';
+      return;
+    }
     // Транзитные состояния владеют кнопкой: метку ставит вызвавший.
     if (busy) return;
     if (limitHit) {
@@ -396,22 +437,22 @@ const clapSound = s3Sound('clap.mp3');
       // итог всё равно посчитает сервер.
       if (typeof next !== 'number' || !Number.isFinite(next) || next <= 0) {
         if (modalText) {
-          modalText.textContent = `Потратить … Пивкойнов? Владелец: ${pending.owner}`;
+          modalText.textContent = modalTextFor(null, pending.owner);
         }
-        if (yesBtn instanceof HTMLButtonElement && !busy && !limitHit && pauseLeft <= 0) {
+        if (yesBtn instanceof HTMLButtonElement && !busy && !limitHit && pauseLeft <= 0 && !guest) {
           yesBtn.textContent = 'Забрать за … 🍺';
         }
         return;
       }
       if (next === pending.price) {
         if (modalText && row.owner_login) {
-          modalText.textContent = `Потратить ${pending.price} Пивкойнов? Владелец: ${pending.owner}`;
+          modalText.textContent = modalTextFor(pending.price, pending.owner);
         }
         return;
       }
       pending.price = next;
       if (modalText) {
-        modalText.textContent = `Потратить ${next} Пивкойнов? Владелец: ${pending.owner}`;
+        modalText.textContent = modalTextFor(next, pending.owner);
       }
       renderBuyButton();
     } catch {
@@ -422,9 +463,10 @@ const clapSound = s3Sound('clap.mp3');
   function openModal(): void {
     if (!modal || !pending || !modalText || !modalTitle) return;
     modalTitle.textContent = pending.title;
-    modalText.textContent = `Потратить ${pending.price} Пивкойнов? Владелец: ${pending.owner}`;
+    modalText.textContent = modalTextFor(pending.price, pending.owner);
     stopLotProjection();
     restoreBuyButton();
+    applyGuestUi();
     modal.classList.remove('hidden');
     modal.classList.add('flex');
     trapFocus(modal);
@@ -450,7 +492,9 @@ const clapSound = s3Sound('clap.mp3');
   function closeModal(): void {
     stopLotProjection();
     pending = null;
+    guest = false;
     restoreBuyButton();
+    applyGuestUi();
     if (!modal) return;
     modal.classList.add('hidden');
     modal.classList.remove('flex');
@@ -464,21 +508,6 @@ const clapSound = s3Sound('clap.mp3');
     if (btn instanceof HTMLButtonElement && btn.disabled) return;
     const { buyLot: id, lotTitle, lotPrice, lotOwner, lotVideo } = btn.dataset;
     if (!id) return;
-    // Без сессии — в логин через Twitch с возвратом к тому же Лоту (тикет 09).
-    // Витрина открыта всем, модалка переоткроется после возврата.
-    if (isSupabaseConfigured()) {
-      const sb = getSupabase();
-      const { data } = (await sb?.auth.getSession()) ?? { data: { session: null } };
-      if (!data.session) {
-        stashPendingBuy(id);
-        showNotice(
-          'СТРИМ ВКЛЮЧИЛСЯ, А ТЫ? Сначала вход через Twitch — потом вернём к лоту.',
-          false
-        );
-        await signInWithTwitch(returnUrlForLot(id));
-        return;
-      }
-    }
     pending = {
       id,
       title: lotTitle ?? id,
@@ -486,6 +515,18 @@ const clapSound = s3Sound('clap.mp3');
       owner: lotOwner ?? '?',
       video: lotVideo,
     };
+    // Без сессии — не уводим принудительно: открываем ту же модалку в гостевом
+    // режиме, где CTA — вход через Twitch. Лот запоминается внутри неё.
+    if (isSupabaseConfigured()) {
+      const sb = getSupabase();
+      const { data } = (await sb?.auth.getSession()) ?? { data: { session: null } };
+      if (!data.session) {
+        guest = true;
+        openModal();
+        return;
+      }
+    }
+    guest = false;
     openModal();
   });
 
@@ -493,6 +534,13 @@ const clapSound = s3Sound('clap.mp3');
     if (!pending) return;
     const { id, title, owner, video } = pending;
     const price = pending.price;
+    // Гостевой режим: кнопка — вход через Twitch. Запоминаем лот, чтобы после
+    // возврата модалка открылась снова уже для подтверждения покупки.
+    if (guest) {
+      stashPendingBuy(id);
+      await signInWithTwitch(returnUrlForLot(id));
+      return;
+    }
     // Гейт «хватит/не хватит» — серверный (тикет 08): BEFORE ответит
     // `insufficient funds`, покажем честно. Без настроенного хранилища
     // покупать нечего — честная ошибка, деньги целы.
@@ -508,12 +556,9 @@ const clapSound = s3Sound('clap.mp3');
     const sb = getSupabase();
     const { data } = (await sb?.auth.getSession()) ?? { data: { session: null } };
     if (!data.session) {
-      stashPendingBuy(id);
-      showNotice(
-        'СТРИМ ВКЛЮЧИЛСЯ, А ТЫ? Сессия кончилась — войди через Twitch, потом вернём к лоту.',
-        false
-      );
-      await signInWithTwitch(returnUrlForLot(id));
+      // Сессия кончилась при открытой модалке — переключаем её в гостевой
+      // режим (вход по кнопке), без принудительного редиректа.
+      enterGuestMode();
       return;
     }
     // Перекуп за одним швом (buyLot из lib/lots.ts): свежая N, INSERT,
@@ -553,12 +598,8 @@ const clapSound = s3Sound('clap.mp3');
       return;
     }
     if (result.kind === 'unauthenticated') {
-      stashPendingBuy(id);
-      showNotice(
-        'СТРИМ ВКЛЮЧИЛСЯ, А ТЫ? Сессия кончилась — войди через Twitch, потом вернём к лоту.',
-        false
-      );
-      await signInWithTwitch(returnUrlForLot(id));
+      // Сервер не увидел сессию — та же гостевая модалка, вход по кнопке.
+      enterGuestMode();
       return;
     }
     switch (result.kind) {
