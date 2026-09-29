@@ -17,10 +17,13 @@
                               инфо-строка под ним.
 
   Тумблеры сверху:
-    - «Квадрат»: обычная ячейка / две колонки (проверить, надо ли выделять).
+    - «Квадрат»: как портрет (обрезка в 77:136) / размытая подложка (кадр
+      вписан целиком, поля — его размытая копия) / квадрат 1:1 / две колонки.
     - «Дыры»:   как есть / плотно (dense) — широкая карточка оставляет пустые
                 ячейки в конце предыдущего ряда; dense подтягивает туда
                 следующие мелкие карточки (ценой порядка по цене).
+
+  По умолчанию открывается вариант B, квадрат — «как портрет».
 
   Оговорка throwaway (как в scratch/buy-guest, scratch/lot-cards):
     - НЕ часть сборки, отдельный HTML вне Astro;
@@ -236,6 +239,23 @@
         display: block;
         width: 100%;
         height: 100%;
+      }
+
+      /* Квадрат на размытой подложке: сам кадр вписан целиком, поля заполняет
+         его же увеличенная размытая копия — рамка остаётся «телефонной». */
+      .sq-bg {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        background-size: cover;
+        background-position: center;
+        filter: blur(14px) brightness(0.55);
+        transform: scale(1.12);
+      }
+
+      .media img.sq-fg {
+        position: relative;
+        z-index: 1;
       }
 
       .play {
@@ -478,7 +498,11 @@
           <div class="control">
             <span class="label">Квадрат</span>
             <div class="seg" id="square-seg">
-              <button type="button" data-square="cell" aria-pressed="true">Ячейка</button>
+              <button type="button" data-square="crop" aria-pressed="true">Как портрет</button>
+              <button type="button" data-square="blur" aria-pressed="false">
+                Размытая подложка
+              </button>
+              <button type="button" data-square="cell" aria-pressed="false">Квадрат 1:1</button>
               <button type="button" data-square="span2" aria-pressed="false">2 колонки</button>
             </div>
           </div>
@@ -777,7 +801,7 @@
         },
       ];
 
-      const STATE = { square: 'cell', dense: 'off' };
+      const STATE = { square: 'crop', dense: 'off' };
       const esc = (s) =>
         String(s).replace(
           /[&<>"]/g,
@@ -802,21 +826,49 @@
         return `<button class="play" type="button" aria-label="Смотреть привет"><span class="btn btn-s">▶ смотреть</span></button>`;
       }
 
-      // Обычная ячейка: портрет 77:136 + заполнение; квадрат/широкое (вариант 0) — своя пропорция.
-      function cellCard(l) {
-        const k = kindOf(l);
-        const portraitStyle = k === 'portrait' ? '77 / 136' : `${l.w} / ${l.h}`;
-        const fit = k === 'portrait' ? 'cover' : 'contain';
-        const span2 = k === 'square' && STATE.square === 'span2' ? ' span2' : '';
-        return `<article class="card${span2}">
+      function cta(l) {
+        return `<div class="cta"><button class="btn" type="button">▶ Забрать за ${next(l.price)} 🍺</button></div>`;
+      }
+
+      // Ячейка с заданной пропорцией кадра и способом заполнения.
+      function cellCardWith(l, aspect, fit, extraClass) {
+        return `<article class="card${extraClass || ''}">
           <h3 class="title">${esc(l.title)}</h3>
-          <div class="media" style="aspect-ratio:${portraitStyle}">
+          <div class="media" style="aspect-ratio:${aspect}">
             <img src="${l.poster}" alt="" loading="lazy" style="object-fit:${fit}" />
             ${playBtn()}
             ${ownerBadge(l)}
           </div>
-          <div class="cta"><button class="btn" type="button">▶ Забрать за ${next(l.price)} 🍺</button></div>
+          ${cta(l)}
         </article>`;
+      }
+
+      // Квадрат — режим из тумблера: как портрет (обрезка) / размытая подложка /
+      // квадрат 1:1 / две колонки.
+      function squareCard(l) {
+        if (STATE.square === 'crop') return cellCardWith(l, '77 / 136', 'cover');
+        if (STATE.square === 'blur') {
+          return `<article class="card">
+            <h3 class="title">${esc(l.title)}</h3>
+            <div class="media" style="aspect-ratio:77 / 136">
+              <div class="sq-bg" style="background-image:url('${l.poster}')"></div>
+              <img class="sq-fg" src="${l.poster}" alt="" loading="lazy" style="object-fit:contain" />
+              ${playBtn()}
+              ${ownerBadge(l)}
+            </div>
+            ${cta(l)}
+          </article>`;
+        }
+        return cellCardWith(l, '1 / 1', 'contain', STATE.square === 'span2' ? ' span2' : '');
+      }
+
+      // Обычная ячейка: портрет 77:136 + заполнение; квадрат — по режиму;
+      // широкое (вариант 0) — своя пропорция, вписывание.
+      function cellCard(l) {
+        const k = kindOf(l);
+        if (k === 'square') return squareCard(l);
+        if (k === 'portrait') return cellCardWith(l, '77 / 136', 'cover');
+        return cellCardWith(l, `${l.w} / ${l.h}`, 'contain');
       }
 
       // Полоса A: медиа слева, инфо справа.
@@ -874,11 +926,17 @@
       const feed = document.getElementById('feed');
       const hint = document.getElementById('hint');
       const slabel = document.getElementById('slabel');
+      const SQUARE_LABELS = {
+        crop: 'как портрет (обрезка)',
+        blur: 'размытая подложка',
+        cell: 'квадрат 1:1',
+        span2: 'две колонки',
+      };
 
       function render(key) {
         const v = VARIANTS.find((x) => x.key === key) ?? VARIANTS[0];
         const counts = LOTS.reduce((a, l) => ((a[kindOf(l)] = (a[kindOf(l)] || 0) + 1), a), {});
-        hint.textContent = `Вариант ${v.key} «${v.name}»: ${v.desc} Всего ${LOTS.length} лотов — портрет ${counts.portrait || 0}, квадрат ${counts.square || 0}, широкое ${counts.wide || 0}.`;
+        hint.textContent = `Вариант ${v.key} «${v.name}»: ${v.desc} Всего ${LOTS.length} лотов — портрет ${counts.portrait || 0}, квадрат ${counts.square || 0}, широкое ${counts.wide || 0}. Квадрат: ${SQUARE_LABELS[STATE.square]}.`;
         slabel.textContent = `${v.key} · ${v.name}`;
         feed.classList.toggle('dense', STATE.dense === 'on');
         feed.innerHTML = LOTS.map(v.render).join('');
@@ -886,7 +944,7 @@
 
       function currentKey() {
         const k = new URLSearchParams(location.search).get('variant');
-        return VARIANTS.some((v) => v.key === k) ? k : 'A';
+        return VARIANTS.some((v) => v.key === k) ? k : 'B';
       }
 
       let active = currentKey();
