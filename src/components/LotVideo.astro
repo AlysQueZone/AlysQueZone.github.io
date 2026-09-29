@@ -4,7 +4,8 @@
 // Корень рендерится всегда (шаблон карточки витрины заполняется клиентом);
 // нет видео — корень скрыт. Один компонент на карточку и страницу лота.
 // `aspect` — пропорция кадра: карточка витрины берёт «телефонную» (`portrait`,
-// A2, scratch/lot-cards), страница лота оставляет квадрат по умолчанию.
+// A2, scratch/lot-cards), страница лота — `natural` (рамка по фактической
+// пропорции постера, видео видно целиком; до загрузки — квадрат-плейсхолдер).
 // `<slot />` — оверлеи поверх кадра (бейдж владельца, метка «Твой»).
 import { videoSources, mediaAspectClass, type MediaAspect } from '@/lib/lot-video';
 
@@ -21,6 +22,7 @@ const hasVideo = webm.length > 0;
 
 <div
   data-lot-video-root
+  data-media-adapt={aspect === 'natural' ? '1' : undefined}
   data-video-webm={webm || undefined}
   data-video-mp4={mp4 || undefined}
   data-video-poster={poster || undefined}

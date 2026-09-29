@@ -2,6 +2,7 @@
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import BuyModal from '@/components/BuyModal.astro';
 import LotVideo from '@/components/LotVideo.astro';
+import { LOT_DETAIL_ASPECT } from '@/lib/lot-video';
 
 // Страница Лота — один маршрут `/lot/?id=<slug>`: каркас без данных, поля
 // заполняет клиент из БД (см. docs/adr/0002). Работает для лота, которого
@@ -30,7 +31,7 @@ const base = import.meta.env.BASE_URL;
   <article class="card-pixel mt-4 hidden p-5 sm:p-8" data-lot-view>
     <h1 class="mt-4 text-2xl font-black sm:text-3xl" data-lot-title></h1>
     <div class="mt-4 w-full max-w-md">
-      <LotVideo videoUrl={null} title="" />
+      <LotVideo videoUrl={null} title="" aspect={LOT_DETAIL_ASPECT} />
     </div>
     <p class="mt-2 text-sm text-mist">
       владелец:{' '}

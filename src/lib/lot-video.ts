@@ -26,18 +26,24 @@ export function videoSources(videoUrl: string | null | undefined): VideoSources 
 
 /**
  * Пропорция кадра лота (доменное понятие, а не строка Tailwind):
- * `square` — страница лота; `portrait` — «телефонный» кадр карточки витрины
- * (77/136 ≈ 0.566 — kubic_lego.mp4 = 308×544). Классы — литералами, иначе
- * Tailwind не увидит их при сканировании.
+ * `square` — квадрат; `portrait` — «телефонный» кадр карточки витрины
+ * (77/136 ≈ 0.566 — kubic_lego.mp4 = 308×544); `natural` — страница лота:
+ * рамка принимает фактическую пропорцию постера, видео видно целиком.
+ * Классы — литералами, иначе Tailwind не увидит их при сканировании.
  */
-export type MediaAspect = 'square' | 'portrait';
+export type MediaAspect = 'square' | 'portrait' | 'natural';
 
 export function mediaAspectClass(aspect: MediaAspect): string {
+  // `natural` до загрузки постера держит квадрат-плейсхолдер (не схлопываться
+  // в нулевую высоту); фактическую пропорцию ставит data-media-adapt ниже.
   return aspect === 'portrait' ? 'aspect-[77/136]' : 'aspect-square';
 }
 
 /** Пропорция кадра карточки витрины — одна на карточку и её скелетон. */
 export const LOT_CARD_ASPECT: MediaAspect = 'portrait';
+
+/** Кадр страницы лота: по фактической пропорции постера (видео целиком). */
+export const LOT_DETAIL_ASPECT: MediaAspect = 'natural';
 
 function isWebmUrl(url: string): boolean {
   return WEBM_RE.test(url);
@@ -123,9 +129,11 @@ function orientationOf(w: number, h: number): MediaOrientation | null {
 
 /**
  * Подобрать показ кадра по фактической пропорции постера (на лету, когда
- * картинка загрузилась). Портрет — базовую «телефонную» рамку оставляем,
- * заполнение. Широкое — рамка по пропорции видео и вписывание: иначе 16:9
- * в 9:16 обрезается до центра. Квадрат — базовую рамку оставляем, вписывание.
+ * картинка загрузилась). `natural` (страница лота) — рамка всегда по
+ * фактической пропорции и вписывание: видео видно целиком в любой ориентации.
+ * Иначе — правила витрины: портрет оставляет базовую «телефонную» рамку с
+ * заполнением; широкое берёт рамку по пропорции видео и вписывание (иначе 16:9
+ * в 9:16 обрезается до центра); квадрат оставляет базовую рамку с вписыванием.
  * Наружу отдаём ориентацию (`onOrientation`): раскладку карточки (полоса,
  * размытая подложка) решает витрина — это её забота, не общая.
  */
@@ -136,7 +144,7 @@ function applyPosterFit(
 ): void {
   const orientation = orientationOf(img.naturalWidth, img.naturalHeight);
   if (!orientation) return;
-  if (orientation === 'wide') {
+  if (orientation === 'wide' || root.dataset.mediaAdapt === '1') {
     root.style.aspectRatio = `${img.naturalWidth} / ${img.naturalHeight}`;
     root.dataset.mediaFit = 'contain';
   } else {
