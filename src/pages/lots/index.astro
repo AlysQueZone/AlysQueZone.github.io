@@ -153,29 +153,11 @@ import BrandHeadline from '@/components/BrandHeadline.astro';
     }
   }
 
-  /** Слоты, которые в широкой карточке переезжают в плашку поверх кадра.
-   *  «Твой» (data-mine-badge) остаётся поверх кадра — это не владелец. */
-  const WIDE_OVERLAY_SLOTS = [
-    '[data-free-badge]',
-    '[data-owner-badge]',
-    '[data-lot-heading]',
-    '[data-lot-cta]',
-  ];
-
-  /** Широкая карточка-полоса (вариант C прототипа scratch/lot-feed): кадр во
-   *  всю ширину, плашка (владелец/название/кнопка) поверх низа. Идемпотентно;
-   *  смена видео пересобирает карточку (см. reconcile), поэтому разворот
-   *  «широкая → портрет» отдельно не разруливаем. */
+  /** Широкая карточка (16:9): тот же состав, что у обычной (название → кадр →
+   *  кнопка под кадром), но во всю строку. Раскладку задаёт CSS по data-wide;
+   *  пропорцию кадра уже выставил lib/lot-video. */
   function applyWideCard(card: HTMLElement): void {
-    if (card.dataset.wide === '1') return;
-    const overlay = card.querySelector('[data-wide-overlay]');
-    if (!(overlay instanceof HTMLElement)) return;
     card.dataset.wide = '1';
-    overlay.classList.remove('hidden');
-    for (const sel of WIDE_OVERLAY_SLOTS) {
-      const el = card.querySelector(sel);
-      if (el) overlay.appendChild(el);
-    }
   }
 
   /** Квадратное видео: базовую «телефонную» рамку оставляем, кадр вписан

@@ -17,7 +17,7 @@ const base = import.meta.env.BASE_URL;
   data-lot-card
   class="card-pixel flex flex-col gap-2 p-4 transition hover:-translate-y-0.5 motion-reduce:hover:translate-y-0"
 >
-  <h3 data-lot-heading class="text-base font-extrabold">
+  <h3 class="text-base font-extrabold">
     <a data-lot-link href={`${base}lots/`} class="hover:text-ember">
       <span data-lot-title></span>
     </a>
@@ -35,11 +35,8 @@ const base = import.meta.env.BASE_URL;
     <span data-mine-badge class="badge-pixel absolute top-2 right-2 hidden bg-pivko text-cream">
       Твой
     </span>
-    <!-- Плашка широкой карточки (вариант C): сюда скрипт витрины переносит
-         заголовок, владельца и кнопку, когда постер оказался шире 16:9. -->
-    <div data-wide-overlay class="hidden"></div>
   </LotVideo>
-  <div data-lot-cta class="mt-auto pt-2">
+  <div class="mt-auto pt-2">
     <button
       type="button"
       class="btn-arcade btn-arcade-primary w-full px-4 py-3 text-sm"
