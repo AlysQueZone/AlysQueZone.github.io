@@ -33,6 +33,8 @@ export function isOfflineError(err: unknown): boolean {
   return OFFLINE_MARKERS.some((marker) => low.includes(marker)) || err instanceof TypeError;
 }
 
+// Набор — объединение прежних копий; 'no twitch identity' шлют покупочные RPC
+// (в JWT нет twitch-личности) — это тот же «нет входа», а не отдельная болезнь.
 const NO_AUTH_MARKERS = ['not authenticated', 'row-level security', 'jwt', 'no twitch identity'];
 
 /** Нет входа/сессия не прошла: JWT, RLS, «not authenticated», нет twitch-личности. */
