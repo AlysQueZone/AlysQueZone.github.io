@@ -1,0 +1,974 @@
+<!doctype html>
+<!--
+  ПРОТОТИП (throwaway) — карточки лотов: владелец, цена и размер под видео 9:16.
+
+  Вопросы из TODO (раздел «Карточки»):
+    1. Как явно выделить владельца лота?
+    2. На карточке «дублируется» цена: показ цены + кнопка «Забрать за N». Как
+       совместить, при этом не теряя цену на неактивной кнопке (не хватает
+       Пивкойнов)?
+    3. Карточка мала под «телефонные» видео 9:16 — сейчас квадрат и object-cover
+       режет кадр до центра. Как показать видео целиком (или почти)?
+
+  Сверху слева — переключатель баланса (1000 / 3000 / 0 🍺): он переводит кнопки
+  между «хватает» и «не хватает», чтобы проверить пункт 2 в обоих состояниях.
+  Внизу — переключатель вариантов (стрелки ← →, стрелки клавиатуры, ?variant=).
+
+  Варианты (радикально разные по структуре, не по цвету):
+    0 «Сейчас»        — как на витрине сегодня (квадрат-обрезка, цена-строка +
+                        цена-в-кнопке) — база для сравнения.
+    A «Портрет-герой» — постер 9:16 целиком; владелец — бейдж поверх кадра;
+                        цена живёт только в кнопке, у неактивной — в надписи.
+    B «Строка»        — горизонтальная карточка: портретный кадр слева, справа
+                        владелец-чип, цена-плашка и кнопка без цены.
+    C «Обложка»       — квадрат с показом видео целиком (contain); владелец —
+                        лента поперёк низа кадра, цена — стикер в углу кадра,
+                        кнопка без цены.
+    D «Прилавок»      — владелец шапкой карточки; внизу одна полоса
+                        «цена | кнопка»: цена остаётся читаемой, когда кнопка
+                        гаснет.
+
+  Поле решения по цене (вопрос 2), которое здесь проверяем: на карточке — РОВНО
+  одна цена, и это цена покупки (next_price = «сколько заплатишь»). Текущая
+  `price` (последняя уплаченная = рыночная стоимость) на карточке не дублируется;
+  для своего лота (mine) показываем стоимость, потому что купить его нельзя.
+  Сейчас же карточка показывает `price` отдельной строкой, а кнопка — `next_price`
+  (они всегда различаются на ~10%) — отсюда ощущение дубля.
+
+  Оговорка throwaway (как в scratch/buy-guest, scratch/suggest-greeting):
+    - НЕ часть сборки, отдельный HTML вне Astro;
+    - токены/шрифты/классы повторены вручную (Tailwind в файле нет);
+    - данные фейковые; кнопки декоративные, ничего не покупают;
+    - постеры — хотлинком с CDN канала (.webp рядом с .webm из content/lots.toml).
+-->
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Прототип · Карточки лотов — AlysQueZone</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rubik:wght@400;700;800;900&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --color-void: #fff6bf;
+        --color-panel: #ffe6ac;
+        --color-bar: #ffe4a6;
+        --color-card: #f0c46c;
+        --color-milk: #422006;
+        --color-mist: #744210;
+        --color-stream: #c2187b;
+        --color-ctahover: #9e145f;
+        --color-ember: #ff9e2c;
+        --color-melon: #c21d3b;
+        --color-legend: #b3127a;
+        --color-cream: #fffbea;
+        --color-pivko: #7a5f00;
+        --font-display: 'Press Start 2P', 'Rubik', system-ui, sans-serif;
+        --font-sans: 'Rubik', system-ui, -apple-system, sans-serif;
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background-color: var(--color-void);
+        color: var(--color-milk);
+        font-family: var(--font-sans);
+        -webkit-font-smoothing: antialiased;
+        min-height: 100vh;
+        padding-bottom: 7rem;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      a.title-link:hover {
+        color: var(--color-ember);
+      }
+
+      :focus-visible {
+        outline: 3px solid var(--color-blush, #ff00bc);
+        outline-offset: 2px;
+      }
+
+      .wrap {
+        max-width: 72rem;
+        margin: 0 auto;
+        padding: 1rem 1rem 2rem;
+      }
+
+      .display {
+        font-family: var(--font-display);
+        line-height: 1.7;
+      }
+
+      /* ---- шапка прототипа ------------------------------------------------ */
+      .topbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        border-bottom: 3px solid var(--color-milk);
+        padding-bottom: 0.75rem;
+        margin-bottom: 1rem;
+      }
+
+      .brand {
+        font-family: var(--font-display);
+        font-size: 14px;
+        line-height: 1.7;
+        text-transform: uppercase;
+      }
+
+      .tag {
+        font-family: var(--font-display);
+        font-size: 9px;
+        line-height: 1.7;
+        text-transform: uppercase;
+        background: var(--color-melon);
+        color: var(--color-cream);
+        padding: 4px 8px;
+        border-radius: 2px;
+        margin-left: 0.5rem;
+      }
+
+      .balance {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+
+      .balance .label {
+        font-weight: 900;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        min-height: 44px;
+        border: 3px solid var(--color-milk);
+        border-radius: 4px;
+        box-shadow: 4px 4px 0 color-mix(in srgb, var(--color-milk) 30%, transparent);
+        padding: 0.5rem 0.75rem;
+        font-weight: 900;
+        background: var(--color-void);
+      }
+
+      .seg {
+        display: inline-flex;
+      }
+
+      .seg button {
+        font: inherit;
+        font-weight: 900;
+        font-size: 0.8rem;
+        border: 3px solid var(--color-milk);
+        background: var(--color-panel);
+        color: var(--color-milk);
+        padding: 0.5rem 0.75rem;
+        min-height: 44px;
+        cursor: pointer;
+      }
+
+      .seg button + button {
+        border-left: 0;
+      }
+
+      .seg button:first-child {
+        border-radius: 4px 0 0 4px;
+      }
+
+      .seg button:last-child {
+        border-radius: 0 4px 4px 0;
+      }
+
+      .seg button[aria-pressed='true'] {
+        background: var(--color-stream);
+        color: var(--color-cream);
+      }
+
+      .hint {
+        font-size: 0.85rem;
+        color: var(--color-mist);
+        margin: 0 0 1rem;
+        max-width: 60rem;
+      }
+
+      /* ---- сетка ---------------------------------------------------------- */
+      .grid {
+        display: grid;
+        gap: 1rem;
+      }
+
+      .grid.cols-3 {
+        grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+      }
+
+      .grid.cols-2 {
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      }
+
+      .grid.rows {
+        grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+      }
+
+      /* ---- карточка (общий каркас) ---------------------------------------- */
+      .card {
+        background: var(--color-panel);
+        border: 3px solid var(--color-milk);
+        box-shadow: 6px 6px 0 var(--color-milk);
+        border-radius: 4px;
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        min-width: 0;
+      }
+
+      .card:hover {
+        transform: translateY(-2px);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .card:hover {
+          transform: none;
+        }
+      }
+
+      .title {
+        font-size: 1rem;
+        font-weight: 900;
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+      }
+
+      .muted {
+        color: var(--color-mist);
+        font-size: 0.85rem;
+      }
+
+      .mt-auto {
+        margin-top: auto;
+        padding-top: 0.5rem;
+      }
+
+      /* ---- медиа ---------------------------------------------------------- */
+      .media {
+        position: relative;
+        width: 100%;
+        overflow: hidden;
+        border: 2px solid var(--color-milk);
+        background: #000;
+      }
+
+      .media.square {
+        aspect-ratio: 1 / 1;
+      }
+
+      .media.portrait {
+        aspect-ratio: 9 / 16;
+      }
+
+      .media.four5 {
+        aspect-ratio: 4 / 5;
+      }
+
+      .media img {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      .fit-cover img {
+        object-fit: cover;
+      }
+
+      .fit-contain img {
+        object-fit: contain;
+      }
+
+      .play {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgb(0 0 0 / 35%);
+        border: 0;
+        cursor: pointer;
+        padding: 0;
+      }
+
+      .play-mini {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgb(0 0 0 / 30%);
+        border: 0;
+        cursor: pointer;
+        padding: 0;
+        color: var(--color-cream);
+        font-size: 1.5rem;
+      }
+
+      /* ---- кнопки --------------------------------------------------------- */
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.25rem;
+        min-height: 44px;
+        border: 3px solid var(--color-milk);
+        box-shadow: 4px 4px 0 var(--color-milk);
+        border-radius: 4px;
+        font: inherit;
+        font-weight: 900;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        cursor: pointer;
+        padding: 0.5rem 1rem;
+        background: transparent;
+        color: var(--color-milk);
+        text-align: center;
+      }
+
+      .btn-primary {
+        background: var(--color-stream);
+        color: var(--color-cream);
+      }
+
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+
+      .btn.block {
+        width: 100%;
+      }
+
+      .btn-s {
+        font-size: 0.7rem;
+        min-height: 0;
+        padding: 0.5rem 0.75rem;
+      }
+
+      /* ---- бейджи/чипы ---------------------------------------------------- */
+      .badge {
+        display: inline-block;
+        font-family: var(--font-display);
+        font-size: 9px;
+        line-height: 1.7;
+        padding: 4px 8px;
+        border-radius: 2px;
+        text-transform: uppercase;
+      }
+
+      .badge-bar {
+        background: var(--color-bar);
+        color: var(--color-milk);
+      }
+
+      .badge-pivko {
+        background: var(--color-pivko);
+        color: var(--color-cream);
+      }
+
+      .owner-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-weight: 900;
+        font-size: 0.8rem;
+        background: var(--color-bar);
+        border: 2px solid var(--color-milk);
+        border-radius: 4px;
+        padding: 0.25rem 0.5rem;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .owner-chip.free {
+        background: var(--color-panel);
+        color: var(--color-mist);
+      }
+
+      .mine-inline {
+        font-weight: 900;
+        color: var(--color-pivko);
+      }
+
+      .price-big {
+        font-size: 1.25rem;
+        font-weight: 900;
+        color: var(--color-pivko);
+      }
+
+      .price-pill {
+        font-weight: 900;
+        font-size: 1.05rem;
+        color: var(--color-pivko);
+        background: var(--color-void);
+        border: 3px solid var(--color-milk);
+        border-radius: 4px;
+        box-shadow: 3px 3px 0 var(--color-milk);
+        padding: 0.4rem 0.75rem;
+        white-space: nowrap;
+      }
+
+      /* ---- вариант A: бейджи поверх кадра --------------------------------- */
+      .ov {
+        position: absolute;
+        top: 0.5rem;
+        left: 0.5rem;
+        pointer-events: none;
+      }
+
+      .ov-tr {
+        left: auto;
+        right: 0.5rem;
+      }
+
+      /* ---- вариант B: горизонтальная строка ------------------------------- */
+      .vB-card {
+        flex-direction: row;
+        gap: 0.75rem;
+        align-items: stretch;
+      }
+
+      .vB-thumb {
+        flex: 0 0 38%;
+        max-width: 160px;
+      }
+
+      .vB-info {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+
+      .vB-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.35rem;
+      }
+
+      .vB-actions {
+        margin-top: auto;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem;
+        justify-content: space-between;
+      }
+
+      /* ---- вариант C: лента владельца + стикер цены ----------------------- */
+      .sticker {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        pointer-events: none;
+        background: var(--color-void);
+        border: 3px solid var(--color-milk);
+        border-radius: 4px;
+        box-shadow: 3px 3px 0 var(--color-milk);
+        padding: 0.25rem 0.5rem;
+        font-weight: 900;
+        color: var(--color-pivko);
+        font-size: 1rem;
+      }
+
+      .ribbon {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        pointer-events: none;
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        background: var(--color-bar);
+        border-top: 3px solid var(--color-milk);
+        padding: 0.4rem 0.6rem;
+        font-weight: 900;
+        font-size: 0.8rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .ribbon.mine {
+        background: var(--color-pivko);
+        color: var(--color-cream);
+      }
+
+      /* ---- вариант D: полоса «цена | кнопка» ------------------------------ */
+      .actionbar {
+        margin-top: auto;
+        display: flex;
+        border: 3px solid var(--color-milk);
+        border-radius: 4px;
+        box-shadow: 4px 4px 0 var(--color-milk);
+        overflow: hidden;
+      }
+
+      .actionbar .aprice {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: 0.35rem 0.75rem;
+        background: var(--color-void);
+        min-width: 0;
+      }
+
+      .actionbar .aprice small {
+        font-size: 0.6rem;
+        font-weight: 900;
+        text-transform: uppercase;
+        color: var(--color-mist);
+      }
+
+      .actionbar .aprice b {
+        font-size: 1.15rem;
+        font-weight: 900;
+        color: var(--color-pivko);
+        white-space: nowrap;
+      }
+
+      .actionbar .abtn {
+        flex: 0 0 auto;
+        border: 0;
+        border-left: 3px solid var(--color-milk);
+        border-radius: 0;
+        box-shadow: none;
+        min-height: 58px;
+        padding: 0.5rem 1.1rem;
+      }
+
+      /* ---- переключатель вариантов ---------------------------------------- */
+      .switcher {
+        position: fixed;
+        left: 50%;
+        bottom: 1rem;
+        transform: translateX(-50%);
+        z-index: 60;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: var(--color-milk);
+        color: var(--color-cream);
+        border-radius: 999px;
+        padding: 0.4rem 0.5rem;
+        box-shadow: 0 6px 0 rgb(0 0 0 / 25%);
+        max-width: calc(100vw - 1rem);
+      }
+
+      .switcher button {
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: 999px;
+        border: 0;
+        background: var(--color-cream);
+        color: var(--color-milk);
+        font-size: 1.1rem;
+        font-weight: 900;
+        cursor: pointer;
+        flex: 0 0 auto;
+      }
+
+      .switcher .slabel {
+        font-family: var(--font-display);
+        font-size: 9px;
+        line-height: 1.7;
+        text-align: center;
+        min-width: 15rem;
+        text-transform: uppercase;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      @media (max-width: 520px) {
+        .switcher .slabel {
+          min-width: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="topbar">
+        <div class="brand">Прототип карточек<span class="tag">throwaway</span></div>
+        <div class="balance">
+          <span class="label">Баланс</span>
+          <span class="chip"><span aria-hidden="true">🍺</span><span id="balance">1000</span></span>
+          <div class="seg" id="balance-seg">
+            <button type="button" data-bal="1000" aria-pressed="true">1000</button>
+            <button type="button" data-bal="3000" aria-pressed="false">3000</button>
+            <button type="button" data-bal="0" aria-pressed="false">0</button>
+          </div>
+        </div>
+      </div>
+
+      <p class="hint" id="hint"></p>
+
+      <div id="stage"></div>
+    </div>
+
+    <div class="switcher" role="group" aria-label="Переключение вариантов">
+      <button type="button" id="prev" aria-label="Предыдущий вариант">←</button>
+      <div class="slabel" id="slabel"></div>
+      <button type="button" id="next" aria-label="Следующий вариант">→</button>
+    </div>
+
+    <script>
+      // ---- данные -----------------------------------------------------------
+      const CDN = 'https://cdns.memealerts.com/p';
+      const poster = (p) => `${CDN}/${p}/alert_orig.webp`;
+
+      // Фейковый каталог: mix активных / «не хватает» / своего лота.
+      const CARDS = [
+        {
+          title: 'Массовый привет (коты одобряют)',
+          price: 800,
+          next: 880,
+          owner: 'nyanyachos',
+          mine: false,
+          poster: poster('64f8378906d68898c5b8e508/2d11fea1-bda2-493a-9774-510e15c6a589'),
+        },
+        {
+          title: 'Привет сразу всем (оптом)',
+          price: 700,
+          next: 770,
+          owner: null,
+          mine: false,
+          poster: poster('672ba6a81135f4340a61a4d0/6e47bcfc-453d-47da-8b6f-958c2a25bc4a'),
+        },
+        {
+          title: 'Здраствуйте, nyanyachos',
+          price: 1200,
+          next: 1320,
+          owner: 'evilzerg57',
+          mine: false,
+          poster: poster('66961426e904cc2377372321/a24b3e2f-5f63-42bc-b40a-346eb305464d'),
+        },
+        {
+          title: 'o7 arhion24',
+          price: 800,
+          next: 880,
+          owner: 'ТЫ',
+          mine: true,
+          poster: poster('69bcde52b57c1c9b432af084/0fcaba76-262b-4768-be63-9ae9daa7a390'),
+        },
+        {
+          title: 'Миф о бесплатном пивете',
+          price: 1000,
+          next: 1100,
+          owner: 'Bradhi',
+          mine: false,
+          poster: poster('649b210acfd0d2a8f427e00f/1870f6b6-c0d7-45c9-b39f-f7c00c5220b7'),
+        },
+        {
+          title: 'Привет foxindique и INexizI',
+          price: 900,
+          next: 990,
+          owner: null,
+          mine: false,
+          poster: poster('672ba6a81135f4340a61a4d0/9ccdb2ec-b274-4a0a-8fe9-34604a7779e5'),
+        },
+      ];
+
+      // ---- состояние --------------------------------------------------------
+      const BAL = { value: 1000 };
+
+      const isShort = (c) => !c.mine && c.next > BAL.value;
+      // На карточке — одна цена: цена покупки; для своего лота — стоимость.
+      const payPrice = (c) => (c.mine ? c.price : c.next);
+      const esc = (s) =>
+        String(s).replace(
+          /[&<>"]/g,
+          (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]
+        );
+
+      // ---- кусочки разметки -------------------------------------------------
+      function posterImg(c) {
+        return `<img src="${c.poster}" alt="" loading="lazy" />`;
+      }
+
+      function ownerBadge(c) {
+        if (!c.owner) return `<span class="badge badge-bar">свободен</span>`;
+        return `<span class="badge badge-bar">👑 ${esc(c.owner)}</span>`;
+      }
+
+      function ownerChip(c) {
+        const head = c.owner
+          ? `<span class="owner-chip">👑 ${esc(c.owner)}</span>`
+          : `<span class="owner-chip free">свободен · забери первым</span>`;
+        const mine = c.mine ? `<span class="badge badge-pivko">Твой</span>` : '';
+        return head + mine;
+      }
+
+      function media(c, aspect, fit) {
+        return `<div class="media ${aspect} fit-${fit}">
+          ${posterImg(c)}
+          <button class="play" type="button" aria-label="Смотреть привет">
+            <span class="btn btn-primary btn-s">▶ смотреть</span>
+          </button>
+        </div>`;
+      }
+
+      function buyBtn(c, label, block) {
+        const off = c.mine || isShort(c);
+        const text = c.mine ? 'Твой привет' : label;
+        return `<button class="btn ${off ? '' : 'btn-primary'} ${block ? 'block' : ''}" type="button" ${
+          off ? 'disabled' : ''
+        }>${esc(text)}</button>`;
+      }
+
+      // ---- варианты ---------------------------------------------------------
+      // 0 — как сейчас: квадрат-обрезка, цена строкой + цена в кнопке.
+      function v0(c) {
+        const label = isShort(c) ? 'Не хватает Пивкойнов' : `Забрать за ${c.next} 🍺`;
+        return `<article class="card">
+          <h3 class="title"><a class="title-link" href="#">${esc(c.title)}</a></h3>
+          ${media(c, 'square', 'cover')}
+          <p class="muted">владелец: <span>${esc(c.owner ?? '—')}</span>${
+            c.mine ? ' <span class="mine-inline">· ТВОЙ</span>' : ''
+          }</p>
+          <p class="price-big">${c.price} 🍺</p>
+          <div class="mt-auto">${buyBtn(c, label, false)}</div>
+        </article>`;
+      }
+
+      // A — портрет-герой: кадр целиком, владелец поверх, цена в кнопке.
+      function vA(c) {
+        const label = isShort(c) ? `Не хватает · ${c.next} 🍺` : `▶ Забрать за ${c.next} 🍺`;
+        return `<article class="card">
+          <div class="media portrait fit-contain">
+            ${posterImg(c)}
+            <button class="play" type="button" aria-label="Смотреть привет">
+              <span class="btn btn-primary btn-s">▶ смотреть</span>
+            </button>
+            <div class="ov">${ownerBadge(c)}</div>
+            ${c.mine ? `<div class="ov ov-tr"><span class="badge badge-pivko">Твой</span></div>` : ''}
+          </div>
+          <h3 class="title"><a class="title-link" href="#">${esc(c.title)}</a></h3>
+          <div class="mt-auto">${buyBtn(c, label, true)}</div>
+        </article>`;
+      }
+
+      // B — строка: портретный кадр слева, владелец-чип, цена-плашка и кнопка.
+      function vB(c) {
+        const off = c.mine || isShort(c);
+        const label = c.mine ? 'Твой привет' : isShort(c) ? 'Не хватает' : 'Забрать';
+        return `<article class="card vB-card">
+          <div class="vB-thumb">
+            <div class="media portrait fit-contain">
+              ${posterImg(c)}
+              <button class="play-mini" type="button" aria-label="Смотреть привет">▶</button>
+            </div>
+          </div>
+          <div class="vB-info">
+            <div class="vB-head">${ownerChip(c)}</div>
+            <h3 class="title"><a class="title-link" href="#">${esc(c.title)}</a></h3>
+            <div class="vB-actions">
+              <span class="price-pill">${payPrice(c)} 🍺</span>
+              <button class="btn ${off ? '' : 'btn-primary'}" type="button" ${
+                off ? 'disabled' : ''
+              }>${esc(label)}</button>
+            </div>
+          </div>
+        </article>`;
+      }
+
+      // C — обложка: кадр целиком в квадрате, лента владельца, стикер цены.
+      function vC(c) {
+        const off = c.mine || isShort(c);
+        const label = c.mine ? 'Твой привет' : isShort(c) ? 'Не хватает Пивкойнов' : '▶ Забрать';
+        return `<article class="card">
+          <div class="media square fit-contain">
+            ${posterImg(c)}
+            <button class="play" type="button" aria-label="Смотреть привет">
+              <span class="btn btn-primary btn-s">▶ смотреть</span>
+            </button>
+            <div class="sticker">${payPrice(c)} 🍺</div>
+            <div class="ribbon ${c.mine ? 'mine' : ''}">
+              ${c.mine ? '👑' : '👤'} ${esc(c.owner ?? 'свободен')}${c.mine ? ' · ТВОЙ' : ''}
+            </div>
+          </div>
+          <h3 class="title"><a class="title-link" href="#">${esc(c.title)}</a></h3>
+          <div class="mt-auto">
+            <button class="btn ${off ? '' : 'btn-primary'} block" type="button" ${
+              off ? 'disabled' : ''
+            }>${esc(label)}</button>
+          </div>
+        </article>`;
+      }
+
+      // D — прилавок: владелец шапкой, внизу полоса «цена | кнопка».
+      function vD(c) {
+        const off = c.mine || isShort(c);
+        const label = c.mine ? 'Твой привет' : isShort(c) ? 'Не хватает' : 'Забрать';
+        return `<article class="card">
+          <div class="vB-head">${ownerChip(c)}</div>
+          <h3 class="title"><a class="title-link" href="#">${esc(c.title)}</a></h3>
+          ${media(c, 'portrait', 'contain')}
+          <div class="actionbar">
+            <div class="aprice">
+              <small>${c.mine ? 'стоимость' : 'забрать за'}</small>
+              <b>${payPrice(c)} 🍺</b>
+            </div>
+            <button class="abtn btn ${off ? '' : 'btn-primary'}" type="button" ${
+              off ? 'disabled' : ''
+            }>${esc(label)}</button>
+          </div>
+        </article>`;
+      }
+
+      const VARIANTS = [
+        {
+          key: '0',
+          name: 'Сейчас',
+          desc: 'База для сравнения: квадрат с обрезкой кадра, цена отдельной строкой (последняя уплаченная) и она же в кнопке («Забрать за N»). На неактивной кнопке цены нет.',
+          grid: 'cols-3',
+          render: v0,
+        },
+        {
+          key: 'A',
+          name: 'Портрет-герой',
+          desc: 'Кадр 9:16 показан целиком (contain на чёрном). Владелец — бейдж поверх кадра. Цена — только в кнопке; когда Пивкойнов не хватает, в надписи стоит цена («Не хватает · N 🍺»).',
+          grid: 'cols-2',
+          render: vA,
+        },
+        {
+          key: 'B',
+          name: 'Строка',
+          desc: 'Горизонтальная карточка: портретный кадр слева (видны все 9:16), справа чип владельца, цена-плашка и кнопка без цены. Цена не дублируется и видна всегда — даже на неактивной кнопке.',
+          grid: 'rows',
+          render: vB,
+        },
+        {
+          key: 'C',
+          name: 'Обложка',
+          desc: 'Квадрат, но видео целиком (contain). Владелец — лента поперёк низа кадра, цена — стикер в углу. Кнопка без цены: на неактивной (не хватает / твой) цена остаётся стикером.',
+          grid: 'cols-3',
+          render: vC,
+        },
+        {
+          key: 'D',
+          name: 'Прилавок',
+          desc: 'Владелец — шапка карточки (над названием). Внизу одна полоса «цена | кнопка»: цена живёт в левой половине и остаётся читаемой, когда кнопка гаснет. На 9:16 виден кадр целиком.',
+          grid: 'cols-2',
+          render: vD,
+        },
+      ];
+
+      // ---- отрисовка --------------------------------------------------------
+      const stage = document.getElementById('stage');
+      const hint = document.getElementById('hint');
+      const slabel = document.getElementById('slabel');
+
+      function render(key) {
+        const v = VARIANTS.find((x) => x.key === key) ?? VARIANTS[0];
+        hint.textContent = `Вариант ${v.key} «${v.name}»: ${v.desc}`;
+        slabel.textContent = `${v.key} · ${v.name}`;
+        stage.innerHTML = `<div class="grid ${v.grid}">${CARDS.map(v.render).join('')}</div>`;
+      }
+
+      function currentKey() {
+        const k = new URLSearchParams(location.search).get('variant');
+        return VARIANTS.some((v) => v.key === k) ? k : '0';
+      }
+
+      let active = currentKey();
+
+      function setVariant(key) {
+        active = key;
+        try {
+          const url = new URL(location.href);
+          url.searchParams.set('variant', key);
+          history.replaceState(null, '', url);
+        } catch {
+          /* file:// в части браузеров запрещает replaceState — просто отрисуем */
+        }
+        render(key);
+      }
+
+      function cycle(step) {
+        const i = VARIANTS.findIndex((v) => v.key === active);
+        const next = VARIANTS[(i + step + VARIANTS.length) % VARIANTS.length];
+        setVariant(next.key);
+      }
+
+      document.getElementById('prev').addEventListener('click', () => cycle(-1));
+      document.getElementById('next').addEventListener('click', () => cycle(1));
+
+      document.addEventListener('keydown', (e) => {
+        const t = e.target;
+        if (
+          t instanceof HTMLElement &&
+          (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)
+        )
+          return;
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          cycle(-1);
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          cycle(1);
+        }
+      });
+
+      // Клики по декоративным ссылкам/кнопкам не должны ничего делать.
+      document.addEventListener('click', (e) => {
+        const el = e.target.closest('a[href="#"], .play, .play-mini, .btn, .abtn');
+        if (el) e.preventDefault();
+      });
+
+      // Баланс: переключает активные/неактивные кнопки на живом экране.
+      const balanceEl = document.getElementById('balance');
+      document.getElementById('balance-seg').addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-bal]');
+        if (!btn) return;
+        BAL.value = Number(btn.dataset.bal);
+        balanceEl.textContent = String(BAL.value);
+        document.querySelectorAll('#balance-seg button').forEach((b) => {
+          b.setAttribute('aria-pressed', String(b === btn));
+        });
+        render(active);
+      });
+
+      setVariant(active);
+    </script>
+  </body>
+</html>
