@@ -27,6 +27,7 @@
 import { getSessionUid, getSupabase, fetchOutbidCatchup } from './supabase';
 import { fetchLotCatalog, subscribeLots, onBought } from './lots';
 import { subscribeLive } from './live';
+import { readBuyIntent, updateBuyIntentPrice } from './buy-intent';
 import { sellerLine, type OutbidEvent } from './outbid-event';
 import { playOutbidSound } from './outbid-sound';
 import { MAX_NOTICES, ensureCorner, makeRebuyButton, showNotice } from './outbid-notices';
@@ -229,12 +230,12 @@ export function initOutbidNotice(): void {
   function refreshRebuyButtons(): void {
     document.querySelectorAll('button[data-rebuy-live]').forEach((node) => {
       if (!(node instanceof HTMLButtonElement)) return;
-      const slug = node.dataset.buyLot;
-      if (!slug) return;
-      const next = liveNext.get(slug);
+      const intent = readBuyIntent(node);
+      if (!intent) return;
+      const next = liveNext.get(intent.slug);
       if (next === undefined) return;
+      updateBuyIntentPrice(node, next);
       node.textContent = `▶ Забрать за ${next} 🍺`;
-      node.dataset.lotPrice = String(next);
     });
   }
 

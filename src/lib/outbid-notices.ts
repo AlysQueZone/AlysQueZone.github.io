@@ -8,6 +8,7 @@
  */
 
 import { sellerLine, type OutbidEvent } from './outbid-event';
+import { formatStaged, writeBuyIntent } from './buy-intent';
 
 export const MAX_NOTICES = 3;
 const NOTICE_TTL_MS = 20000;
@@ -19,26 +20,28 @@ export type LivePrices = Map<string, number>;
 
 /** Кнопка перекупа в стиле сайта (как «Купить» на карточках: bg-stream).
  *  N — из подписки на БД; пока прайс не приехал или вью отсутствует — честный
- *  «…» вместо факта уплаченной цены как N (сервер при записи всё равно
- *  подтвердит настоящую). */
+ *  «…» (намерение несёт price: null), а не уплаченная цена как N (сервер при
+ *  записи всё равно подтвердит настоящую). */
 export function makeRebuyButton(ev: OutbidEvent, liveNext: LivePrices): HTMLButtonElement {
-  const next = liveNext.get(ev.slug);
+  const next = liveNext.get(ev.slug) ?? null;
   const btn = document.createElement('button');
   btn.type = 'button';
-  btn.textContent = next !== undefined ? `▶ Забрать за ${next} 🍺` : '▶ Забрать за … 🍺';
+  btn.textContent = `▶ Забрать за ${formatStaged(next)} 🍺`;
   // Аркадная кнопка стиля C (классы из global.css) + отступ от текста.
   btn.className = 'btn-arcade btn-arcade-primary';
   btn.style.marginTop = '8px';
   btn.style.padding = '8px 16px';
   btn.style.fontSize = '14px';
-  btn.dataset.buyLot = ev.slug;
-  btn.dataset.lotTitle = ev.title;
-  // Staged — живая N, иначе текущая уплаченная (сервер пересчитает настоящую).
-  btn.dataset.lotPrice = String(next ?? ev.price);
-  btn.dataset.lotOwner = ev.by;
+  // Намерение — один слот (lib/buy-intent.ts), не пять атрибутов вразнобой.
+  writeBuyIntent(btn, {
+    slug: ev.slug,
+    title: ev.title,
+    price: next,
+    owner: ev.by,
+    video: ev.video,
+  });
   // Живая кнопка: refreshPrices() правит текст и staged-цену по подписке.
   btn.dataset.rebuyLive = '1';
-  if (ev.video) btn.dataset.lotVideo = ev.video;
   return btn;
 }
 

@@ -204,7 +204,7 @@ import BrandHeadline from '@/components/BrandHeadline.astro';
     // Владелец и «Твой» — бейджами поверх кадра (общий fillOwnerBadges).
     fillOwnerBadges(card, st);
     // Цена на карточке не дублируется — она живёт только в кнопке (fillBuyButton).
-    fillBuyButton(card.querySelector('[data-buy-lot]'), st, myBalance);
+    fillBuyButton(card.querySelector('[data-buy-intent]'), st, myBalance);
   }
 
   // slug → узел карточки: reconcile набора (создать/снести/обновить).

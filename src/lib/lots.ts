@@ -1,5 +1,6 @@
 import { getSupabase, withAuthRetry, buyLotShared } from './supabase';
 import { subscribeLive } from './live';
+import { buyAvailability, formatStaged, writeBuyIntent } from './buy-intent';
 
 /**
  * Живое состояние Лота: каталог + прайс-фид + флаг «мой» за один запрос.
@@ -158,12 +159,13 @@ export async function fetchLotState(slug: string, uid: string | null): Promise<L
 }
 
 /**
- * Заполнить кнопку покупки данными Лота — контракт с BuyModal (`data-buy-lot*`).
+ * Заполнить кнопку покупки данными Лота — намерение через lib/buy-intent.ts
+ * (`data-buy-intent`), правило «не хватает» — оттуда же (buyAvailability).
  * Одно место на витрину и страницу лота: правка формы тут меняет оба экрана.
  * `balance` — зеркало серверного гейта: N известна и баланс меньше — кнопка
  * гаснет с честной надписью, но цена в ней остаётся («Не хватает · N 🍺»).
  * Исключения: свой лот — «Твой привет» (цены нет, покупка невозможна),
- * N неизвестна — «…».
+ * N неизвестна — «…» (намерение несёт price: null, сервер посчитает сам).
  */
 export function fillBuyButton(
   btn: Element | null,
@@ -171,25 +173,24 @@ export function fillBuyButton(
   balance: number | null = null
 ): void {
   if (!(btn instanceof HTMLButtonElement)) return;
-  btn.dataset.buyLot = st.slug;
-  btn.dataset.lotTitle = st.title;
-  // Staged-цена — живая N из каталога; N неизвестна — «…», сервер посчитает сам.
-  btn.dataset.lotPrice = String(st.nextPrice ?? st.price);
-  btn.dataset.lotOwner = st.owner_login ?? '—';
-  if (st.video_url) btn.dataset.lotVideo = st.video_url;
-  else delete btn.dataset.lotVideo;
+  const intent = {
+    slug: st.slug,
+    title: st.title,
+    price: st.nextPrice,
+    owner: st.owner_login ?? '—',
+    video: st.video_url,
+  };
+  writeBuyIntent(btn, intent);
   // Свой лот купить нельзя (перекуп у себя бессмыслен) — кнопка гаснет.
   // N неизвестна — не гасим по балансу: сравнить не с чем, решает сервер.
-  const short = st.nextPrice !== null && balance !== null && balance < st.nextPrice;
-  const off = st.mine || short;
+  const availability = buyAvailability(intent, balance);
+  const off = st.mine || availability === 'short';
   btn.disabled = off;
   btn.textContent = st.mine
     ? 'Твой привет'
-    : short
-      ? `Не хватает · ${st.nextPrice} 🍺`
-      : st.nextPrice !== null
-        ? `▶ Забрать за ${st.nextPrice} 🍺`
-        : '▶ Забрать за … 🍺';
+    : availability === 'short'
+      ? `Не хватает · ${formatStaged(st.nextPrice)} 🍺`
+      : `▶ Забрать за ${formatStaged(st.nextPrice)} 🍺`;
   btn.classList.toggle('opacity-50', off);
 }
 

@@ -2,9 +2,10 @@
 // Общий компонент покупки (тикеты 10 «биржа» и 11 «карточка»):
 // модалка «Потратить N Пивкойнов?» + confetti + уведомления в тоне канала.
 //
-// Использование: положить <BuyModal /> на страницу и вешать на кнопки
-// data-buy-lot="<id>" data-lot-title="<title>" data-lot-price="<n>"
-// data-lot-owner="<owner>" data-lot-video="<video_url>".
+// Использование: положить <BuyModal /> на страницу; кнопки покупки носят
+// намерение в слоте data-buy-intent (lib/buy-intent.ts, writeBuyIntent:
+// slug/title/price/owner/video). Клик по кнопке с намерением сам откроет
+// модалку — скрипт ниже делегированный.
 // При покупке играет видео лота со звуком (видимо, в уведомлении); без video_url — clap с S3.
 // Клик по такой кнопке сам откроет модалку — скрипт ниже делегированный.
 // Гость (нет сессии): модалка открывается в гостевом режиме — CTA «Войти через
@@ -81,6 +82,13 @@ const clapSound = s3Sound('clap.mp3');
   import { fetchLotState, subscribeLots, buyLot, announceBought } from '@/lib/lots';
   import { fetchMyBalance, onBalance } from '@/lib/balance';
   import {
+    buyAvailability,
+    findBuyButton,
+    formatStaged,
+    readBuyIntent,
+    type BuyIntent,
+  } from '@/lib/buy-intent';
+  import {
     getSupabase,
     isSupabaseConfigured,
     signInWithTwitch,
@@ -100,8 +108,7 @@ const clapSound = s3Sound('clap.mp3');
   const noBtn = document.getElementById('buy-modal-no');
   const notice = document.getElementById('buy-notice');
 
-  let pending: { id: string; title: string; price: number; owner: string; video?: string } | null =
-    null;
+  let pending: BuyIntent | null = null;
   let noticeTimer: number | undefined;
   let pauseTimer: number | undefined;
   /** Сколько секунд паузы осталось на кнопке (0 — кнопка свободна). */
@@ -122,13 +129,13 @@ const clapSound = s3Sound('clap.mp3');
   // display-mirror, source of truth — DB (см. выше).
   const LIMIT_LABEL = 'Лимит: 10 покупок за 10 минут';
 
-  function buyLabel(price: number): string {
-    return `Забрать за ${price} 🍺`;
+  function buyLabel(price: number | null): string {
+    return `Забрать за ${formatStaged(price)} 🍺`;
   }
 
   /** Текст окна: у гостя — «Цена: …» справочно, у своих — приглашение потратить. */
   function modalTextFor(price: number | null, owner: string): string {
-    const n = price === null ? '…' : String(price);
+    const n = formatStaged(price);
     return guest
       ? `Цена: ${n} Пивкойнов. Владелец: ${owner}`
       : `Потратить ${n} Пивкойнов? Владелец: ${owner}`;
@@ -322,10 +329,16 @@ const clapSound = s3Sound('clap.mp3');
       yesBtn.textContent = pauseLabel(pauseLeft);
       return;
     }
-    const price = pending?.price ?? 0;
-    const short = balance !== null && balance < price;
-    yesBtn.disabled = short;
-    yesBtn.textContent = short ? 'Не хватает Пивкойнов' : pending ? buyLabel(price) : 'Забрать';
+    // Общее правило доступности (lib/buy-intent.ts): не хватает — кнопка
+    // гаснет; N неизвестна — не гасим, сравнить не с чем (решает сервер).
+    const availability = pending ? buyAvailability(pending, balance) : 'available';
+    yesBtn.disabled = availability === 'short';
+    yesBtn.textContent =
+      availability === 'short'
+        ? 'Не хватает Пивкойнов'
+        : pending
+          ? buyLabel(pending.price)
+          : 'Забрать';
   }
 
   function setBusy(value: boolean): void {
@@ -398,11 +411,11 @@ const clapSound = s3Sound('clap.mp3');
    * Серверная ошибка — правда в последней инстанции (см. startPause в обработчике).
    */
   async function refreshPauseProjection(lotId: string): Promise<void> {
-    if (!pending || pending.id !== lotId || limitHit || pauseLeft > 0) return;
+    if (!pending || pending.slug !== lotId || limitHit || pauseLeft > 0) return;
     if (!isSupabaseConfigured()) return;
     try {
       const uid = await getSessionUid();
-      if (!uid || !pending || pending.id !== lotId) return;
+      if (!uid || !pending || pending.slug !== lotId) return;
       const history = await fetchSharedHistory(lotId, pending.owner);
       for (let i = history.length - 1; i >= 0; i -= 1) {
         const entry = history[i];
@@ -410,7 +423,7 @@ const clapSound = s3Sound('clap.mp3');
         const boughtAt = Date.parse(entry.created_at);
         if (!Number.isFinite(boughtAt)) return;
         const remaining = Math.ceil(PAUSE_SEC - (Date.now() - boughtAt) / 1000);
-        if (remaining > 0 && pending && pending.id === lotId && pauseLeft <= 0 && !limitHit) {
+        if (remaining > 0 && pending && pending.slug === lotId && pauseLeft <= 0 && !limitHit) {
           startPause(remaining);
         }
         return;
@@ -427,34 +440,16 @@ const clapSound = s3Sound('clap.mp3');
    * цена подтянется (см. конец startPause).
    */
   async function refreshPriceProjection(lotId: string): Promise<void> {
-    if (!pending || pending.id !== lotId || limitHit || pauseLeft > 0) return;
+    if (!pending || pending.slug !== lotId || limitHit || pauseLeft > 0) return;
     if (!isSupabaseConfigured()) return;
     try {
       const row = await fetchLotState(lotId, null);
-      if (!row || !pending || pending.id !== lotId || limitHit || pauseLeft > 0) return;
+      if (!row || !pending || pending.slug !== lotId || limitHit || pauseLeft > 0) return;
       if (row.owner_login) pending.owner = row.owner_login;
-      const next = row.nextPrice;
-      // N неизвестна (вью отсутствует) — честный «…» вместо staged как N;
-      // итог всё равно посчитает сервер.
-      if (typeof next !== 'number' || !Number.isFinite(next) || next <= 0) {
-        if (modalText) {
-          modalText.textContent = modalTextFor(null, pending.owner);
-        }
-        if (yesBtn instanceof HTMLButtonElement && !busy && !limitHit && pauseLeft <= 0 && !guest) {
-          yesBtn.textContent = 'Забрать за … 🍺';
-        }
-        return;
-      }
-      if (next === pending.price) {
-        if (modalText && row.owner_login) {
-          modalText.textContent = modalTextFor(pending.price, pending.owner);
-        }
-        return;
-      }
-      pending.price = next;
-      if (modalText) {
-        modalText.textContent = modalTextFor(next, pending.owner);
-      }
+      // N неизвестна (вью отсутствует) — намерение несёт price: null: честный
+      // «…» и никакого сравнения с балансом; итог всё равно посчитает сервер.
+      pending.price = row.nextPrice;
+      if (modalText) modalText.textContent = modalTextFor(pending.price, pending.owner);
       renderBuyButton();
     } catch {
       // проекция — best effort, правда придёт с сервера
@@ -477,7 +472,7 @@ const clapSound = s3Sound('clap.mp3');
       renderBuyButton();
     })();
     // Живые проекции: пауза (моя последняя покупка этого лота) + цена (N из БД).
-    const lotId = pending.id;
+    const lotId = pending.slug;
     try {
       lotUnsub = subscribeLots(() => {
         void refreshPauseProjection(lotId);
@@ -504,18 +499,12 @@ const clapSound = s3Sound('clap.mp3');
 
   document.addEventListener('click', async (e) => {
     const target = e.target as HTMLElement | null;
-    const btn = target?.closest?.('[data-buy-lot]');
+    const btn = target?.closest?.('[data-buy-intent]');
     if (!(btn instanceof HTMLElement)) return;
     if (btn instanceof HTMLButtonElement && btn.disabled) return;
-    const { buyLot: id, lotTitle, lotPrice, lotOwner, lotVideo } = btn.dataset;
-    if (!id) return;
-    pending = {
-      id,
-      title: lotTitle ?? id,
-      price: Number(lotPrice ?? 0),
-      owner: lotOwner ?? '?',
-      video: lotVideo,
-    };
+    const intent = readBuyIntent(btn);
+    if (!intent) return;
+    pending = intent;
     // Без сессии — не уводим принудительно: открываем ту же модалку в гостевом
     // режиме, где CTA — вход через Twitch. Лот запоминается внутри неё.
     if (isSupabaseConfigured()) {
@@ -533,7 +522,7 @@ const clapSound = s3Sound('clap.mp3');
 
   yesBtn?.addEventListener('click', async () => {
     if (!pending) return;
-    const { id, title, owner, video } = pending;
+    const { slug: id, title, owner, video } = pending;
     const price = pending.price;
     // Гостевой режим: кнопка — вход через Twitch. Запоминаем лот, чтобы после
     // возврата модалка открылась снова уже для подтверждения покупки.
@@ -576,7 +565,7 @@ const clapSound = s3Sound('clap.mp3');
       return;
     }
     if (result.status === 'ok') {
-      const paid = result.paid > 0 ? result.paid : price;
+      const paid = result.paid > 0 ? result.paid : (price ?? 0);
       celebrate({ id, title, price: paid, owner, video });
       return;
     }
@@ -648,15 +637,16 @@ const clapSound = s3Sound('clap.mp3');
     }
   });
 
-  /** Ждать появления узла: витрина/страница рисуют карточку из БД после
-   *  загрузки, кнопки в DOM сразу нет. Без этого возврат из логина терялся. */
-  function waitForSelector(selector: string, timeoutMs: number): Promise<Element | null> {
-    const immediate = document.querySelector(selector);
+  /** Ждать появления кнопки покупки Лота: витрина/страница рисуют карточку
+   *  из БД после загрузки, кнопки в DOM сразу нет. Без этого возврат из логина
+   *  терялся. Ищем по слоту намерения (lib/buy-intent.ts). */
+  function waitForBuyButton(slug: string, timeoutMs: number): Promise<HTMLElement | null> {
+    const immediate = findBuyButton(slug);
     if (immediate) return Promise.resolve(immediate);
     return new Promise((resolve) => {
       const started = Date.now();
       const poll = window.setInterval(() => {
-        const el = document.querySelector(selector);
+        const el = findBuyButton(slug);
         if (el || Date.now() - started >= timeoutMs) {
           window.clearInterval(poll);
           resolve(el);
@@ -675,8 +665,7 @@ const clapSound = s3Sound('clap.mp3');
     if (!data.session) return;
     const id = peekPendingBuy();
     if (!id) return;
-    const sel = `[data-buy-lot="${typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(id) : id}"]`;
-    const btn = await waitForSelector(sel, 8000);
+    const btn = await waitForBuyButton(id, 8000);
     if (!(btn instanceof HTMLElement)) return;
     clearPendingBuy();
     btn.click();
