@@ -26,6 +26,7 @@
 
 import { getSessionUid, getSupabase, fetchOutbidCatchup } from './supabase';
 import { fetchLotCatalog, subscribeLots, onBought } from './lots';
+import { subscribeLive } from './live';
 import { sellerLine, type OutbidEvent } from './outbid-event';
 import { playOutbidSound } from './outbid-sound';
 import { MAX_NOTICES, ensureCorner, makeRebuyButton, showNotice } from './outbid-notices';
@@ -383,24 +384,15 @@ export function initOutbidNotice(): void {
 
   let subscribed = false;
 
+  /** Канал колокола — через общий реестр живых подписок (lib/live.ts). */
   function ensureSubscribed(): void {
     if (subscribed || uid === null) return;
-    const sb = getSupabase();
-    if (!sb) return;
-    try {
-      sb.channel('alysque:outbid')
-        .on(
-          'postgres_changes',
-          { event: 'UPDATE', schema: 'public', table: 'lots' },
-          (payload: { new?: LotRow; old?: LotRow }) => {
-            handleRow(payload.new ?? {}, payload.old ?? null);
-          }
-        )
-        .subscribe();
-      subscribed = true;
-    } catch {
-      // Realtime недоступен — тихий noop, попробуем снова при смене сессии
-    }
+    const ok = subscribeLive({ table: 'lots', event: 'UPDATE' }, (payload) => {
+      handleRow(payload.new ?? {}, payload.old ?? null);
+    });
+    // Realtime недоступен — тихий noop, попробуем снова при смене сессии
+    if (!ok) return;
+    subscribed = true;
   }
 
   void (async () => {

@@ -194,6 +194,7 @@ assertSupabaseConfigured();
     <script>
       import { getSupabase, getSessionUid, isSupabaseConfigured } from '@/lib/supabase';
       import { fetchMyBalance, subscribeMyBalance } from '@/lib/balance';
+      import { subscribeLive } from '@/lib/live';
       import { initOutbidNotice } from '@/lib/outbid-notice';
       import { initSubmissionNotice } from '@/lib/submission-notice';
       initOutbidNotice();
@@ -316,18 +317,9 @@ assertSupabaseConfigured();
 
       if (isSupabaseConfigured()) {
         void refreshDealLog();
-        try {
-          getSupabase()
-            ?.channel('alysque:deal-log')
-            .on(
-              'postgres_changes',
-              { event: 'INSERT', schema: 'public', table: 'purchases' },
-              () => void refreshDealLog()
-            )
-            .subscribe();
-        } catch {
-          // Realtime недоступен — виден последний подтянутый хвост
-        }
+        // Канал маркизы — через общий реестр живых подписок (lib/live.ts).
+        // Realtime недоступен — виден последний подтянутый хвост.
+        subscribeLive({ table: 'purchases', event: 'INSERT' }, () => void refreshDealLog());
         document.addEventListener('visibilitychange', () => {
           if (!document.hidden) void refreshDealLog();
         });

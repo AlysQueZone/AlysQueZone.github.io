@@ -1,4 +1,5 @@
-import { getSupabase, withAuthRetry, subscribeSharedLots, buyLotShared } from './supabase';
+import { getSupabase, withAuthRetry, buyLotShared } from './supabase';
+import { subscribeLive } from './live';
 
 /**
  * Живое состояние Лота: каталог + прайс-фид + флаг «мой» за один запрос.
@@ -216,11 +217,17 @@ export function fillOwnerBadges(root: ParentNode | null, st: LotState): void {
 /**
  * Живая подписка на смену Лотов: тик таблицы `lots` (вью в Realtime-публикацию
  * не входит, поэтому по событию caller перечитывает каталог — см.
- * fetchLotCatalog). Без настроенного хранилища — noop-отписка.
- * Возвращает функцию отписки.
+ * fetchLotCatalog). Канал открывает общий реестр lib/live.ts: витрина и
+ * модалка на один slug делят один канал. Без настроенного хранилища —
+ * noop-отписка. Возвращает функцию отписки.
  */
 export function subscribeLots(onChange: () => void, slug?: string): () => void {
-  return subscribeSharedLots(onChange, slug);
+  return (
+    subscribeLive(
+      { table: 'lots', event: '*', ...(slug ? { filter: `slug=eq.${slug}` } : {}) },
+      () => onChange()
+    ) ?? (() => {})
+  );
 }
 
 // ---------------------------------------------------------------------------

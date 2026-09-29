@@ -11,6 +11,7 @@
  */
 
 import { getSupabase, withAuthRetry } from './supabase';
+import { subscribeLive } from './live';
 
 /** Отразить баланс во всех чипах шапки (`data-wallet-balance`). */
 export function paintBalance(balance: number): void {
@@ -60,43 +61,20 @@ export async function fetchMyBalance(): Promise<number | null> {
 }
 
 /**
- * Живая подписка на свой баланс (postgres_changes по public.profiles).
- * Без настроенного хранилища или uid — noop-отписка.
+ * Живая подписка на свой баланс (postgres_changes по public.profiles) через
+ * общий реестр подписок lib/live.ts. Без настроенного хранилища или uid —
+ * noop-отписка.
  */
 export function subscribeMyBalance(uid: string, onBalance: (balance: number) => void): () => void {
-  const sb = getSupabase();
-  if (!sb || !uid) return () => {};
-  try {
-    const channel = sb.channel(`alysque:balance:${uid}`, {
-      config: { broadcast: { self: false } },
-    });
-    channel
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'profiles',
-          filter: `user_id=eq.${uid}`,
-        },
-        (payload) => {
-          const row = (payload.new ?? {}) as Record<string, unknown>;
-          const balance = Number(row['balance']);
-          if (Number.isFinite(balance) && balance >= 0) {
-            onBalance(balance);
-            announceBalance(balance);
-          }
-        }
-      )
-      .subscribe();
-    return () => {
-      try {
-        void sb.removeChannel(channel);
-      } catch {
-        // отписка — best effort
+  if (!uid) return () => {};
+  return (
+    subscribeLive({ table: 'profiles', event: '*', filter: `user_id=eq.${uid}` }, (payload) => {
+      const row = (payload.new ?? {}) as Record<string, unknown>;
+      const balance = Number(row['balance']);
+      if (Number.isFinite(balance) && balance >= 0) {
+        onBalance(balance);
+        announceBalance(balance);
       }
-    };
-  } catch {
-    return () => {};
-  }
+    }) ?? (() => {})
+  );
 }

@@ -8,6 +8,8 @@
  *   Никаких `service_role`/DSN/паролей здесь нет и не будет.
  * - Провайдер Twitch и redirect-адреса настроены человеком в дашборде,
  *   код только вызывает signInWithOAuth/signOut и слушает сессию.
+ * - Живые подписки Realtime открывает только lib/live.ts (реестр каналов);
+ *   здесь — транспорт, сессия, хвост перепродаж и запись покупки.
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
@@ -161,9 +163,9 @@ export function returnUrlForLot(lotId: string): string {
 //
 // Каталог (названия, video_url) живёт в БД (public.lots), живой слой поверх —
 // в lib/lots.ts (fetchLotCatalog: вью lots_with_next_price одним запросом).
-// Здесь остались сырой адаптер подписки, хвост перепродаж и покупка.
-// Без настроенных PUBLIC_SUPABASE_* — честная деградация: функции возвращают
-// пусто, подписка — noop; на сборке такие ключи обязательны (assertSupabaseConfigured).
+// Здесь остались хвост перепродаж и запись покупки; живые подписки — в
+// lib/live.ts. Без настроенных PUBLIC_SUPABASE_* — честная деградация: функции
+// возвращают пусто; на сборке такие ключи обязательны (assertSupabaseConfigured).
 // ---------------------------------------------------------------------------
 
 /** Одна запись общего хвоста перепродаж: from — предыдущий Владелец. */
@@ -335,33 +337,6 @@ export async function fetchOutbidCatchup(uid: string, limit = 10): Promise<Outbi
     return events.sort((a, b) => b.at - a.at).slice(0, Math.max(1, limit));
   } catch {
     return [];
-  }
-}
-
-/**
- * Живая подписка на смену Лотов (postgres_changes по таблице lots).
- * Без настроенного хранилища — noop-отписка. Возвращает функцию отписки.
- */
-export function subscribeSharedLots(onChange: () => void, slug?: string): () => void {
-  const sb = getSupabase();
-  if (!sb) return () => {};
-  try {
-    const channel = sb.channel(slug ? `alysque:lot:${slug}` : 'alysque:lots', {
-      config: { broadcast: { self: false } },
-    });
-    const filter = slug
-      ? { event: '*' as const, schema: 'public', table: 'lots', filter: `slug=eq.${slug}` }
-      : { event: '*' as const, schema: 'public', table: 'lots' };
-    channel.on('postgres_changes', filter, () => onChange()).subscribe();
-    return () => {
-      try {
-        void sb.removeChannel(channel);
-      } catch {
-        // отписка — best effort
-      }
-    };
-  } catch {
-    return () => {};
   }
 }
 
