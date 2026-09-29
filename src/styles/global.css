@@ -306,10 +306,88 @@ video:-webkit-full-screen {
   object-fit: contain;
 }
 
-/* Кадр лота с широким/квадратным видео: пропорцию и признак вписывания
-   проставляет lib/lot-video.ts по загруженному постеру (16:9 в «телефонной»
-   рамке иначе обрезалось бы до центра). Unlayered: иначе utility
-   .object-cover из слоя utilities перебил бы правило. */
+/* Кадр лота: пропорцию и признак вписывания проставляет lib/lot-video.ts по
+   загруженному постеру (16:9 в «телефонной» рамке иначе обрезалось бы до
+   центра). Раскладку карточки поверх этого (полоса/подложка) решает витрина.
+   Unlayered: иначе utility .object-cover из слоя utilities перебил бы правило. */
 .lot-media-frame[data-media-fit='contain'] :is(img, video) {
   object-fit: contain;
+}
+
+/* Слои внутри кадра: подложка (квадрат) → постер → кнопка/бейджи. У постера
+   положительный z-index, поэтому кнопку и бейджи поднимаем выше — иначе они
+   уйдут под него и «смотреть» не нажмётся. Плашка полосы — выше всех (z 3). */
+.lot-media-frame .sq-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-size: cover;
+  background-position: center;
+  filter: blur(14px) brightness(0.55);
+  transform: scale(1.12);
+}
+
+.lot-media-frame [data-lot-video-poster] {
+  position: relative;
+  z-index: 1;
+}
+
+.lot-media-frame [data-lot-video-play],
+.lot-media-frame .badge-pixel {
+  z-index: 2;
+}
+
+/* Широкая карточка-полоса (прототип scratch/lot-feed, вариант C): кадр во всю
+   ширину, инфо-плашка (владелец/название/кнопка) поверх низа. Скрипт витрины
+   переносит узлы в [data-wide-overlay], когда постер широкий. Unlayered —
+   иначе утилиты (p-4, gap-2, w-full) перебили бы эти правила. */
+[data-lot-card][data-wide] {
+  grid-column: 1 / -1;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+[data-lot-card][data-wide] .lot-media-frame {
+  border: 0;
+}
+
+[data-lot-card][data-wide] [data-wide-overlay] {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  background: linear-gradient(to top, color-mix(in srgb, black 82%, transparent), transparent);
+}
+
+[data-lot-card][data-wide] [data-wide-overlay] .badge-pixel {
+  position: static;
+}
+
+[data-lot-card][data-wide] [data-wide-overlay] [data-lot-heading] {
+  flex: 1;
+  min-width: 12rem;
+  color: var(--color-cream);
+}
+
+[data-lot-card][data-wide] [data-wide-overlay] [data-lot-cta] {
+  margin: 0;
+  padding: 0;
+  flex: 0 0 auto;
+}
+
+[data-lot-card][data-wide] [data-wide-overlay] .btn-arcade {
+  width: auto;
+}
+
+@media (max-width: 640px) {
+  [data-lot-card][data-wide] [data-wide-overlay] .btn-arcade {
+    width: 100%;
+  }
 }

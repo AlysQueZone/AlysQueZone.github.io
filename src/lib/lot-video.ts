@@ -93,28 +93,68 @@ function playInlineVideo(root: HTMLElement): void {
 }
 
 /**
- * Подобрать показ кадра по фактической пропорции постера (на лету, когда
- * картинка загрузилась). Портрет — родная «телефонная» рамка карточки с
- * заполнением; широкая/квадратная картинка (16:9 и пр.) — рамка по её
- * пропорции и вписывание целиком: в 9:16 такие обрезаются до центра.
+ * Ориентация кадра по фактической пропорции постера.
+ * `wide` — заметно шире квадрата (16:9 и т.п.); `square` — около 1:1;
+ * `portrait` — «телефонный», как большинство лотов.
  */
-function applyPosterFit(root: HTMLElement, img: HTMLImageElement): void {
-  const { naturalWidth: w, naturalHeight: h } = img;
-  if (!w || !h) return;
-  if (w >= h) {
-    root.style.aspectRatio = `${w} / ${h}`;
+export type MediaOrientation = 'portrait' | 'square' | 'wide';
+
+/** Порог «широкого» кадра: ≥ 1.2 — уже заметно 16:9-подобное. */
+export const WIDE_RATIO_MIN = 1.2;
+/** Ниже этого — портрет; между порогами кадр считаем квадратом. */
+export const SQUARE_RATIO_MIN = 0.9;
+
+export type OrientationHandler = (
+  orientation: MediaOrientation,
+  root: HTMLElement,
+  img: HTMLImageElement
+) => void;
+
+function orientationOf(w: number, h: number): MediaOrientation | null {
+  if (!w || !h) return null;
+  const ratio = w / h;
+  if (ratio >= WIDE_RATIO_MIN) return 'wide';
+  if (ratio >= SQUARE_RATIO_MIN) return 'square';
+  return 'portrait';
+}
+
+/**
+ * Подобрать показ кадра по фактической пропорции постера (на лету, когда
+ * картинка загрузилась). Портрет — базовую «телефонную» рамку оставляем,
+ * заполнение. Широкое — рамка по пропорции видео и вписывание: иначе 16:9
+ * в 9:16 обрезается до центра. Квадрат — базовую рамку оставляем, вписывание.
+ * Наружу отдаём ориентацию (`onOrientation`): раскладку карточки (полоса,
+ * размытая подложка) решает витрина — это её забота, не общая.
+ */
+function applyPosterFit(
+  root: HTMLElement,
+  img: HTMLImageElement,
+  onOrientation?: OrientationHandler
+): void {
+  const orientation = orientationOf(img.naturalWidth, img.naturalHeight);
+  if (!orientation) return;
+  root.dataset.mediaOrientation = orientation;
+  if (orientation === 'wide') {
+    root.style.aspectRatio = `${img.naturalWidth} / ${img.naturalHeight}`;
     root.dataset.mediaFit = 'contain';
   } else {
     root.style.removeProperty('aspect-ratio');
-    delete root.dataset.mediaFit;
+    if (orientation === 'square') root.dataset.mediaFit = 'contain';
+    else delete root.dataset.mediaFit;
   }
+  onOrientation?.(orientation, root, img);
 }
 
 /**
  * Заполнить корень видео данными лота (клиентский рендер).
  * Пустой `videoUrl` — корень прячется. Идущее воспроизведение не трогаем.
+ * `onOrientation` (витрина) вызывается, когда известна пропорция постера.
  */
-export function fillVideo(root: Element | null, videoUrl: string | null | undefined): void {
+export function fillVideo(
+  root: Element | null,
+  videoUrl: string | null | undefined,
+  onOrientation?: OrientationHandler
+): void {
   if (!(root instanceof HTMLElement)) return;
   if (root.querySelector('video')) return;
   const { webm, mp4, poster } = videoSources(videoUrl);
@@ -132,16 +172,17 @@ export function fillVideo(root: Element | null, videoUrl: string | null | undefi
     // Один слушатель на постер: при смене src пересчитает пропорцию заново.
     if (img.dataset.ratioBound !== '1') {
       img.dataset.ratioBound = '1';
-      img.addEventListener('load', () => applyPosterFit(root, img));
+      img.addEventListener('load', () => applyPosterFit(root, img, onOrientation));
     }
     if (poster) {
       if (img.getAttribute('src') !== poster) img.src = poster;
       // Из кэша картинка может быть уже готова — load не придёт.
-      if (img.complete && img.naturalWidth > 0) applyPosterFit(root, img);
+      if (img.complete && img.naturalWidth > 0) applyPosterFit(root, img, onOrientation);
     } else {
       img.removeAttribute('src');
       root.style.removeProperty('aspect-ratio');
       delete root.dataset.mediaFit;
+      delete root.dataset.mediaOrientation;
     }
   }
   root.classList.toggle('hidden', webm.length === 0);
