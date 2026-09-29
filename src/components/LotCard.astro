@@ -5,10 +5,11 @@
 // владелец — тёмный бейдж поверх кадра, цена — только в кнопке (у неактивной
 // она остаётся в надписи). Шаблон: витрина целиком рисуется клиентом из БД
 // (см. docs/adr/0002), полей-данных здесь нет. Скрипт витрины клонирует
-// шаблон и заполняет data-слоты (заголовок/бейдж владельца/бейдж «Твой»/
-// видео/кнопка). Владелец NULL — бейдж показывает «свободен». Видео — общий
-// компонент LotVideo (кадру задана портретная пропорция).
+// шаблон и заполняет data-слоты (заголовок/видео/кнопка); бейджи владельца —
+// общий LotBadges (заполняет fillOwnerBadges). Владелец NULL — «свободен».
+// Видео — общий компонент LotVideo (кадру задана портретная пропорция).
 import LotVideo from './LotVideo.astro';
+import LotBadges from './LotBadges.astro';
 import { LOT_CARD_ASPECT } from '@/lib/lot-video';
 
 const base = import.meta.env.BASE_URL;
@@ -24,18 +25,7 @@ const base = import.meta.env.BASE_URL;
     </a>
   </h3>
   <LotVideo videoUrl={null} title="" aspect={LOT_CARD_ASPECT}>
-    <span
-      data-owner-badge
-      class="badge-pixel absolute top-2 left-2 hidden max-w-[85%] truncate bg-milk text-cream"
-    >
-      👑
-    </span>
-    <span data-free-badge class="badge-pixel absolute top-2 left-2 bg-bar text-mist">
-      свободен
-    </span>
-    <span data-mine-badge class="badge-pixel absolute top-2 right-2 hidden bg-pivko text-cream">
-      Твой
-    </span>
+    <LotBadges />
   </LotVideo>
   <div class="mt-auto pt-2">
     <button

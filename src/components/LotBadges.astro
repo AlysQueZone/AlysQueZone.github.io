@@ -1,0 +1,19 @@
+---
+// Бейджи владельца поверх кадра — один источник разметки для карточки витрины
+// и страницы лота: владелец (тёмный, с короной), «свободен» (светлый) и «Твой».
+// Клиент заполняет их по data-слотам (lib/lots.ts, fillOwnerBadges): ник поверх
+// кадра, а не строкой текста; у свободного лота владелец скрыт, показан «свободен».
+---
+
+<span
+  data-owner-badge
+  class="badge-pixel absolute top-2 left-2 hidden max-w-[85%] truncate bg-milk text-cream"
+>
+  👑
+</span>
+<span data-free-badge class="badge-pixel absolute top-2 left-2 bg-bar text-mist">
+  свободен
+</span>
+<span data-mine-badge class="badge-pixel absolute top-2 right-2 hidden bg-pivko text-cream">
+  Твой
+</span>

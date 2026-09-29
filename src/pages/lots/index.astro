@@ -69,6 +69,7 @@ import BrandHeadline from '@/components/BrandHeadline.astro';
   import {
     fetchLotCatalogResult,
     fillBuyButton,
+    fillOwnerBadges,
     subscribeLots,
     onBought,
     type LotState,
@@ -200,18 +201,9 @@ import BrandHeadline from '@/components/BrandHeadline.astro';
       (orientation, root, posterImg) =>
         applyCardOrientation(card, root, orientation, posterImg.currentSrc || posterImg.src)
     );
-    // Владелец поверх кадра: ник — тёмным бейджем, иначе светлый «свободен».
-    const ownerEl = card.querySelector('[data-owner-badge]');
-    const freeEl = card.querySelector('[data-free-badge]');
-    const owned = Boolean(st.owner_login);
-    if (ownerEl) {
-      ownerEl.textContent = owned ? `👑 ${st.owner_login}` : '';
-      ownerEl.classList.toggle('hidden', !owned);
-    }
-    if (freeEl) freeEl.classList.toggle('hidden', owned);
+    // Владелец и «Твой» — бейджами поверх кадра (общий fillOwnerBadges).
+    fillOwnerBadges(card, st);
     // Цена на карточке не дублируется — она живёт только в кнопке (fillBuyButton).
-    const badge = card.querySelector('[data-mine-badge]');
-    if (badge) badge.classList.toggle('hidden', !st.mine);
     fillBuyButton(card.querySelector('[data-buy-lot]'), st, myBalance);
   }
 

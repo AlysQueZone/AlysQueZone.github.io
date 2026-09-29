@@ -193,6 +193,27 @@ export function fillBuyButton(
 }
 
 /**
+ * Заполнить бейджи владельца над кадром — один контракт разметки на карточку
+ * витрины и страницу лота (`LotBadges`: data-owner-badge / data-free-badge /
+ * data-mine-badge). Владелец — тёмный бейдж с короной, у свободного лота
+ * показан светлый «свободен»; «Твой» — по флагу mine. Отдельной строки с
+ * владельцем нет: как на витрине, так и в подробностях.
+ */
+export function fillOwnerBadges(root: ParentNode | null, st: LotState): void {
+  if (!root) return;
+  const owned = Boolean(st.owner_login);
+  const owner = root.querySelector('[data-owner-badge]');
+  if (owner instanceof HTMLElement) {
+    owner.textContent = owned ? `👑 ${st.owner_login}` : '';
+    owner.classList.toggle('hidden', !owned);
+  }
+  const free = root.querySelector('[data-free-badge]');
+  if (free instanceof HTMLElement) free.classList.toggle('hidden', owned);
+  const mine = root.querySelector('[data-mine-badge]');
+  if (mine instanceof HTMLElement) mine.classList.toggle('hidden', !st.mine);
+}
+
+/**
  * Живая подписка на смену Лотов: тик таблицы `lots` (вью в Realtime-публикацию
  * не входит, поэтому по событию caller перечитывает каталог — см.
  * fetchLotCatalog). Без настроенного хранилища — noop-отписка.
