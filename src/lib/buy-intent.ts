@@ -104,7 +104,7 @@ export function findBuyButton(slug: string): HTMLElement | null {
   if (typeof document === 'undefined' || slug.length === 0) return null;
   for (const node of document.querySelectorAll('[data-buy-intent]')) {
     const intent = readBuyIntent(node);
-    if (intent && intent.slug === slug) return node instanceof HTMLElement ? node : null;
+    if (intent && intent.slug === slug && node instanceof HTMLElement) return node;
   }
   return null;
 }

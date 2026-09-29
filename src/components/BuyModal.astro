@@ -7,7 +7,6 @@
 // slug/title/price/owner/video). Клик по кнопке с намерением сам откроет
 // модалку — скрипт ниже делегированный.
 // При покупке играет видео лота со звуком (видимо, в уведомлении); без video_url — clap с S3.
-// Клик по такой кнопке сам откроет модалку — скрипт ниже делегированный.
 // Гость (нет сессии): модалка открывается в гостевом режиме — CTA «Войти через
 // Twitch», без принудительного редиректа; после входа модалка вернётся к лоту.
 // После покупки — announceBought({ id, price }) из lib/lots.ts
@@ -186,7 +185,7 @@ const clapSound = s3Sound('clap.mp3');
     title: string;
     price: number;
     owner: string;
-    video?: string;
+    video: string | null;
   }): void {
     closeModal();
     boom();
@@ -376,7 +375,7 @@ const clapSound = s3Sound('clap.mp3');
       if (left <= 0) {
         restoreBuyButton();
         // Пауза отпустила — цена могла уйти: подтянуть живую N из БД.
-        const id = pending?.id;
+        const id = pending?.slug;
         if (id) void refreshPriceProjection(id);
       } else {
         renderBuyButton();

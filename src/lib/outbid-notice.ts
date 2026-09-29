@@ -30,7 +30,13 @@ import { subscribeLive } from './live';
 import { readBuyIntent, updateBuyIntentPrice } from './buy-intent';
 import { sellerLine, type OutbidEvent } from './outbid-event';
 import { playOutbidSound } from './outbid-sound';
-import { MAX_NOTICES, ensureCorner, makeRebuyButton, showNotice } from './outbid-notices';
+import {
+  MAX_NOTICES,
+  ensureCorner,
+  makeRebuyButton,
+  rebuyLabel,
+  showNotice,
+} from './outbid-notices';
 
 const MAX_HISTORY = 10;
 const BELL_ID = 'outbid-bell';
@@ -235,7 +241,7 @@ export function initOutbidNotice(): void {
       const next = liveNext.get(intent.slug);
       if (next === undefined) return;
       updateBuyIntentPrice(node, next);
-      node.textContent = `▶ Забрать за ${next} 🍺`;
+      node.textContent = rebuyLabel(next);
     });
   }
 

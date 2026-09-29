@@ -18,6 +18,11 @@ const CORNER_ID = 'outbid-corner';
 /** Живая N из каталога БД (src/lib/lots.ts): slug → следующая цена. */
 export type LivePrices = Map<string, number>;
 
+/** Подпись кнопки возврата: живая N или честный «…» (одна на создание и live-правку). */
+export function rebuyLabel(price: number | null): string {
+  return `▶ Забрать за ${formatStaged(price)} 🍺`;
+}
+
 /** Кнопка перекупа в стиле сайта (как «Купить» на карточках: bg-stream).
  *  N — из подписки на БД; пока прайс не приехал или вью отсутствует — честный
  *  «…» (намерение несёт price: null), а не уплаченная цена как N (сервер при
@@ -26,7 +31,7 @@ export function makeRebuyButton(ev: OutbidEvent, liveNext: LivePrices): HTMLButt
   const next = liveNext.get(ev.slug) ?? null;
   const btn = document.createElement('button');
   btn.type = 'button';
-  btn.textContent = `▶ Забрать за ${formatStaged(next)} 🍺`;
+  btn.textContent = rebuyLabel(next);
   // Аркадная кнопка стиля C (классы из global.css) + отступ от текста.
   btn.className = 'btn-arcade btn-arcade-primary';
   btn.style.marginTop = '8px';
