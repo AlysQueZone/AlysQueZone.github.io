@@ -7,7 +7,7 @@
  * - одиночное (`showSpotNotice`): плашка снизу или окно по центру с медиа,
  *   тон рамки — покупка.
  *
- * Стек, таймеры, вытеснение, крестик, видео и клик-вне — реализация;
+ * Стек, таймеры, вытеснение, крестик, видео, Escape и клик-вне — реализация;
  * вызывающий говорит только «что показать». Ники и заголовки лотов —
  * пользовательский текст: только textContent, никакого innerHTML.
  */
@@ -34,25 +34,22 @@ export interface CornerNotice {
   closable?: boolean;
   /** Ключ группы: `closeNotices(key)` гасит окошки этого ключа. */
   key?: string;
-  /** Сколько висит, мс; hover удерживает. */
-  ttlMs?: number;
 }
 
 export interface SpotNotice {
   text: string;
   /** Тон рамки: ok — pivko, bad — melon. */
-  tone?: 'ok' | 'bad';
+  tone: 'ok' | 'bad';
   /** Картинка-эмоут в текстовом варианте (clap). */
   image?: { src: string; alt: string };
   /** Видео-вариант: окно по центру, автоплей, 'ended' закрывает. */
   video?: { src: string; onError?: () => void };
-  /** Клик-вне и Escape закрывают (видео-вариант). */
+  /** Клик-вне закрывает (Escape закрывает всегда) — видео-вариант. */
   dismissOnOutside?: boolean;
-  ttlMs?: number;
 }
 
-/** Живые окошки угла: для closeNotices по ключу. */
-const live: { key?: string; close: () => void }[] = [];
+/** Живые окошки угла: порядок = порядок появления; closeNotices — по ключу. */
+const cornerNotices: { key?: string; box: HTMLElement; close: () => void }[] = [];
 
 function ensureCorner(): HTMLElement {
   let corner = document.getElementById(CORNER_ID);
@@ -72,6 +69,7 @@ function ensureCorner(): HTMLElement {
   return corner;
 }
 
+/** Общий крестик закрытия: тач-таргет 44px, как у прочих кнопок в UI. */
 function closeButton(): HTMLButtonElement {
   const btn = document.createElement('button');
   btn.type = 'button';
@@ -87,16 +85,23 @@ export function showCornerNotice(options: CornerNotice): void {
   const corner = ensureCorner();
   const box = document.createElement('div');
   let timer = 0;
+  /** Когда окошко само закроется: hover снимает таймер, но помнит остаток. */
+  let deadline = 0;
   let closed = false;
-  const entry = { key: options.key, close };
+  const entry = { key: options.key, box, close };
   function close(): void {
     if (closed) return;
     closed = true;
     window.clearTimeout(timer);
     box.remove();
-    const at = live.indexOf(entry);
-    if (at >= 0) live.splice(at, 1);
+    const at = cornerNotices.indexOf(entry);
+    if (at >= 0) cornerNotices.splice(at, 1);
   }
+  const arm = (ms: number): void => {
+    window.clearTimeout(timer);
+    deadline = Date.now() + ms;
+    timer = window.setTimeout(close, ms);
+  };
 
   box.className = 'card-pixel';
   box.style.padding = '10px 12px';
@@ -123,23 +128,24 @@ export function showCornerNotice(options: CornerNotice): void {
     box.append(document.createElement('br'), cross);
   }
   corner.appendChild(box);
-  while (corner.children.length > MAX_NOTICES) corner.firstChild?.remove();
+  cornerNotices.push(entry);
+  // Вытеснение — через close(): реестр не копит снятые окошки.
+  while (cornerNotices.length > MAX_NOTICES) cornerNotices[0]?.close();
 
   box.addEventListener('mouseenter', () => window.clearTimeout(timer));
   box.addEventListener('mouseleave', () => {
-    window.clearTimeout(timer);
-    timer = window.setTimeout(close, LEAVE_TTL_MS);
+    // Продолжаем с остатка, но не меньше грейса после ухода мыши.
+    arm(Math.max(deadline - Date.now(), LEAVE_TTL_MS));
   });
   // Кнопка-действие (перекуп) закрывает окошко; сама кнопка работает дальше
   // (делегированный обработчик покупки слушает документ).
   options.action?.addEventListener('click', () => window.setTimeout(close, 0));
-  live.push(entry);
-  timer = window.setTimeout(close, options.ttlMs ?? CORNER_TTL_MS);
+  arm(CORNER_TTL_MS);
 }
 
 /** Погасить окошки угла по ключу (например, лот выкупили обратно). */
 export function closeNotices(key: string): void {
-  for (const entry of [...live]) {
+  for (const entry of [...cornerNotices]) {
     if (entry.key === key) entry.close();
   }
 }
@@ -156,8 +162,8 @@ function ensureSpot(): HTMLElement {
   return spot;
 }
 
-/** Клик-вне и Escape закрывают окошко; отписка возвращается. */
-function attachOutside(spot: HTMLElement, close: () => void): () => void {
+/** Escape закрывает окошко всегда, клик-вне — если просили; отписка возвращается. */
+function attachDismiss(spot: HTMLElement, close: () => void, outside: boolean): () => void {
   const onClick = (e: Event): void => {
     const target = e.target;
     if (target instanceof Node && spot.contains(target)) return;
@@ -166,7 +172,7 @@ function attachOutside(spot: HTMLElement, close: () => void): () => void {
   const onKey = (e: KeyboardEvent): void => {
     if (e.key === 'Escape') close();
   };
-  document.addEventListener('click', onClick);
+  if (outside) document.addEventListener('click', onClick);
   document.addEventListener('keydown', onKey);
   return () => {
     document.removeEventListener('click', onClick);
@@ -180,20 +186,20 @@ export function showSpotNotice(options: SpotNotice): void {
   spotClose?.();
   const spot = ensureSpot();
   spot.className = SPOT_BASE;
-  spot.innerHTML = '';
+  spot.replaceChildren();
 
   const text = document.createElement('span');
   text.textContent = options.text;
 
   let videoEl: HTMLVideoElement | null = null;
-  let detachOutside: (() => void) | null = null;
+  let detachDismiss: (() => void) | null = null;
   let timer = 0;
   let closed = false;
   const close = (): void => {
     if (closed) return;
     closed = true;
     window.clearTimeout(timer);
-    detachOutside?.();
+    detachDismiss?.();
     if (videoEl) {
       try {
         videoEl.pause();
@@ -244,7 +250,6 @@ export function showSpotNotice(options: SpotNotice): void {
     video.addEventListener('error', onError);
     video.addEventListener('ended', close);
     videoEl = video;
-    if (options.dismissOnOutside) detachOutside = attachOutside(spot, close);
   } else {
     spot.classList.add('bottom-16');
     spot.appendChild(text);
@@ -261,9 +266,10 @@ export function showSpotNotice(options: SpotNotice): void {
     }
   }
 
-  if (options.tone) spot.classList.add(options.tone === 'ok' ? 'border-pivko' : 'border-melon');
+  detachDismiss = attachDismiss(spot, close, options.dismissOnOutside === true);
+  spot.classList.add(options.tone === 'ok' ? 'border-pivko' : 'border-melon');
   spot.classList.remove('hidden');
   // С видео окно живёт до конца видео ('ended'), 30с — страховка.
-  const ttl = options.ttlMs ?? (videoEl ? SPOT_VIDEO_TTL_MS : SPOT_TTL_MS);
+  const ttl = videoEl ? SPOT_VIDEO_TTL_MS : SPOT_TTL_MS;
   timer = window.setTimeout(close, ttl);
 }
