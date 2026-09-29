@@ -314,9 +314,10 @@ video:-webkit-full-screen {
   object-fit: contain;
 }
 
-/* Слои внутри кадра: подложка (квадрат) → постер → кнопка/бейджи. У постера
-   положительный z-index, поэтому кнопку и бейджи поднимаем выше — иначе они
-   уйдут под него и «смотреть» не нажмётся. */
+/* Слои внутри кадра: подложка (квадрат) → постер/видео → кнопка/бейджи.
+   У постера и играющего видео положительный z-index, поэтому кнопку и бейджи
+   поднимаем выше — иначе они уйдут под них. Без z-index у видео размытая
+   подложка квадрата перекрывала бы его: слышно звук, картинки нет. */
 .lot-media-frame .sq-bg {
   position: absolute;
   inset: 0;
@@ -327,7 +328,8 @@ video:-webkit-full-screen {
   transform: scale(1.12);
 }
 
-.lot-media-frame [data-lot-video-poster] {
+.lot-media-frame [data-lot-video-poster],
+.lot-media-frame video {
   position: relative;
   z-index: 1;
 }
