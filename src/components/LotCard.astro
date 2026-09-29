@@ -9,6 +9,7 @@
 // видео/кнопка). Владелец NULL — бейдж показывает «свободен». Видео — общий
 // компонент LotVideo (кадру задана портретная пропорция).
 import LotVideo from './LotVideo.astro';
+import { LOT_CARD_ASPECT } from '@/lib/lot-video';
 
 const base = import.meta.env.BASE_URL;
 ---
@@ -22,7 +23,7 @@ const base = import.meta.env.BASE_URL;
       <span data-lot-title></span>
     </a>
   </h3>
-  <LotVideo videoUrl={null} title="" aspect="portrait">
+  <LotVideo videoUrl={null} title="" aspect={LOT_CARD_ASPECT}>
     <span
       data-owner-badge
       class="badge-pixel absolute top-2 left-2 hidden max-w-[85%] truncate bg-milk text-cream"

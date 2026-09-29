@@ -74,7 +74,7 @@ import BrandHeadline from '@/components/BrandHeadline.astro';
     type LotState,
   } from '@/lib/lots';
   import { fetchMyBalance, onBalance } from '@/lib/balance';
-  import { initLotVideos, fillVideo } from '@/lib/lot-video';
+  import { initLotVideos, fillVideo, type MediaOrientation } from '@/lib/lot-video';
   import { setTitleEmotes } from '@/lib/emotes';
 
   const base = import.meta.env.BASE_URL;
@@ -153,13 +153,6 @@ import BrandHeadline from '@/components/BrandHeadline.astro';
     }
   }
 
-  /** Широкая карточка (16:9): тот же состав, что у обычной (название → кадр →
-   *  кнопка под кадром), но во всю строку. Раскладку задаёт CSS по data-wide;
-   *  пропорцию кадра уже выставил lib/lot-video. */
-  function applyWideCard(card: HTMLElement): void {
-    card.dataset.wide = '1';
-  }
-
   /** Квадратное видео: базовую «телефонную» рамку оставляем, кадр вписан
    *  целиком, поля — его же увеличенная размытая копия (подложка). */
   function applySquareBlur(root: HTMLElement, src: string): void {
@@ -178,12 +171,24 @@ import BrandHeadline from '@/components/BrandHeadline.astro';
     root.querySelector('.sq-bg')?.remove();
   }
 
+  /** Разложить карточку по ориентации постера: широкая — во всю строку,
+   *  квадрат — размытая подложка в «телефонной» рамке, портрет — базовая.
+   *  Обратимо: смена видео снимает прежнюю раскладку (ширину и подложку). */
+  function applyCardOrientation(
+    card: HTMLElement,
+    root: HTMLElement,
+    orientation: MediaOrientation,
+    src: string
+  ): void {
+    if (orientation === 'wide') card.dataset.wide = '1';
+    else delete card.dataset.wide;
+    if (orientation === 'square') applySquareBlur(root, src);
+    else removeSquareBlur(root);
+  }
+
   /** Заполнить карточку состоянием Лота по data-слотам шаблона. */
   function fillCard(card: HTMLElement, st: LotState): void {
     card.dataset.lotCard = st.slug;
-    // Запоминаем видео: смена (poster) требует пересборки карточки — раскладка
-    // зависит от пропорции (см. reconcile).
-    card.dataset.videoUrl = st.video_url ?? '';
     const link = card.querySelector('[data-lot-link]');
     if (link instanceof HTMLAnchorElement) link.href = lotHref(st.slug);
     setTitleEmotes(card.querySelector('[data-lot-title]'), st.title);
@@ -192,12 +197,8 @@ import BrandHeadline from '@/components/BrandHeadline.astro';
     fillVideo(
       card.querySelector('[data-lot-video-root]'),
       st.video_url,
-      (orientation, root, posterImg) => {
-        if (orientation === 'wide') applyWideCard(card);
-        else if (orientation === 'square') {
-          applySquareBlur(root, posterImg.currentSrc || posterImg.src);
-        } else removeSquareBlur(root);
-      }
+      (orientation, root, posterImg) =>
+        applyCardOrientation(card, root, orientation, posterImg.currentSrc || posterImg.src)
     );
     // Владелец поверх кадра: ник — тёмным бейджем, иначе светлый «свободен».
     const ownerEl = card.querySelector('[data-owner-badge]');
@@ -231,14 +232,7 @@ import BrandHeadline from '@/components/BrandHeadline.astro';
 
     for (const st of states.values()) {
       if (!Number.isFinite(st.price)) continue;
-      let card = rendered.get(st.slug);
-      // Сменилось видео (постер) — раскладка карточки (полоса/подложка) зависит
-      // от пропорции, поэтому пересобираем её с нуля, а не правим на месте.
-      if (card && card.dataset.videoUrl !== (st.video_url ?? '')) {
-        card.remove();
-        rendered.delete(st.slug);
-        card = undefined;
-      }
+      const card = rendered.get(st.slug);
       if (card) {
         fillCard(card, st);
         continue;

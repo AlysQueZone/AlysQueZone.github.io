@@ -5,12 +5,12 @@
 // целиком рисует клиент из БД (см. docs/adr/0002), поэтому сервер отдаёт
 // только скелетоны; скрипт страницы сносит их после первого ответа.
 // aria-hidden: для скринридера состояние объявляет отдельный role="status".
-import { mediaAspectClass } from '@/lib/lot-video';
+import { mediaAspectClass, LOT_CARD_ASPECT } from '@/lib/lot-video';
 ---
 
 <article data-lot-skeleton class="card-pixel flex flex-col gap-2 p-4" aria-hidden="true">
   <div class="skeleton-block h-5 w-3/4"></div>
-  <div class:list={['lot-media-frame', mediaAspectClass('portrait')]}>
+  <div class:list={['lot-media-frame', mediaAspectClass(LOT_CARD_ASPECT)]}>
     <div class="skeleton-block skeleton-block-cream absolute top-2 left-2 h-5 w-24"></div>
   </div>
   <div class="skeleton-block mt-auto h-11 w-full"></div>

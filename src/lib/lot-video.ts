@@ -36,6 +36,9 @@ export function mediaAspectClass(aspect: MediaAspect): string {
   return aspect === 'portrait' ? 'aspect-[77/136]' : 'aspect-square';
 }
 
+/** Пропорция кадра карточки витрины — одна на карточку и её скелетон. */
+export const LOT_CARD_ASPECT: MediaAspect = 'portrait';
+
 function isWebmUrl(url: string): boolean {
   return WEBM_RE.test(url);
 }
@@ -100,9 +103,9 @@ function playInlineVideo(root: HTMLElement): void {
 export type MediaOrientation = 'portrait' | 'square' | 'wide';
 
 /** Порог «широкого» кадра: ≥ 1.2 — уже заметно 16:9-подобное. */
-export const WIDE_RATIO_MIN = 1.2;
+const WIDE_RATIO_MIN = 1.2;
 /** Ниже этого — портрет; между порогами кадр считаем квадратом. */
-export const SQUARE_RATIO_MIN = 0.9;
+const SQUARE_RATIO_MIN = 0.9;
 
 export type OrientationHandler = (
   orientation: MediaOrientation,
@@ -133,7 +136,6 @@ function applyPosterFit(
 ): void {
   const orientation = orientationOf(img.naturalWidth, img.naturalHeight);
   if (!orientation) return;
-  root.dataset.mediaOrientation = orientation;
   if (orientation === 'wide') {
     root.style.aspectRatio = `${img.naturalWidth} / ${img.naturalHeight}`;
     root.dataset.mediaFit = 'contain';
@@ -182,7 +184,6 @@ export function fillVideo(
       img.removeAttribute('src');
       root.style.removeProperty('aspect-ratio');
       delete root.dataset.mediaFit;
-      delete root.dataset.mediaOrientation;
     }
   }
   root.classList.toggle('hidden', webm.length === 0);
