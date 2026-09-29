@@ -15,6 +15,10 @@
                               инфо (владелец/название/кнопка) справа.
     B «Полоса: медиа сверху»— широкое = полоса: широкий кадр-баннер сверху,
                               инфо-строка под ним.
+    C «Полоса: инфо поверх» — широкое = полоса: кадр во всю ширину целиком,
+                              инфо-плашка (владелец/название/кнопка) поверх низа.
+    D «Полоса: медиа шире»  — как A, но медиа ~72%, инфо-колонка узкая и по
+                              центру (лечит «пустое поле справа» у A).
 
   Тумблеры сверху:
     - «Квадрат»: как портрет (обрезка в 77:136) / размытая подложка (кадр
@@ -23,7 +27,7 @@
                 ячейки в конце предыдущего ряда; dense подтягивает туда
                 следующие мелкие карточки (ценой порядка по цене).
 
-  По умолчанию открывается вариант B, квадрат — «как портрет».
+  По умолчанию открывается вариант B, квадрат — «размытая подложка».
 
   Оговорка throwaway (как в scratch/buy-guest, scratch/lot-cards):
     - НЕ часть сборки, отдельный HTML вне Astro;
@@ -384,6 +388,95 @@
         color: var(--color-mist);
       }
 
+      /* D: медиа широкое, инфо-колонка узкая и по центру (меньше «пустоты»). */
+      .card.wide-d {
+        flex-direction: row;
+        gap: 1rem;
+        align-items: stretch;
+      }
+
+      .wd-media {
+        position: relative;
+        flex: 0 0 72%;
+        aspect-ratio: 16 / 9;
+        overflow: hidden;
+        border: 2px solid var(--color-milk);
+        background: #000;
+      }
+
+      .wd-media img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .wd-info {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 0.5rem;
+      }
+
+      .wd-info .cta {
+        margin-top: 0.25rem;
+      }
+
+      /* C: кадр во всю ширину целиком, инфо-плашка поверх низа кадра. */
+      .card.wide-c {
+        padding: 0;
+        overflow: hidden;
+      }
+
+      .wc-cover {
+        position: relative;
+        width: 100%;
+        overflow: hidden;
+        background: #000;
+      }
+
+      .wc-cover img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .wc-overlay {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.9rem 1rem;
+        background: linear-gradient(to top, rgb(0 0 0 / 80%), rgb(0 0 0 / 0%));
+      }
+
+      .wc-overlay .badge {
+        position: static;
+      }
+
+      .wc-overlay .title {
+        flex: 1;
+        min-width: 12rem;
+        color: var(--color-cream);
+      }
+
+      .wc-overlay .cta {
+        margin: 0;
+        padding: 0;
+        flex: 0 0 auto;
+      }
+
+      .wc-overlay .btn {
+        width: auto;
+      }
+
       /* B: широкий кадр-баннер сверху, инфо-строка снизу */
       .card.wide-b {
         padding: 0;
@@ -430,13 +523,20 @@
       }
 
       @media (max-width: 760px) {
-        .card.wide-a {
+        .card.wide-a,
+        .card.wide-d {
           flex-direction: column;
         }
 
-        .wa-media {
+        .wa-media,
+        .wd-media {
           flex: 0 0 auto;
           aspect-ratio: 16 / 9;
+        }
+
+        .wc-overlay .btn,
+        .wc-overlay .cta {
+          width: 100%;
         }
       }
 
@@ -801,7 +901,7 @@
         },
       ];
 
-      const STATE = { square: 'crop', dense: 'off' };
+      const STATE = { square: 'blur', dense: 'off' };
       const esc = (s) =>
         String(s).replace(
           /[&<>"]/g,
@@ -902,6 +1002,37 @@
         </article>`;
       }
 
+      // Полоса C: кадр во всю ширину целиком (пропорция видео), инфо-плашка
+      // поверх низа кадра — отдельного поля справа нет.
+      function wideC(l) {
+        return `<article class="card wide wide-c">
+          <div class="wc-cover" style="aspect-ratio:${l.w} / ${l.h}">
+            <img src="${l.poster}" alt="" loading="lazy" />
+            ${playBtn()}
+            <div class="wc-overlay">
+              ${ownerBadge(l)}
+              <h3 class="title">${esc(l.title)}</h3>
+              <div class="cta"><button class="btn" type="button">▶ Забрать за ${next(l.price)} 🍺</button></div>
+            </div>
+          </div>
+        </article>`;
+      }
+
+      // Полоса D: как A, но медиа шире (~72%), инфо-колонка узкая и по центру.
+      function wideD(l) {
+        return `<article class="card wide wide-d">
+          <div class="wd-media">
+            <img src="${l.poster}" alt="" loading="lazy" />
+            ${playBtn()}
+            ${ownerBadge(l)}
+          </div>
+          <div class="wd-info">
+            <h3 class="title">${esc(l.title)}</h3>
+            <div class="cta"><button class="btn" type="button">▶ Забрать за ${next(l.price)} 🍺</button></div>
+          </div>
+        </article>`;
+      }
+
       const VARIANTS = [
         {
           key: '0',
@@ -920,6 +1051,18 @@
           name: 'Полоса: медиа сверху',
           desc: 'Широкое — полоса: кадр-баннер во всю ширину сверху, инфо-строка (название + кнопка) снизу.',
           render: (l) => (kindOf(l) === 'wide' ? wideB(l) : cellCard(l)),
+        },
+        {
+          key: 'C',
+          name: 'Полоса: инфо поверх',
+          desc: 'Широкое — кадр во всю ширину целиком (пропорция видео), а владелец/название/кнопка — плашкой поверх низа кадра. Отдельного поля справа нет.',
+          render: (l) => (kindOf(l) === 'wide' ? wideC(l) : cellCard(l)),
+        },
+        {
+          key: 'D',
+          name: 'Полоса: медиа шире',
+          desc: 'Как A, но медиа занимает ~72% ширины, инфо-колонка узкая и выровнена по центру — не пустует.',
+          render: (l) => (kindOf(l) === 'wide' ? wideD(l) : cellCard(l)),
         },
       ];
 
