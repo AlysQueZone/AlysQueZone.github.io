@@ -93,6 +93,24 @@ function playInlineVideo(root: HTMLElement): void {
 }
 
 /**
+ * Подобрать показ кадра по фактической пропорции постера (на лету, когда
+ * картинка загрузилась). Портрет — родная «телефонная» рамка карточки с
+ * заполнением; широкая/квадратная картинка (16:9 и пр.) — рамка по её
+ * пропорции и вписывание целиком: в 9:16 такие обрезаются до центра.
+ */
+function applyPosterFit(root: HTMLElement, img: HTMLImageElement): void {
+  const { naturalWidth: w, naturalHeight: h } = img;
+  if (!w || !h) return;
+  if (w >= h) {
+    root.style.aspectRatio = `${w} / ${h}`;
+    root.dataset.mediaFit = 'contain';
+  } else {
+    root.style.removeProperty('aspect-ratio');
+    delete root.dataset.mediaFit;
+  }
+}
+
+/**
  * Заполнить корень видео данными лота (клиентский рендер).
  * Пустой `videoUrl` — корень прячется. Идущее воспроизведение не трогаем.
  */
@@ -111,8 +129,20 @@ export function fillVideo(root: Element | null, videoUrl: string | null | undefi
   }
   const img = root.querySelector('[data-lot-video-poster]');
   if (img instanceof HTMLImageElement) {
-    if (poster) img.src = poster;
-    else img.removeAttribute('src');
+    // Один слушатель на постер: при смене src пересчитает пропорцию заново.
+    if (img.dataset.ratioBound !== '1') {
+      img.dataset.ratioBound = '1';
+      img.addEventListener('load', () => applyPosterFit(root, img));
+    }
+    if (poster) {
+      if (img.getAttribute('src') !== poster) img.src = poster;
+      // Из кэша картинка может быть уже готова — load не придёт.
+      if (img.complete && img.naturalWidth > 0) applyPosterFit(root, img);
+    } else {
+      img.removeAttribute('src');
+      root.style.removeProperty('aspect-ratio');
+      delete root.dataset.mediaFit;
+    }
   }
   root.classList.toggle('hidden', webm.length === 0);
 }

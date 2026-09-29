@@ -305,3 +305,11 @@ video:fullscreen {
 video:-webkit-full-screen {
   object-fit: contain;
 }
+
+/* Кадр лота с широким/квадратным видео: пропорцию и признак вписывания
+   проставляет lib/lot-video.ts по загруженному постеру (16:9 в «телефонной»
+   рамке иначе обрезалось бы до центра). Unlayered: иначе utility
+   .object-cover из слоя utilities перебил бы правило. */
+.lot-media-frame[data-media-fit='contain'] :is(img, video) {
+  object-fit: contain;
+}
