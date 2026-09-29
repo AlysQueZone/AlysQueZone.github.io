@@ -61,24 +61,17 @@ import BrandHeadline from '@/components/BrandHeadline.astro';
 
 <script>
   // Живая витрина: каталог + цены + «мой» флаг — из lib/lots.ts (fetchLotCatalog).
-  // Набор карточек строится/сносится по каталогу (INSERT/DELETE в lots), поля —
-  // по данным; перерисовка от Realtime. Владелец NULL — бейдж скрыт.
-  // «Мои приветы» — только из БД: лоты, где mine (owner_uid == uid сессии).
-  // Локальный инвентарь не читаем. Без PUBLIC_SUPABASE_* — честная деградация.
+  // Набор карточек строится/сносится по каталогу (INSERT/DELETE в lots), слоты
+  // карточки и раскладку кадра заполняет lib/lot-view.ts (fillLot); перерисовка
+  // от Realtime. «Мои приветы» — только из БД: лоты, где mine (owner_uid == uid
+  // сессии). Локальный инвентарь не читаем. Без PUBLIC_SUPABASE_* — честная
+  // деградация.
   import { getSupabase, isSupabaseConfigured, getSessionUid } from '@/lib/supabase';
-  import {
-    fetchLotCatalogResult,
-    fillBuyButton,
-    fillOwnerBadges,
-    subscribeLots,
-    onBought,
-    type LotState,
-  } from '@/lib/lots';
+  import { fetchLotCatalogResult, subscribeLots, onBought, type LotState } from '@/lib/lots';
+  import { fillLot, lotUrl } from '@/lib/lot-view';
   import { fetchMyBalance, onBalance } from '@/lib/balance';
-  import { initLotVideos, fillVideo, type MediaOrientation } from '@/lib/lot-video';
-  import { setTitleEmotes } from '@/lib/emotes';
+  import { initLotVideos } from '@/lib/lot-video';
 
-  const base = import.meta.env.BASE_URL;
   const GUEST_TEXT = 'Войди через Twitch — тут будут твои приветы';
   const EMPTY_TEXT = 'Пока пусто — забери первый привет ниже';
   const GRID_EMPTY_TEXT = 'Пока лотов нет — скоро появятся';
@@ -86,10 +79,6 @@ import BrandHeadline from '@/components/BrandHeadline.astro';
   /** Баланс — зеркало гейта: не хватает — кнопки гаснут. */
   let myBalance: number | null = null;
   let lastStates: Map<string, LotState> = new Map();
-
-  function lotHref(slug: string): string {
-    return `${base}lot/?id=${encodeURIComponent(slug)}`;
-  }
 
   function showMyNote(text: string, count: number): void {
     const slot = document.querySelector('[data-my-privety]');
@@ -142,7 +131,7 @@ import BrandHeadline from '@/components/BrandHeadline.astro';
       row.className =
         'border-2 border-milk bg-panel px-3 py-2 text-sm shadow-[3px_3px_0_var(--color-milk)]';
       const link = document.createElement('a');
-      link.href = lotHref(s.slug);
+      link.href = lotUrl(s.slug);
       link.className = 'font-bold hover:underline';
       link.textContent = s.title;
       row.appendChild(link);
@@ -154,57 +143,11 @@ import BrandHeadline from '@/components/BrandHeadline.astro';
     }
   }
 
-  /** Квадратное видео: базовую «телефонную» рамку оставляем, кадр вписан
-   *  целиком, поля — его же увеличенная размытая копия (подложка). */
-  function applySquareBlur(root: HTMLElement, src: string): void {
-    const existing = root.querySelector('.sq-bg');
-    if (existing instanceof HTMLElement) {
-      existing.style.backgroundImage = `url('${src}')`;
-      return;
-    }
-    const bg = document.createElement('div');
-    bg.className = 'sq-bg';
-    bg.style.backgroundImage = `url('${src}')`;
-    root.insertBefore(bg, root.firstChild);
-  }
-
-  function removeSquareBlur(root: HTMLElement): void {
-    root.querySelector('.sq-bg')?.remove();
-  }
-
-  /** Разложить карточку по ориентации постера: широкая — во всю строку,
-   *  квадрат — размытая подложка в «телефонной» рамке, портрет — базовая.
-   *  Обратимо: смена видео снимает прежнюю раскладку (ширину и подложку). */
-  function applyCardOrientation(
-    card: HTMLElement,
-    root: HTMLElement,
-    orientation: MediaOrientation,
-    src: string
-  ): void {
-    if (orientation === 'wide') card.dataset.wide = '1';
-    else delete card.dataset.wide;
-    if (orientation === 'square') applySquareBlur(root, src);
-    else removeSquareBlur(root);
-  }
-
-  /** Заполнить карточку состоянием Лота по data-слотам шаблона. */
+  /** Заполнить карточку состоянием Лота: слоты и раскладку кадра ведёт
+   *  общий lib/lot-view.ts (fillLot); здесь — только ключ reconcile. */
   function fillCard(card: HTMLElement, st: LotState): void {
     card.dataset.lotCard = st.slug;
-    const link = card.querySelector('[data-lot-link]');
-    if (link instanceof HTMLAnchorElement) link.href = lotHref(st.slug);
-    setTitleEmotes(card.querySelector('[data-lot-title]'), st.title);
-    // Раскладку (широкая полоса / размытая подложка / портрет) решает витрина:
-    // пропорцию постера сообщает lib/lot-video после загрузки картинки.
-    fillVideo(
-      card.querySelector('[data-lot-video-root]'),
-      st.video_url,
-      (orientation, root, posterImg) =>
-        applyCardOrientation(card, root, orientation, posterImg.currentSrc || posterImg.src)
-    );
-    // Владелец и «Твой» — бейджами поверх кадра (общий fillOwnerBadges).
-    fillOwnerBadges(card, st);
-    // Цена на карточке не дублируется — она живёт только в кнопке (fillBuyButton).
-    fillBuyButton(card.querySelector('[data-buy-intent]'), st, myBalance);
+    fillLot(card, st, { balance: myBalance });
   }
 
   // slug → узел карточки: reconcile набора (создать/снести/обновить).

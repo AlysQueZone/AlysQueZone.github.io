@@ -1,6 +1,5 @@
 import { getSupabase, withAuthRetry, buyLotShared } from './supabase';
 import { subscribeLive } from './live';
-import { buyAvailability, formatStaged, writeBuyIntent } from './buy-intent';
 import { errorText, isNoAuthError, isOfflineError } from './errors';
 
 /**
@@ -157,63 +156,6 @@ export async function fetchLotStateResult(
 /** Состояние одного Лота; нет строки/ошибка/не настроено → null. */
 export async function fetchLotState(slug: string, uid: string | null): Promise<LotState | null> {
   return (await fetchLotStateResult(slug, uid)).state;
-}
-
-/**
- * Заполнить кнопку покупки данными Лота — намерение через lib/buy-intent.ts
- * (`data-buy-intent`), правило «не хватает» — оттуда же (buyAvailability).
- * Одно место на витрину и страницу лота: правка формы тут меняет оба экрана.
- * `balance` — зеркало серверного гейта: N известна и баланс меньше — кнопка
- * гаснет с честной надписью, но цена в ней остаётся («Не хватает · N 🍺»).
- * Исключения: свой лот — «Твой привет» (цены нет, покупка невозможна),
- * N неизвестна — «…» (намерение несёт price: null, сервер посчитает сам).
- */
-export function fillBuyButton(
-  btn: Element | null,
-  st: LotState,
-  balance: number | null = null
-): void {
-  if (!(btn instanceof HTMLButtonElement)) return;
-  const intent = {
-    slug: st.slug,
-    title: st.title,
-    price: st.nextPrice,
-    owner: st.owner_login ?? '—',
-    video: st.video_url,
-  };
-  writeBuyIntent(btn, intent);
-  // Свой лот купить нельзя (перекуп у себя бессмыслен) — кнопка гаснет.
-  // N неизвестна — не гасим по балансу: сравнить не с чем, решает сервер.
-  const availability = buyAvailability(intent, balance);
-  const off = st.mine || availability === 'short';
-  btn.disabled = off;
-  btn.textContent = st.mine
-    ? 'Твой привет'
-    : availability === 'short'
-      ? `Не хватает · ${formatStaged(st.nextPrice)} 🍺`
-      : `▶ Забрать за ${formatStaged(st.nextPrice)} 🍺`;
-  btn.classList.toggle('opacity-50', off);
-}
-
-/**
- * Заполнить бейджи владельца над кадром — один контракт разметки на карточку
- * витрины и страницу лота (`LotBadges`: data-owner-badge / data-free-badge /
- * data-mine-badge). Владелец — тёмный бейдж с короной, у свободного лота
- * показан светлый «свободен»; «Твой» — по флагу mine. Отдельной строки с
- * владельцем нет: как на витрине, так и в подробностях.
- */
-export function fillOwnerBadges(root: ParentNode | null, st: LotState): void {
-  if (!root) return;
-  const owned = Boolean(st.owner_login);
-  const owner = root.querySelector('[data-owner-badge]');
-  if (owner instanceof HTMLElement) {
-    owner.textContent = owned ? `👑 ${st.owner_login}` : '';
-    owner.classList.toggle('hidden', !owned);
-  }
-  const free = root.querySelector('[data-free-badge]');
-  if (free instanceof HTMLElement) free.classList.toggle('hidden', owned);
-  const mine = root.querySelector('[data-mine-badge]');
-  if (mine instanceof HTMLElement) mine.classList.toggle('hidden', !st.mine);
 }
 
 /**

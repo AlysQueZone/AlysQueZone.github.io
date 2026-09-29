@@ -90,17 +90,10 @@ const base = import.meta.env.BASE_URL;
     fetchSharedHistory,
     type SharedHistoryEntry,
   } from '@/lib/supabase';
-  import {
-    fetchLotStateResult,
-    fillBuyButton,
-    fillOwnerBadges,
-    subscribeLots,
-    onBought,
-    type LotState,
-  } from '@/lib/lots';
+  import { fetchLotStateResult, subscribeLots, onBought, type LotState } from '@/lib/lots';
+  import { fillLot } from '@/lib/lot-view';
   import { fetchMyBalance, onBalance } from '@/lib/balance';
-  import { initLotVideos, fillVideo } from '@/lib/lot-video';
-  import { setTitleEmotes } from '@/lib/emotes';
+  import { initLotVideos } from '@/lib/lot-video';
 
   const slug = (new URLSearchParams(window.location.search).get('id') ?? '').trim();
 
@@ -108,11 +101,8 @@ const base = import.meta.env.BASE_URL;
   const missing = document.querySelector('[data-lot-missing]');
   const errorNote = document.querySelector('[data-lot-error]');
   const history = document.querySelector('[data-lot-history]');
-  const titleEl = document.querySelector('[data-lot-title]');
-  const videoRoot = document.querySelector('[data-lot-video-root]');
   const suggestedEl = document.querySelector('[data-lot-suggested]');
   const suggestedLoginEl = document.querySelector('[data-lot-suggested-login]');
-  const buyBtn = document.querySelector('[data-buy-intent]');
   const skeleton = document.querySelector('[data-lot-skeleton]');
   const statusEl = document.querySelector('[data-lot-status]');
   const list = document.querySelector('[data-history-list]');
@@ -157,25 +147,19 @@ const base = import.meta.env.BASE_URL;
     toggle(errorNote, false);
     toggle(history, true);
     hideSkeleton();
-    setTitleEmotes(titleEl, st.title);
     document.title = `${st.title} — AlysQueZone`;
-    fillVideo(videoRoot, st.video_url, (orientation, root) => {
-      // Раскладка кадра страницы лота: широкое видео — во всю ширину контента
-      // (как полоса на витрине), портрет/квадрат — в «телефонной» ширине.
-      // Геометрию по data-атрибуту задаёт global.css.
-      root.dataset.mediaOrientation = orientation;
-    });
+    // Слоты Лота (заголовок с эмоутами, видео с раскладкой кадра, бейджи,
+    // кнопка) — общий lib/lot-view.ts; раскладку кадра страницы лота
+    // (широкое — во всю ширину, портрет/квадрат — «телефонная») читает
+    // global.css по data-media-orientation.
+    fillLot(view, st, { balance: myBalance });
     initLotVideos(document);
-    // Владелец и «Твой» — как на витрине, бейджами поверх кадра; цена — только
-    // в кнопке (fillBuyButton).
-    fillOwnerBadges(view, st);
     // Автор привета — только в подробностях лота, в списках подписи нет.
     if (suggestedEl instanceof HTMLElement) {
       suggestedEl.classList.toggle('hidden', !st.suggested_by_login);
       if (suggestedLoginEl) suggestedLoginEl.textContent = st.suggested_by_login ?? '—';
     }
     lastState = st;
-    fillBuyButton(buyBtn, st, myBalance);
   }
 
   function renderSharedHistory(entries: SharedHistoryEntry[], uid: string | null): void {
@@ -244,6 +228,6 @@ const base = import.meta.env.BASE_URL;
   // Баланс пришёл из BaseLayout — перекрасить кнопку покупки.
   onBalance((value) => {
     myBalance = value;
-    if (lastState) fillBuyButton(buyBtn, lastState, myBalance);
+    if (lastState) fillLot(view, lastState, { balance: myBalance });
   });
 </script>

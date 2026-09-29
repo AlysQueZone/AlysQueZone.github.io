@@ -307,7 +307,8 @@ video:-webkit-full-screen {
 
 /* Кадр лота: пропорцию и признак вписывания проставляет lib/lot-video.ts по
    загруженному постеру (16:9 в «телефонной» рамке иначе обрезалось бы до
-   центра). Раскладку карточки поверх этого (полоса/подложка) решает витрина.
+   центра). Раскладку карточки поверх этого (полоса/подложка) решает
+   lib/lot-view.ts — общий для витрины, страницы лота и главной.
    Unlayered: иначе utility .object-cover из слоя utilities перебил бы правило. */
 .lot-media-frame[data-media-fit='contain'] :is(img, video) {
   object-fit: contain;
@@ -353,8 +354,9 @@ video:-webkit-full-screen {
 
 /* Широкая карточка (16:9): тот же состав, что у обычной (название → кадр →
    кнопка под кадром), но во всю строку; кадр — по пропорции видео. Кнопка не
-   поверх видео, поэтому управление плеером не перекрывается. Unlayered:
-   иначе utility grid-раскладки перебила бы span. */
-[data-lot-card][data-wide] {
+   поверх видео, поэтому управление плеером не перекрывается. Ориентацию на
+   кадр ставит lib/lot-view.ts (`data-media-orientation`). Unlayered: иначе
+   utility grid-раскладки перебила бы span. */
+[data-lot-card]:has(.lot-media-frame[data-media-orientation='wide']) {
   grid-column: 1 / -1;
 }

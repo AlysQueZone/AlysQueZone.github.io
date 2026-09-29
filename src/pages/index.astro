@@ -1,6 +1,9 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import RulesModal from '@/components/RulesModal.astro';
+import BuyModal from '@/components/BuyModal.astro';
+import LotCard from '@/components/LotCard.astro';
+import LotCardSkeleton from '@/components/LotCardSkeleton.astro';
 import BrandHeadline from '@/components/BrandHeadline.astro';
 import { ALYSQUE_WAUW } from '@/lib/emotes';
 
@@ -90,15 +93,7 @@ const base = import.meta.env.BASE_URL;
     </div>
     <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4" data-random-lots>
       {Array.from({ length: 4 }, () => (
-        <article
-          class="card-pixel flex min-w-0 flex-col p-5"
-          data-random-skeleton
-          aria-hidden="true"
-        >
-          <div class="skeleton-block mt-3 h-5 w-3/4"></div>
-          <div class="skeleton-block mt-1 h-4 w-1/2"></div>
-          <div class="skeleton-block mt-3 h-6 w-1/3"></div>
-        </article>
+        <LotCardSkeleton />
       ))}
     </div>
     <p data-random-state class="mt-3 hidden text-sm font-bold text-mist"></p>
@@ -113,17 +108,37 @@ const base = import.meta.env.BASE_URL;
     </div>
   </section>
   <RulesModal />
+  <BuyModal />
+  <!-- Шаблон случайной карточки: тот же LotCard, что на витрине (одно
+       представление Лота), заполняет lib/lot-view.ts. -->
+  <template data-lot-card-template>
+    <LotCard />
+  </template>
 </BaseLayout>
 
 <script>
   // Случайные приветы — из живого каталога БД, выбор в браузере (не на билде).
+  // Карточки — каноничный LotCard (шаблон в разметке): слоты Лота и раскладку
+  // кадра заполняет lib/lot-view.ts, как на витрине; цена и покупка — в кнопке,
+  // модалка покупки на странице (BuyModal). Свой ручной miniCard удалён —
+  // одно представление Лота на всех поверхностях (docs/adr/0009).
   import { getSessionUid, isSupabaseConfigured } from '@/lib/supabase';
-  import { fetchLotCatalogResult } from '@/lib/lots';
+  import { fetchLotCatalogResult, onBought, type LotState } from '@/lib/lots';
+  import { fillLot } from '@/lib/lot-view';
+  import { initLotVideos } from '@/lib/lot-video';
+  import { fetchMyBalance, onBalance } from '@/lib/balance';
 
   const slot = document.querySelector('[data-random-lots]');
+  const tpl = document.querySelector('[data-lot-card-template]');
   const note = document.querySelector('[data-random-state]');
   const status = document.querySelector('[data-random-status]');
   const PICK = 4;
+
+  /** Баланс — зеркало гейта: не хватает — кнопки карточек гаснут. */
+  let myBalance: number | null = null;
+  /** Показанные карточки и их состояния — для перекраски без нового выбора. */
+  let rendered = new Map<string, HTMLElement>();
+  let lastStates = new Map<string, LotState>();
 
   function setNote(text: string | null): void {
     if (!(note instanceof HTMLElement)) return;
@@ -138,50 +153,50 @@ const base = import.meta.env.BASE_URL;
 
   /** Скелетоны — только на первую загрузку. */
   function clearSkeletons(): void {
-    slot?.querySelectorAll('[data-random-skeleton]').forEach((el) => el.remove());
+    slot?.querySelectorAll('[data-lot-skeleton]').forEach((el) => el.remove());
   }
 
-  function miniCard(slug: string, title: string, owner: string | null, price: number): HTMLElement {
-    const card = document.createElement('article');
-    card.className =
-      'card-pixel flex min-w-0 flex-col p-5 transition hover:-translate-y-0.5 motion-reduce:hover:translate-y-0';
-    const h = document.createElement('h3');
-    h.className = 'mt-3 font-extrabold break-words';
-    // Карточка ведёт на страницу лота, как карточки витрины: иначе случайный
-    // привет — тупик, открыть его нечем.
-    const a = document.createElement('a');
-    a.href = `${import.meta.env.BASE_URL}lot/?id=${encodeURIComponent(slug)}`;
-    a.className = 'hover:text-ember';
-    a.textContent = title;
-    h.appendChild(a);
-    card.appendChild(h);
-    const ownerP = document.createElement('p');
-    ownerP.className = 'mt-1 truncate text-sm text-mist';
-    ownerP.textContent = `владелец: ${owner ?? '—'}`;
-    card.appendChild(ownerP);
-    const priceP = document.createElement('p');
-    priceP.className = 'mt-3 text-xl font-black text-pivko';
-    priceP.textContent = `${price} 🍺`;
-    card.appendChild(priceP);
-    return card;
+  /** Перекрасить уже показанные карточки из последнего снапшота. */
+  function refill(): void {
+    for (const [slug, card] of rendered) {
+      const st = lastStates.get(slug);
+      if (st) fillLot(card, st, { balance: myBalance });
+    }
   }
 
-  async function renderRandom(): Promise<void> {
-    if (!(slot instanceof HTMLElement)) return;
-    const uid = await getSessionUid();
-    const { ok, states } = await fetchLotCatalogResult(uid);
+  /** Выбрать случайные лоты и нарисовать их карточками LotCard. */
+  function paintCards(states: Map<string, LotState>): void {
+    if (!(slot instanceof HTMLElement) || !(tpl instanceof HTMLTemplateElement)) return;
     const pool = [...states.values()];
     for (let i = pool.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [pool[i], pool[j]] = [pool[j] as (typeof pool)[number], pool[i] as (typeof pool)[number]];
     }
-    const pick = pool.slice(0, PICK);
+    const cards: HTMLElement[] = [];
+    rendered = new Map();
+    for (const st of pool.slice(0, PICK)) {
+      if (!Number.isFinite(st.price)) continue;
+      const fresh = tpl.content.firstElementChild;
+      if (!(fresh instanceof HTMLElement)) break;
+      const card = fresh.cloneNode(true) as HTMLElement;
+      fillLot(card, st, { balance: myBalance });
+      rendered.set(st.slug, card);
+      cards.push(card);
+    }
+    slot.replaceChildren(...cards);
+    initLotVideos(slot);
+  }
+
+  async function renderRandom(): Promise<void> {
+    if (!(slot instanceof HTMLElement)) return;
+    const uid = await getSessionUid();
+    myBalance = await fetchMyBalance();
+    const { ok, states } = await fetchLotCatalogResult(uid);
+    lastStates = states;
     clearSkeletons();
-    slot.replaceChildren(
-      ...pick.map((st) => miniCard(st.slug, st.title, st.owner_login, st.price))
-    );
+    paintCards(states);
     const msg =
-      pick.length > 0
+      rendered.size > 0
         ? null
         : ok
           ? 'Пока пусто — зайди на биржу'
@@ -190,8 +205,24 @@ const base = import.meta.env.BASE_URL;
     setStatus(msg ?? '');
   }
 
-  if (isSupabaseConfigured()) void renderRandom();
-  else {
+  /** После своей покупки — свежий снапшот и перекраска тех же карточек. */
+  async function refreshCards(): Promise<void> {
+    if (!isSupabaseConfigured()) return;
+    const uid = await getSessionUid();
+    myBalance = await fetchMyBalance();
+    const { states } = await fetchLotCatalogResult(uid);
+    lastStates = states;
+    refill();
+  }
+
+  if (isSupabaseConfigured()) {
+    void renderRandom();
+    onBought(() => void refreshCards());
+    onBalance((value) => {
+      myBalance = value;
+      refill();
+    });
+  } else {
     const msg = 'Приветы не загрузились — проверь связь';
     clearSkeletons();
     setNote(msg);
