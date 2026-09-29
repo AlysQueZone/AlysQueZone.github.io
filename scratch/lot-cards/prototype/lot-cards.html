@@ -17,8 +17,11 @@
   Варианты (радикально разные по структуре, не по цвету):
     0 «Сейчас»        — как на витрине сегодня (квадрат-обрезка, цена-строка +
                         цена-в-кнопке) — база для сравнения.
-    A «Портрет-герой» — постер 9:16 целиком; владелец — бейдж поверх кадра;
+    A «Портрет-герой» — кадр в пропорции реальных «телефонных» видео (77:136 —
+                        kubic_lego.mp4), владелец — тёмный бейдж поверх кадра;
                         цена живёт только в кнопке, у неактивной — в надписи.
+    A2 «Название сверху» — то же, что A, но заголовок перед кадром (спорный
+                        пункт: сдвигает видео ниже).
     B «Строка»        — горизонтальная карточка: портретный кадр слева, справа
                         владелец-чип, цена-плашка и кнопка без цены.
     C «Обложка»       — квадрат с показом видео целиком (contain); владелец —
@@ -27,6 +30,10 @@
     D «Прилавок»      — владелец шапкой карточки; внизу одна полоса
                         «цена | кнопка»: цена остаётся читаемой, когда кнопка
                         гаснет.
+
+  Тумблер «Кадр» сверху: «Заполнить» (cover) / «Вписать» (contain) — чтобы
+  сравнить обрезку и вписывание на живых постерах (у них пропорции разные).
+  Пропорция бокса кадра — 77:136 (kubic_lego.mp4 = 308×544) по умолчанию.
 
   Поле решения по цене (вопрос 2), которое здесь проверяем: на карточке — РОВНО
   одна цена, и это цена покупки (next_price = «сколько заплатишь»). Текущая
@@ -70,6 +77,9 @@
         --color-pivko: #7a5f00;
         --font-display: 'Press Start 2P', 'Rubik', system-ui, sans-serif;
         --font-sans: 'Rubik', system-ui, -apple-system, sans-serif;
+        /* Пропорция кадра по умолчанию — «телефонный» формат реальных видео:
+           kubic_lego.mp4 = 308x544, отсюда 77/136 ≈ 0.566. */
+        --media-ratio: 77 / 136;
       }
 
       *,
@@ -289,7 +299,7 @@
       }
 
       .media.portrait {
-        aspect-ratio: 9 / 16;
+        aspect-ratio: var(--media-ratio);
       }
 
       .media.four5 {
@@ -393,6 +403,17 @@
         color: var(--color-milk);
       }
 
+      /* Владелец: тёмный бейдж, чтобы жёлтая корона была видна (на bar сливалась). */
+      .badge-owner {
+        background: var(--color-milk);
+        color: var(--color-cream);
+      }
+
+      .badge-free {
+        background: var(--color-bar);
+        color: var(--color-mist);
+      }
+
       .badge-pivko {
         background: var(--color-pivko);
         color: var(--color-cream);
@@ -404,7 +425,8 @@
         gap: 0.35rem;
         font-weight: 900;
         font-size: 0.8rem;
-        background: var(--color-bar);
+        background: var(--color-milk);
+        color: var(--color-cream);
         border: 2px solid var(--color-milk);
         border-radius: 4px;
         padding: 0.25rem 0.5rem;
@@ -516,7 +538,8 @@
         display: flex;
         align-items: center;
         gap: 0.35rem;
-        background: var(--color-bar);
+        background: var(--color-milk);
+        color: var(--color-cream);
         border-top: 3px solid var(--color-milk);
         padding: 0.4rem 0.6rem;
         font-weight: 900;
@@ -638,6 +661,13 @@
             <button type="button" data-bal="0" aria-pressed="false">0</button>
           </div>
         </div>
+        <div class="balance">
+          <span class="label">Кадр</span>
+          <div class="seg" id="crop-seg">
+            <button type="button" data-crop="cover" aria-pressed="true">Заполнить</button>
+            <button type="button" data-crop="contain" aria-pressed="false">Вписать</button>
+          </div>
+        </div>
       </div>
 
       <p class="hint" id="hint"></p>
@@ -710,6 +740,9 @@
 
       // ---- состояние --------------------------------------------------------
       const BAL = { value: 1000 };
+      // Кадрирование: 'cover' (заполнить, обрезает поля) или 'contain' (вписать целиком).
+      const CROP = { fit: 'cover' };
+      const fitClass = () => (CROP.fit === 'contain' ? 'fit-contain' : 'fit-cover');
 
       const isShort = (c) => !c.mine && c.next > BAL.value;
       // На карточке — одна цена: цена покупки; для своего лота — стоимость.
@@ -726,8 +759,8 @@
       }
 
       function ownerBadge(c) {
-        if (!c.owner) return `<span class="badge badge-bar">свободен</span>`;
-        return `<span class="badge badge-bar">👑 ${esc(c.owner)}</span>`;
+        if (!c.owner) return `<span class="badge badge-free">свободен</span>`;
+        return `<span class="badge badge-owner">👑 ${esc(c.owner)}</span>`;
       }
 
       function ownerChip(c) {
@@ -739,7 +772,8 @@
       }
 
       function media(c, aspect, fit) {
-        return `<div class="media ${aspect} fit-${fit}">
+        const fitCls = fit ? `fit-${fit}` : fitClass();
+        return `<div class="media ${aspect} ${fitCls}">
           ${posterImg(c)}
           <button class="play" type="button" aria-label="Смотреть привет">
             <span class="btn btn-primary btn-s">▶ смотреть</span>
@@ -770,19 +804,35 @@
         </article>`;
       }
 
-      // A — портрет-герой: кадр целиком, владелец поверх, цена в кнопке.
-      function vA(c) {
-        const label = isShort(c) ? `Не хватает · ${c.next} 🍺` : `▶ Забрать за ${c.next} 🍺`;
-        return `<article class="card">
-          <div class="media portrait fit-contain">
+      // Общий кадр вариантов A/A2: портрет целиком (или заполнением — по тумблеру),
+      // бейдж владельца поверх, у своего — «Твой».
+      function mediaOwnerOverlay(c) {
+        return `<div class="media portrait ${fitClass()}">
             ${posterImg(c)}
             <button class="play" type="button" aria-label="Смотреть привет">
               <span class="btn btn-primary btn-s">▶ смотреть</span>
             </button>
             <div class="ov">${ownerBadge(c)}</div>
             ${c.mine ? `<div class="ov ov-tr"><span class="badge badge-pivko">Твой</span></div>` : ''}
-          </div>
+          </div>`;
+      }
+
+      // A — портрет-герой: кадр целиком, владелец поверх, цена в кнопке.
+      function vA(c) {
+        const label = isShort(c) ? `Не хватает · ${c.next} 🍺` : `▶ Забрать за ${c.next} 🍺`;
+        return `<article class="card">
+          ${mediaOwnerOverlay(c)}
           <h3 class="title"><a class="title-link" href="#">${esc(c.title)}</a></h3>
+          <div class="mt-auto">${buyBtn(c, label, true)}</div>
+        </article>`;
+      }
+
+      // A2 — то же, но название сверху: сначала видно, что за привет, потом кадр.
+      function vA2(c) {
+        const label = isShort(c) ? `Не хватает · ${c.next} 🍺` : `▶ Забрать за ${c.next} 🍺`;
+        return `<article class="card">
+          <h3 class="title"><a class="title-link" href="#">${esc(c.title)}</a></h3>
+          ${mediaOwnerOverlay(c)}
           <div class="mt-auto">${buyBtn(c, label, true)}</div>
         </article>`;
       }
@@ -842,7 +892,7 @@
         return `<article class="card">
           <div class="vB-head">${ownerChip(c)}</div>
           <h3 class="title"><a class="title-link" href="#">${esc(c.title)}</a></h3>
-          ${media(c, 'portrait', 'contain')}
+          ${media(c, 'portrait')}
           <div class="actionbar">
             <div class="aprice">
               <small>${c.mine ? 'стоимость' : 'забрать за'}</small>
@@ -866,9 +916,16 @@
         {
           key: 'A',
           name: 'Портрет-герой',
-          desc: 'Кадр 9:16 показан целиком (contain на чёрном). Владелец — бейдж поверх кадра. Цена — только в кнопке; когда Пивкойнов не хватает, в надписи стоит цена («Не хватает · N 🍺»).',
+          desc: 'Кадр в пропорции «телефонного» видео (77:136, как kubic_lego) — сверху, название под ним. Владелец — тёмный бейдж поверх кадра (корона видна). Цена — только в кнопке; у неактивной она в надписи («Не хватает · N 🍺»). Тумблер «Кадр» сверху: Заполнить (обрезка полей) / Вписать (целиком).',
           grid: 'cols-2',
           render: vA,
+        },
+        {
+          key: 'A2',
+          name: 'Название сверху',
+          desc: 'То же, что A, но название идёт первым — сразу понятно, что за привет, и только потом кадр. Спорный пункт: сдвигает видео ниже.',
+          grid: 'cols-2',
+          render: vA2,
         },
         {
           key: 'B',
@@ -963,6 +1020,17 @@
         BAL.value = Number(btn.dataset.bal);
         balanceEl.textContent = String(BAL.value);
         document.querySelectorAll('#balance-seg button').forEach((b) => {
+          b.setAttribute('aria-pressed', String(b === btn));
+        });
+        render(active);
+      });
+
+      // Кадр: «Заполнить» (cover) / «Вписать» (contain) — перерисовка вариантов.
+      document.getElementById('crop-seg').addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-crop]');
+        if (!btn) return;
+        CROP.fit = btn.dataset.crop;
+        document.querySelectorAll('#crop-seg button').forEach((b) => {
           b.setAttribute('aria-pressed', String(b === btn));
         });
         render(active);
