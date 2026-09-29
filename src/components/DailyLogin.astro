@@ -26,7 +26,7 @@
   } from '@/lib/daily';
   import { boom } from '@/lib/confetti';
   import { paintBalance } from '@/lib/balance';
-  import { createModal } from '@/lib/modal';
+  import { createModal, type ModalHandle } from '@/lib/modal';
   import { errorText } from '@/lib/errors';
 
   /** Окно ежедневного входа: по центру, карточка стиля C, confetti при успехе.
@@ -34,8 +34,12 @@
    *  ширина ограничена вьюпортом — целиком видно на 360px и 1440px.
    *  Оверлей кладём в body: <DailyLogin /> живёт в шапке с backdrop-blur,
    *  а он ломает fixed-позиционирование потомков (окно прилипало к верху). */
+  /** Живое окно входа: прежнее закрываем через цикл, а не сносом узла, —
+   *  иначе запись осталась бы в стеке модуля и перехватывала Escape/Tab. */
+  let dailyModal: ModalHandle | null = null;
+
   function showDailyWindow(text: string, withConfetti: boolean): void {
-    document.querySelectorAll('[data-daily-notice]').forEach((n) => n.remove());
+    dailyModal?.close();
     const overlay = document.createElement('div');
     overlay.dataset.dailyNotice = '1';
     overlay.setAttribute('role', 'dialog');
@@ -78,8 +82,10 @@
       },
       onClose() {
         overlay.remove();
+        dailyModal = null;
       },
     });
+    dailyModal = daily;
     if (withConfetti) boom();
     daily?.open();
   }

@@ -491,11 +491,6 @@ const LOSE_POOL = GAMBA_LOSE_SOUNDS.map((f) => s3Sound(f)).join(',');
     },
   });
 
-  function open(): void {
-    if (spinning) return;
-    gamba?.open();
-  }
-
   async function spin(): Promise<void> {
     // Синхронный лок: ни повторный клик, ни зажатый Enter не запустят второй
     // запрос, пока текущий в полёте. Кнопку гасим до первого await.
@@ -587,11 +582,8 @@ const LOSE_POOL = GAMBA_LOSE_SOUNDS.map((f) => s3Sound(f)).join(',');
   }
 
   document.addEventListener('click', (e) => {
-    const target = e.target as HTMLElement | null;
-    if (target?.closest?.('[data-gamba-button]')) {
-      open();
-      return;
-    }
+    const trigger = (e.target as HTMLElement | null)?.closest?.('[data-gamba-button]');
+    if (trigger instanceof HTMLElement) gamba?.open(trigger);
   });
   spinBtn?.addEventListener('click', () => {
     void spin();

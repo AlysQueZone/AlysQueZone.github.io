@@ -27,12 +27,10 @@ export interface ModalHooks {
 }
 
 export interface ModalHandle {
-  readonly root: HTMLElement;
   /** Показать окно; повторный вызов открытого — noop. `opener` — куда вернуть фокус. */
   open(opener?: HTMLElement | null): void;
   /** Скрыть окно; повторный вызов закрытого — noop. */
   close(): void;
-  isOpen(): boolean;
 }
 
 const FOCUSABLE =
@@ -62,7 +60,8 @@ function show(root: HTMLElement): void {
   root.classList.remove('hidden');
   root.classList.add('flex');
   if (!root.hasAttribute('role')) root.setAttribute('role', 'dialog');
-  root.setAttribute('aria-modal', 'true');
+  if (!root.hasAttribute('aria-modal')) root.setAttribute('aria-modal', 'true');
+  // Пустое окно (только разметка) всё равно должно принимать фокус.
   if (!root.hasAttribute('tabindex')) root.tabIndex = -1;
 }
 
@@ -131,17 +130,15 @@ export function createModal(root: Element | null, hooks: ModalHooks = {}): Modal
     hooks.onOpen?.();
   }
 
-  const handle: ModalHandle = {
-    root: el,
-    open: openWindow,
-    close,
-    isOpen: () => open,
-  };
+  const handle: ModalHandle = { open: openWindow, close };
 
   // Клик-вне (по самому корню) и кнопки `data-modal-close` — забота модуля;
   // слушатель на корне, а не на document: клик, которым окно открыли, уже
   // не попадёт в него (путь события посчитан до появления окна в DOM).
+  // Обслуживаем только верхнее окно — контракт «клик — верхнему», а не
+  // случайная доступность нижнего оверлея под разметкой.
   el.addEventListener('click', (e) => {
+    if (topEntry()?.root !== el) return;
     const target = e.target as HTMLElement | null;
     if (target === el || target?.closest?.('[data-modal-close]')) handle.close();
   });

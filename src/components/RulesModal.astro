@@ -139,7 +139,7 @@ const REWARD_LINE = rewardLine();
   });
 
   document.addEventListener('click', (e) => {
-    const target = e.target as HTMLElement | null;
-    if (target?.closest?.('[data-rules-button]')) rules?.open();
+    const trigger = (e.target as HTMLElement | null)?.closest?.('[data-rules-button]');
+    if (trigger instanceof HTMLElement) rules?.open(trigger);
   });
 </script>

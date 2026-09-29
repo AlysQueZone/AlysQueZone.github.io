@@ -124,6 +124,43 @@ const clapSound = s3Sound('clap.mp3');
   // display-mirror, source of truth — DB (см. выше).
   const LIMIT_LABEL = 'Лимит: 10 покупок за 10 минут';
 
+  // Цикл окна — общий модуль (Escape, клик-вне, фокус); здесь только показ
+  // содержимого и живые проекции, а на закрытии — снятие своего состояния.
+  const buyModal = createModal(modal, {
+    onOpen() {
+      if (!pending) return;
+      if (modalTitle) modalTitle.textContent = pending.title;
+      if (modalText) modalText.textContent = modalTextFor(pending.price, pending.owner);
+      stopLotProjection();
+      restoreBuyButton();
+      applyGuestUi();
+      // Баланс — зеркало серверного гейта: не хватает — «Да, забираю» гаснет.
+      void (async () => {
+        balance = await fetchMyBalance();
+        renderBuyButton();
+      })();
+      // Живые проекции: пауза (моя последняя покупка этого лота) + цена (N из БД).
+      const lotId = pending.slug;
+      try {
+        lotUnsub = subscribeLots(() => {
+          void refreshPauseProjection(lotId);
+          void refreshPriceProjection(lotId);
+        }, lotId);
+      } catch {
+        lotUnsub = null;
+      }
+      void refreshPauseProjection(lotId);
+      void refreshPriceProjection(lotId);
+    },
+    onClose() {
+      stopLotProjection();
+      pending = null;
+      guest = false;
+      restoreBuyButton();
+      applyGuestUi();
+    },
+  });
+
   function buyLabel(price: number | null): string {
     return `Забрать за ${formatStaged(price)} 🍺`;
   }
@@ -183,7 +220,7 @@ const clapSound = s3Sound('clap.mp3');
     owner: string;
     video: string | null;
   }): void {
-    closeModal();
+    buyModal?.close();
     boom();
     const text = `ЗАБРАЛ! Привет твой: ${entry.title} — ушло ${entry.price} Пивкойнов`;
     if (entry.video) {
@@ -356,51 +393,6 @@ const clapSound = s3Sound('clap.mp3');
     }
   }
 
-  // Цикл окна — общий модуль (Escape, клик-вне, фокус); здесь только показ
-  // содержимого и живые проекции, а на закрытии — снятие своего состояния.
-  const buyModal = createModal(modal, {
-    onOpen() {
-      if (!pending) return;
-      if (modalTitle) modalTitle.textContent = pending.title;
-      if (modalText) modalText.textContent = modalTextFor(pending.price, pending.owner);
-      stopLotProjection();
-      restoreBuyButton();
-      applyGuestUi();
-      // Баланс — зеркало серверного гейта: не хватает — «Да, забираю» гаснет.
-      void (async () => {
-        balance = await fetchMyBalance();
-        renderBuyButton();
-      })();
-      // Живые проекции: пауза (моя последняя покупка этого лота) + цена (N из БД).
-      const lotId = pending.slug;
-      try {
-        lotUnsub = subscribeLots(() => {
-          void refreshPauseProjection(lotId);
-          void refreshPriceProjection(lotId);
-        }, lotId);
-      } catch {
-        lotUnsub = null;
-      }
-      void refreshPauseProjection(lotId);
-      void refreshPriceProjection(lotId);
-    },
-    onClose() {
-      stopLotProjection();
-      pending = null;
-      guest = false;
-      restoreBuyButton();
-      applyGuestUi();
-    },
-  });
-
-  function openModal(): void {
-    buyModal?.open();
-  }
-
-  function closeModal(): void {
-    buyModal?.close();
-  }
-
   document.addEventListener('click', async (e) => {
     const target = e.target as HTMLElement | null;
     const btn = target?.closest?.('[data-buy-intent]');
@@ -409,6 +401,8 @@ const clapSound = s3Sound('clap.mp3');
     const intent = readBuyIntent(btn);
     if (!intent) return;
     pending = intent;
+    // Разметка модалки статична; без неё открывать нечего (гард прежнего цикла).
+    if (!(modal && modalText && modalTitle)) return;
     // Без сессии — не уводим принудительно: открываем ту же модалку в гостевом
     // режиме, где CTA — вход через Twitch. Лот запоминается внутри неё.
     if (isSupabaseConfigured()) {
@@ -416,12 +410,12 @@ const clapSound = s3Sound('clap.mp3');
       const { data } = (await sb?.auth.getSession()) ?? { data: { session: null } };
       if (!data.session) {
         guest = true;
-        openModal();
+        buyModal?.open(btn);
         return;
       }
     }
     guest = false;
-    openModal();
+    buyModal?.open(btn);
   });
 
   yesBtn?.addEventListener('click', async () => {
@@ -496,7 +490,7 @@ const clapSound = s3Sound('clap.mp3');
     }
     restoreBuyButton();
     if (result.kind === 'insufficient-funds') {
-      closeModal();
+      buyModal?.close();
       showSpotNotice({
         text: 'Не хватает Пивкойнов — пойжем жоско в гамбу или забери Ежедневный вход, а этот привет подождёт.',
         tone: 'bad',
