@@ -1,7 +1,7 @@
--- Одна формула роста цены (архитектурное ревью, кандидат G): BEFORE-триггер
--- покупки и вью lots_with_next_price больше не переписывают правило руками —
--- оба зовут public.next_lot_price(price, purchase_count). Вью пересоздавали
--- целиком пять раз, и каждое изменение трогало объект с той же формулой рядом.
+-- Одна формула роста цены (решение — docs/adr/0007): BEFORE-триггер покупки и
+-- вью lots_with_next_price больше не переписывают правило руками — оба зовут
+-- public.next_lot_price(price, purchase_count). Вью пересоздавали целиком пять
+-- раз, и каждое изменение трогало объект с той же формулой рядом.
 -- Потолок цены — public.lot_price_cap() (одним числом, как ставки
 -- commission_rate/royalty_rate): триггер выше него отказывает
 -- ('price cap reached'), вью им же ограничивает показ N.
@@ -105,10 +105,10 @@ end;
 $$;
 revoke execute on function public.enforce_purchase_rules() from public, anon, authenticated;
 
--- 4. Вью — проекция таблицы, формула и потолок — из функций; состав колонок
---    прежний (смена состава — только DROP + CREATE, docs/agents/supabase.md).
-drop view if exists public.lots_with_next_price;
-create view public.lots_with_next_price as
+-- 4. Вью — проекция таблицы, формула и потолок — из функций. Состав колонок не
+--    меняется, поэтому CREATE OR REPLACE (со сменой состава — только DROP+CREATE,
+--    docs/agents/supabase.md); security_invoker и гранты подтверждаем явно.
+create or replace view public.lots_with_next_price as
 select
   l.slug,
   l.title,
@@ -129,6 +129,4 @@ alter view public.lots_with_next_price set (security_invoker = true);
 
 revoke all on public.lots_with_next_price from anon, authenticated;
 grant select on public.lots_with_next_price to anon, authenticated;
--- DROP VIEW теряет грант service_role из 20260924120000_explicit_grants.sql:
--- выдаём его здесь явно, иначе новая вью останется без гранта для сервиса.
 grant select on public.lots_with_next_price to service_role;
