@@ -58,6 +58,13 @@ format:
 test:
     npm run test
 
+# Все гейты разом: типы, линт, тесты, формат (его же зовёт pre-commit)
+check:
+    npx tsc --noEmit
+    npm run lint
+    npm run test
+    npm run format:check
+
 # -------------------------------------
 # Контент лотов
 # -------------------------------------
