@@ -15,8 +15,8 @@ import type { LiveOutbid } from './live';
 export type OutbidEvent = LiveOutbid;
 
 /**
- * Строка продавца с раскрытой комиссией (ребаланс, тикет 05): сервер зачислил
- * цену минус 7% (display-mirror формулы тикета 01 из prices.ts), показываем
+ * Строка продавца с раскрытой комиссией: сервер зачислил
+ * цену минус 7% (display-mirror формулы из prices.ts), показываем
  * «получено N − комиссия», а не голую цену сделки.
  */
 export function sellerLine(ev: OutbidEvent): string {

@@ -39,7 +39,7 @@
 
 - Preview-проверка / деплой / релиз (`gh-pages`, миграции в `main`) → `docs/agents/shipping.md`.
 - Supabase-схема / RLS / миграции / отладка → `docs/agents/supabase.md`.
-- Стиль / импорты / рендер / тесты / SQL-гайд / `just` → `docs/agents/code-style.md`.
+- Стиль / импорты / рендер / комментарии / тесты / SQL-гайд / `just` → `docs/agents/code-style.md`.
 - Цвета / токены / типографика / компоненты → `design-system/alysquezone/MASTER.md`.
 - Гамба-звуки / комиссия / рост цены / награда за привет → `docs/agents/economy.md`.
 - Эмоуты / чат VOD / мемы / пасты / стата → `docs/agents/twitch-sources.md`.

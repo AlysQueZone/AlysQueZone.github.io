@@ -1,5 +1,5 @@
 /**
- * Единственный шов к Supabase Auth (тикет 09).
+ * Единственный шов к Supabase Auth.
  *
  * - Клиент создаётся один раз на страницу (singleton), сессия долгая:
  *   persistSession + autoRefreshToken + detectSessionInUrl.
@@ -159,7 +159,7 @@ export function returnUrlForLot(lotId: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Живая витрина (тикет 09).
+// Живая витрина.
 //
 // Каталог и лоты — снапшот живых данных (lib/live.ts, docs/adr/0003).
 // Здесь остались хвост перепродаж и запись покупки. Без настроенных
@@ -328,12 +328,12 @@ export async function fetchOutbidCatchup(uid: string, limit = 10): Promise<Outbi
 }
 
 // ---------------------------------------------------------------------------
-// Shared-покупка (тикет 10).
+// Shared-покупка.
 //
 // Контракт с БД (см. supabase/migrations/*_shared_lots.sql): клиент делает один
 // INSERT в purchases только с lot_id + buyer_uid. Цену (ceil +10%), identity
 // (twitch_id/login из JWT), паузу 30с per-(user,lot), кап 10 покупок/10мин
-// и гейт денег (`insufficient funds` — тикет 08) считает BEFORE-триггер —
+// и гейт денег (`insufficient funds`) считает BEFORE-триггер —
 // клиентские значения цены/identity игнорируются.
 // Успех — только после confirm сервера (ответ без error).
 // ---------------------------------------------------------------------------

@@ -5,7 +5,7 @@ import { errorText, isNoAuthError, isOfflineError } from './errors';
 /**
  * Перекуп: выполнение покупки за одним швом.
  *
- * Контракт с БД (тикет 10, см. supabase/migrations/*_shared_lots.sql): клиент
+ * Контракт с БД (см. supabase/migrations/*_shared_lots.sql): клиент
  * делает один INSERT в purchases только с lot_id + buyer_uid. Цену,
  * identity, паузу, кап и гейт денег считает BEFORE-триггер — клиентские
  * значения игнорируются, итог — всегда price_paid сервера.
@@ -75,7 +75,7 @@ function mapBuyError(err: unknown): BuyErrorInfo {
   if (low.includes('price cap')) {
     return { kind: 'price-cap', raw };
   }
-  // Деньги покупки — серверный гейт (тикет 08, BEFORE-триггер):
+  // Деньги покупки — серверный гейт (BEFORE-триггер):
   // счёта нет или баланса не хватило на серверную цену.
   if (low.includes('insufficient funds') || low.includes('insufficient_funds')) {
     return { kind: 'insufficient-funds', raw };

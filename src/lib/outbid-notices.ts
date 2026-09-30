@@ -55,7 +55,7 @@ export function makeRebuyButton(ev: OutbidEvent): HTMLButtonElement {
 export function showOutbidNotice(ev: OutbidEvent): void {
   showCornerNotice({
     header: '▶ Твой лот перекупили!',
-    // Факт уплаченной цены сервера + раскрытая комиссия продавца (тикет 05);
+    // Факт уплаченной цены сервера + раскрытая комиссия продавца;
     // живая N — на кнопке возврата.
     text: sellerLine(ev),
     action: makeRebuyButton(ev),
