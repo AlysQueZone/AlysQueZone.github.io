@@ -504,6 +504,11 @@ const clapSound = s3Sound('clap.mp3');
       renderBuyButton();
       return;
     }
+    // Сессия доехала позже (возврат из логина): пауза могла не спроецироваться.
+    if (change.kind === 'uid' && pending) {
+      void refreshPauseProjection(pending.slug);
+      return;
+    }
     if (change.kind === 'catalog' && pending && change.changed.has(pending.slug)) {
       const st = live.lot(pending.slug);
       if (!st) return;

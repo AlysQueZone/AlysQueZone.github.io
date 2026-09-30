@@ -334,9 +334,11 @@ describe('createLiveStore', () => {
       'lot-a',
       lot({ owner_uid: 'u1', owner_login: 'me', mine: true, price: 150 })
     );
-    await store.reportPurchase({ id: 'lot-a', price: 150 });
+    await store.reportPurchase({ slug: 'lot-a', price: 150 });
 
-    expect(events.some((event) => event.kind === 'purchase' && event.id === 'lot-a')).toBe(true);
+    expect(
+      events.some((event) => event.kind === 'purchase' && event.purchase.slug === 'lot-a')
+    ).toBe(true);
     expect(events.some((event) => event.kind === 'outbid')).toBe(false);
     expect(store.balance()).toBe(850);
     expect(store.lot('lot-a')?.mine).toBe(true);
@@ -397,6 +399,20 @@ describe('createLiveStore', () => {
     expect(store.balance()).toBe(2000);
   });
 
+  it('ответ каталога с чужим «мой» флагом нормализуется под текущий uid', async () => {
+    const f = fakeReaders();
+    f.state.uid = 'u1';
+    f.state.catalog.set('lot-a', lot({ owner_uid: 'u1', mine: true }));
+    const store = createLiveStore(f.readers);
+    await store.start();
+
+    // Гонка: uid сменился, пока каталог был в полёте; ответ несёт флаг старого uid.
+    store.applyUid('u2');
+    await store.refreshCatalog();
+
+    expect(store.lot('lot-a')?.mine).toBe(false);
+  });
+
   it('подписка после первого чтения сразу отдаёт текущее состояние', async () => {
     const f = fakeReaders();
     f.state.uid = 'u1';
@@ -433,7 +449,7 @@ describe('createLiveStore', () => {
     expect(kinds(events)).toContain('catalog');
   });
 
-  it('sync объявляет синк и перечитывает; dealsTick объявляет сделку', async () => {
+  it('sync объявляет синк и перечитывает; reportDeal объявляет сделку', async () => {
     const f = fakeReaders();
     const store = createLiveStore(f.readers);
     const events = collect(store);
@@ -441,7 +457,7 @@ describe('createLiveStore', () => {
     const catalogCalls = f.calls.catalog;
 
     await store.sync();
-    store.dealsTick();
+    store.reportDeal();
 
     expect(f.calls.catalog).toBe(catalogCalls + 1);
     expect(kinds(events).at(-2)).toBe('sync');

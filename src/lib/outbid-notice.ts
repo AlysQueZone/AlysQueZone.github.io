@@ -25,7 +25,7 @@
  */
 
 import { fetchOutbidCatchup } from './supabase';
-import { live } from './live';
+import { live, normalizeNextPrice } from './live';
 import { readBuyIntent, updateBuyIntentPrice } from './buy-intent';
 import { sellerLine, type OutbidEvent } from './outbid-event';
 import { playOutbidSound } from './outbid-sound';
@@ -224,8 +224,8 @@ export function initOutbidNotice(): void {
       if (!(node instanceof HTMLButtonElement)) return;
       const intent = readBuyIntent(node);
       if (!intent) return;
-      const next = live.lot(intent.slug)?.nextPrice;
-      if (typeof next !== 'number' || !Number.isFinite(next) || next <= 0) return;
+      const next = normalizeNextPrice(live.lot(intent.slug)?.nextPrice);
+      if (next === null) return;
       updateBuyIntentPrice(node, next);
       node.textContent = rebuyLabel(next);
     });
@@ -303,7 +303,7 @@ export function initOutbidNotice(): void {
       return;
     }
     if (change.kind === 'purchase') {
-      removeBoughtFromHistory(change.id);
+      removeBoughtFromHistory(change.purchase.slug);
       return;
     }
     if (change.kind === 'catalog') {

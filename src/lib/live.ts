@@ -17,14 +17,17 @@ import { getSupabase, withAuthRetry } from './supabase';
 import { createLiveRegistry, type LivePayload, type LiveTransport } from './live-core';
 import {
   createLiveStore,
+  normalizeNextPrice,
   type CatalogRead,
   type LiveChange,
   type LiveReaders,
+  type LivePurchase,
   type LotState,
   type LotStateRead,
 } from './live-store';
 
 export type { LiveChange, LiveOutbid, LotState } from './live-store';
+export { normalizeNextPrice } from './live-store';
 
 // ---------------------------------------------------------------------------
 // Читатели Supabase (этап 2): каталог + «мой» флаг за один запрос к вью
@@ -43,14 +46,13 @@ function toLotState(row: LotRow, uid: string | null): LotState | null {
   const slug = row['slug'];
   const price = Number(row['price']);
   if (typeof slug !== 'string' || !Number.isFinite(price)) return null;
-  const nextRaw = Number(row['next_price']);
   const owner_uid = str(row, 'owner_uid');
   return {
     slug,
     title: str(row, 'title') ?? slug,
     video_url: str(row, 'video_url'),
     price,
-    nextPrice: Number.isFinite(nextRaw) && nextRaw > 0 ? nextRaw : null,
+    nextPrice: normalizeNextPrice(row['next_price']),
     owner_login: str(row, 'owner_login'),
     owner_uid,
     suggested_by_login: str(row, 'suggested_by_login'),
@@ -240,7 +242,7 @@ function ensureWired(): void {
   registry.subscribe({ table: 'lots', event: '*' }, () => {
     void store.refreshCatalog();
   });
-  registry.subscribe({ table: 'purchases', event: 'INSERT' }, () => store.dealsTick());
+  registry.subscribe({ table: 'purchases', event: 'INSERT' }, () => store.reportDeal());
 
   // Триггеры перезапроса — у модуля: возврат на вкладку и фокус — один синк.
   if (typeof document !== 'undefined') {
@@ -252,7 +254,8 @@ function ensureWired(): void {
     window.addEventListener('focus', () => void store.sync());
   }
 
-  // Смена сессии — uid снапшота; данные перечитываются, «мой» флаг пересобирается.
+  // Смена сессии: uid снапшота, «мой» флаг каталога пересобирается без сети,
+  // баланс перечитывается (смена uid — не сделка, каталог не перечитываем).
   getSupabase()?.auth.onAuthStateChange((_event, session) => {
     store.applyUid(session?.user.id ?? null);
   });
@@ -302,7 +305,7 @@ export const live = {
   },
 
   /** Своя покупка (из buyLot): событие и перечитка каталога с балансом. */
-  reportPurchase(purchase: { id: string; price: number }): Promise<void> {
+  reportPurchase(purchase: LivePurchase): Promise<void> {
     ensureWired();
     return store.reportPurchase(purchase);
   },

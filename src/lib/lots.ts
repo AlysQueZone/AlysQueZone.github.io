@@ -112,7 +112,7 @@ export async function buyLot(slug: string): Promise<BuyResult> {
     const done = await buyLotShared(slug);
     const paid =
       Number.isFinite(done.price_paid) && done.price_paid > 0 ? done.price_paid : (staged ?? 0);
-    void live.reportPurchase({ id: slug, price: paid });
+    void live.reportPurchase({ slug, price: paid });
     return { status: 'ok', paid, buyer: done.buyer_login };
   } catch (err) {
     const info = mapBuyError(err);

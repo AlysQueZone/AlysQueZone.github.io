@@ -63,15 +63,30 @@ export interface LiveOutbid {
   video: string | null;
 }
 
+/** Своя покупка: какой Лот и за сколько ушёл серверу. */
+export interface LivePurchase {
+  slug: string;
+  price: number;
+}
+
 /** Изменение живых данных; поверхности читают снапшот, вид события — что обновлять. */
 export type LiveChange =
   | { kind: 'uid'; uid: string | null }
   | { kind: 'balance'; balance: number | null; fresh: boolean }
   | { kind: 'catalog'; changed: ReadonlySet<string>; fresh: boolean }
-  | { kind: 'purchase'; id: string; price: number }
+  | { kind: 'purchase'; purchase: LivePurchase }
   | { kind: 'outbid'; event: LiveOutbid }
   | { kind: 'deals' }
   | { kind: 'sync' };
+
+/**
+ * Следующая цена N из значения строки/состояния: конечное > 0, иначе null.
+ * Единственное место правила «N неизвестна» — показ честно рисует «…».
+ */
+export function normalizeNextPrice(value: unknown): number | null {
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
 
 export interface LiveStore {
   // Снапшот — синхронные чтения (что есть на текущий момент).
@@ -98,8 +113,9 @@ export interface LiveStore {
   // Значения и события от производителей (гамба/дейли, buyLot).
   reportBalance(value: number): void;
   /** Своя покупка: событие сразу, перечитка — следом (промис — вся дорожка). */
-  reportPurchase(purchase: { id: string; price: number }): Promise<void>;
-  dealsTick(): void;
+  reportPurchase(purchase: LivePurchase): Promise<void>;
+  /** Сделка случилась (тик purchases) — сигнал своим проекциям (маркиза). */
+  reportDeal(): void;
 }
 
 export function createLiveStore(readers: LiveReaders): LiveStore {
@@ -110,7 +126,8 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
    *  сразу отдаёт состояние, пришедшее до неё (авторизация между скриптами). */
   let uidKnown = false;
   let balanceValue: number | null = null;
-  let balanceAttempted = false;
+  /** Ответ по балансу уже был (для честного прочерка без мигания). */
+  let balanceTried = false;
   let catalogValue = new Map<string, LotState>();
   let catalogFresh = false;
   let catalogKnown = false;
@@ -171,29 +188,36 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
     changed: Set<string>;
   } {
     const merged = new Map<string, LotState>();
-    const changed = new Set<string>();
     for (const [slug, st] of next) {
       const old = catalogValue.get(slug);
-      if (old && sameLot(old, st)) {
-        merged.set(slug, old);
-        continue;
-      }
-      merged.set(slug, st);
-      changed.add(slug);
+      merged.set(slug, old && sameLot(old, st) ? old : st);
     }
-    for (const slug of catalogValue.keys()) {
-      if (!merged.has(slug)) changed.add(slug);
+    return { merged, changed: changedByRef(catalogValue, merged) };
+  }
+
+  /** Набор slug, чей объект состояния сменился (или появился/исчез). */
+  function changedByRef(
+    prev: ReadonlyMap<string, LotState>,
+    next: ReadonlyMap<string, LotState>
+  ): Set<string> {
+    const changed = new Set<string>();
+    for (const [slug, st] of next) {
+      if (prev.get(slug) !== st) changed.add(slug);
     }
-    return { merged, changed };
+    for (const slug of prev.keys()) {
+      if (!next.has(slug)) changed.add(slug);
+    }
+    return changed;
   }
 
   /**
-   * Применить прочитанный каталог: дифф владельца даёт событие перекупа
+   * Применить прочитанный каталог: «мой» флаг — под текущий uid (ответ мог
+   * прийти уже после смены сессии), дифф владельца даёт событие перекупа
    * (только при неизменном uid — смена сессии не сделка), свежесть — флаг.
    */
   function applyCatalog(next: ReadonlyMap<string, LotState>, ok: boolean): void {
     const prev = catalogValue;
-    const { merged, changed } = mergeCatalog(next);
+    const { merged, changed } = mergeCatalog(withMine(next, uidValue));
 
     const outbids: LiveOutbid[] = [];
     if (uidValue !== null) {
@@ -225,9 +249,9 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
   }
 
   /** Баланс пришёл (или не пришёл): null не затирает последнее хорошее. */
-  function applyBalance(value: number | null, ok: boolean): void {
-    const first = !balanceAttempted;
-    balanceAttempted = true;
+  function applyBalance(value: number | null): void {
+    const first = !balanceTried;
+    balanceTried = true;
     if (value === null) {
       // Первый ответ «пусто/отказ» — честный прочерк; дальше последнее
       // хорошее просто остаётся на экране.
@@ -236,21 +260,15 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
     }
     const changed = value !== balanceValue;
     balanceValue = value;
-    if (first || changed) emit({ kind: 'balance', balance: value, fresh: ok });
+    if (first || changed) emit({ kind: 'balance', balance: value, fresh: true });
   }
 
   /** Смена uid: пересобрать «мой» флаг, сбросить чужой баланс, объявить. */
-  function applyUidValue(next: string | null): void {
+  function setUid(next: string | null): void {
     if (next === uidValue) return;
     uidValue = next;
     const recalculated = withMine(catalogValue, next);
-    const changed = new Set<string>();
-    for (const [slug, st] of recalculated) {
-      if (catalogValue.get(slug) !== st) changed.add(slug);
-    }
-    for (const slug of catalogValue.keys()) {
-      if (!recalculated.has(slug)) changed.add(slug);
-    }
+    const changed = changedByRef(catalogValue, recalculated);
     catalogValue = recalculated;
     emit({ kind: 'uid', uid: next });
     if (changed.size > 0) emit({ kind: 'catalog', changed, fresh: catalogFresh });
@@ -258,7 +276,7 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
       balanceValue = null;
       emit({ kind: 'balance', balance: null, fresh: false });
     }
-    balanceAttempted = false;
+    balanceTried = false;
   }
 
   // -------------------------------------------------------------------------
@@ -284,7 +302,7 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
         value = null;
       }
       if (uid !== uidValue) return null; // uid сменился — значение чужое
-      applyBalance(value, value !== null);
+      applyBalance(value);
       return value;
     })();
     balanceInFlight = run;
@@ -348,14 +366,14 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
   function applyUid(next: string | null): void {
     uidKnown = true;
     const before = uidValue;
-    applyUidValue(next);
+    setUid(next);
     if (next !== before && next !== null) void readBalanceNow(next);
   }
 
   return {
     uid: () => uidValue,
     balance: () => balanceValue,
-    balanceKnown: () => balanceAttempted,
+    balanceKnown: () => balanceTried,
     catalog: () => catalogValue,
     lot: (slug) => catalogValue.get(slug) ?? null,
     catalogKnown: () => catalogKnown,
@@ -373,8 +391,9 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
         }
       };
       if (uidKnown) prime({ kind: 'uid', uid: uidValue });
-      if (balanceAttempted)
+      if (balanceTried) {
         prime({ kind: 'balance', balance: balanceValue, fresh: balanceValue !== null });
+      }
       if (catalogKnown) {
         prime({ kind: 'catalog', changed: new Set(catalogValue.keys()), fresh: catalogFresh });
       }
@@ -428,15 +447,15 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
 
     reportBalance(value) {
       if (!Number.isFinite(value) || value < 0) return;
-      applyBalance(value, true);
+      applyBalance(value);
     },
 
     reportPurchase(purchase) {
-      emit({ kind: 'purchase', id: purchase.id, price: purchase.price });
+      emit({ kind: 'purchase', purchase });
       return schedule('all');
     },
 
-    dealsTick() {
+    reportDeal() {
       emit({ kind: 'deals' });
     },
   };

@@ -9,14 +9,13 @@
  */
 
 import { sellerLine, type OutbidEvent } from './outbid-event';
-import { live } from './live';
+import { live, normalizeNextPrice } from './live';
 import { formatStaged, writeBuyIntent } from './buy-intent';
 import { showCornerNotice } from './notice';
 
 /** Живая N кнопки возврата из снапшота; неизвестна — null (честный «…»). */
 function liveNext(slug: string): number | null {
-  const next = live.lot(slug)?.nextPrice ?? null;
-  return next !== null && Number.isFinite(next) && next > 0 ? next : null;
+  return normalizeNextPrice(live.lot(slug)?.nextPrice);
 }
 
 /** Подпись кнопки возврата: живая N или честный «…» (одна на создание и live-правку). */

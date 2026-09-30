@@ -9,7 +9,7 @@
  */
 
 import { commissionFor } from './prices';
-import type { LiveOutbid } from './live-store';
+import type { LiveOutbid } from './live';
 
 /** Событие перекупа — форма из ядра живых данных (один источник). */
 export type OutbidEvent = LiveOutbid;
