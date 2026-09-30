@@ -9,8 +9,8 @@
 // При покупке играет видео лота со звуком (видимо, в уведомлении); без video_url — clap с S3.
 // Гость (нет сессии): модалка открывается в гостевом режиме — CTA «Войти через
 // Twitch», без принудительного редиректа; после входа модалка вернётся к лоту.
-// После покупки — announceBought({ id, price }) из lib/lots.ts
-// (типизированный announce/listen; слушают витрина, страница лота, колокол).
+// После покупки buyLot объявляет её модулю живых данных (lib/live.ts):
+// шапку, витрину, страницу лота и колокол обновляют его события.
 // Цикл окна (Escape / клик по затемнению / фокус) — общий lib/modal.ts:
 // показ и живые проекции — в onOpen, снятие состояния — в onClose.
 import { ALYSQUE_CLAP_DARK } from '@/lib/emotes';
@@ -75,8 +75,8 @@ const clapSound = s3Sound('clap.mp3');
   import { boom } from '@/lib/confetti';
   import { ALYSQUE_CLAP_DARK } from '@/lib/emotes';
   import { createModal } from '@/lib/modal';
-  import { fetchLotState, subscribeLots, buyLot, announceBought } from '@/lib/lots';
-  import { fetchMyBalance, onBalance } from '@/lib/balance';
+  import { buyLot } from '@/lib/lots';
+  import { live } from '@/lib/live';
   import {
     buyAvailability,
     findBuyButton,
@@ -87,14 +87,12 @@ const clapSound = s3Sound('clap.mp3');
   import { showSpotNotice } from '@/lib/notice';
   import {
     getSupabase,
-    isSupabaseConfigured,
     signInWithTwitch,
     stashPendingBuy,
     peekPendingBuy,
     clearPendingBuy,
     returnUrlForLot,
     fetchSharedHistory,
-    getSessionUid,
   } from '@/lib/supabase';
 
   const modal = document.getElementById('buy-modal');
@@ -110,8 +108,6 @@ const clapSound = s3Sound('clap.mp3');
   let pauseLeft = 0;
   /** Кап окна сработал: кнопка показывает лимит до закрытия модалки. */
   let limitHit = false;
-  /** Живая подписка на лот открытой модалки (пауза + цена, снимается при закрытии). */
-  let lotUnsub: (() => void) | null = null;
   /** Баланс — зеркало серверного гейта; `busy` — транзитное «идёт покупка». */
   let balance: number | null = null;
   let busy = false;
@@ -131,29 +127,20 @@ const clapSound = s3Sound('clap.mp3');
       if (!pending) return;
       if (modalTitle) modalTitle.textContent = pending.title;
       if (modalText) modalText.textContent = modalTextFor(pending.price, pending.owner);
-      stopLotProjection();
       restoreBuyButton();
       applyGuestUi();
-      // Баланс — зеркало серверного гейта: не хватает — «Да, забираю» гаснет.
+      // Баланс — зеркало серверного гейта: явная свежесть перед решением.
       void (async () => {
-        balance = await fetchMyBalance();
+        balance = await live.refreshBalance();
         renderBuyButton();
       })();
-      // Живые проекции: пауза (моя последняя покупка этого лота) + цена (N из БД).
+      // Живые проекции: пауза (моя последняя покупка этого лота) + цена (N
+      // из снапшота; сюда же придёт событие явной свежести).
       const lotId = pending.slug;
-      try {
-        lotUnsub = subscribeLots(() => {
-          void refreshPauseProjection(lotId);
-          void refreshPriceProjection(lotId);
-        }, lotId);
-      } catch {
-        lotUnsub = null;
-      }
+      void live.refreshLot(lotId);
       void refreshPauseProjection(lotId);
-      void refreshPriceProjection(lotId);
     },
     onClose() {
-      stopLotProjection();
       pending = null;
       guest = false;
       restoreBuyButton();
@@ -208,11 +195,11 @@ const clapSound = s3Sound('clap.mp3');
     }
   }
 
-  /** Успех: деньги списал сервер (дебет/кредит + леджер в AFTER-триггере),
-   *  шапка подтянет новый баланс из БД по realtime-подписке.
+  /** Успех: деньги списал сервер (дебет/кредит + леджер в AFTER-триггере);
+   *  покупку уже объявил buyLot модулю живых данных — шапка, витрина и
+   *  колокол обновятся его событиями.
    *  Итог — фактически уплаченная серверная цена + confetti + видео лота
-   *  в уведомлении (без video_url — clap с S3). «Мои приветы» обновит
-   *  витрина из shared по событию. */
+   *  в уведомлении (без video_url — clap с S3). */
   function celebrate(entry: {
     id: string;
     title: string;
@@ -238,7 +225,6 @@ const clapSound = s3Sound('clap.mp3');
         image: { src: ALYSQUE_CLAP_DARK, alt: 'alysqueCLAP' },
       });
     }
-    announceBought({ id: entry.id, price: entry.price });
   }
 
   /** Единая точка правды для кнопки: транзит/лимит/пауза/нехватка/цена.
@@ -331,17 +317,6 @@ const clapSound = s3Sound('clap.mp3');
     renderBuyButton();
   }
 
-  function stopLotProjection(): void {
-    if (lotUnsub) {
-      try {
-        lotUnsub();
-      } catch {
-        // отписка — best effort
-      }
-      lotUnsub = null;
-    }
-  }
-
   /**
    * Проекция паузы из shared-истории: моя последняя покупка ЭТОГО лота.
    * Чужой выкуп сюда не попадает (фильтр по buyer_uid), так что таймер не трогает.
@@ -349,9 +324,8 @@ const clapSound = s3Sound('clap.mp3');
    */
   async function refreshPauseProjection(lotId: string): Promise<void> {
     if (!pending || pending.slug !== lotId || limitHit || pauseLeft > 0) return;
-    if (!isSupabaseConfigured()) return;
     try {
-      const uid = await getSessionUid();
+      const uid = live.uid();
       if (!uid || !pending || pending.slug !== lotId) return;
       const history = await fetchSharedHistory(lotId, pending.owner);
       for (let i = history.length - 1; i >= 0; i -= 1) {
@@ -371,26 +345,14 @@ const clapSound = s3Sound('clap.mp3');
   }
 
   /**
-   * Проекция цены из живого каталога БД: лот перекупили при открытой
-   * модалке — новая N видна до нажатия, отдельного ретрая нет.
-   * Пауза/лимит владеют кнопкой — их не затираем; когда отпустят,
-   * цена подтянется (см. конец startPause).
+   * Проекция цены из снапшота живых данных: явная свежесть лота перед решением
+   * (лот перекупили при открытой модалке — новая N видна до нажатия, кнопка
+   * обновится событием каталога). Пауза/лимит владеют кнопкой — их не затираем;
+   * когда отпустят, цена подтянется (см. конец startPause).
    */
-  async function refreshPriceProjection(lotId: string): Promise<void> {
+  function refreshPriceProjection(lotId: string): void {
     if (!pending || pending.slug !== lotId || limitHit || pauseLeft > 0) return;
-    if (!isSupabaseConfigured()) return;
-    try {
-      const row = await fetchLotState(lotId, null);
-      if (!row || !pending || pending.slug !== lotId || limitHit || pauseLeft > 0) return;
-      if (row.owner_login) pending.owner = row.owner_login;
-      // N неизвестна (вью отсутствует) — намерение несёт price: null: честный
-      // «…» и никакого сравнения с балансом; итог всё равно посчитает сервер.
-      pending.price = row.nextPrice;
-      if (modalText) modalText.textContent = modalTextFor(pending.price, pending.owner);
-      renderBuyButton();
-    } catch {
-      // проекция — best effort, правда придёт с сервера
-    }
+    void live.refreshLot(lotId);
   }
 
   document.addEventListener('click', async (e) => {
@@ -405,9 +367,9 @@ const clapSound = s3Sound('clap.mp3');
     if (!(modal && modalText && modalTitle)) return;
     // Без сессии — не уводим принудительно: открываем ту же модалку в гостевом
     // режиме, где CTA — вход через Twitch. Лот запоминается внутри неё.
-    if (isSupabaseConfigured()) {
-      const sb = getSupabase();
-      const { data } = (await sb?.auth.getSession()) ?? { data: { session: null } };
+    const sb = getSupabase();
+    if (sb) {
+      const { data } = await sb.auth.getSession();
       if (!data.session) {
         guest = true;
         buyModal?.open(btn);
@@ -432,7 +394,7 @@ const clapSound = s3Sound('clap.mp3');
     // Гейт «хватит/не хватит» — серверный (тикет 08): BEFORE ответит
     // `insufficient funds`, покажем честно. Без настроенного хранилища
     // покупать нечего — честная ошибка, деньги целы.
-    if (!isSupabaseConfigured()) {
+    if (!getSupabase()) {
       showSpotNotice({
         text: 'Хранилище не настроено — покупка не записана, Пивкойны целы.',
         tone: 'bad',
@@ -448,7 +410,8 @@ const clapSound = s3Sound('clap.mp3');
     }
     // Сессия могла кончиться после открытия модалки — в логин с возвратом к Лоту.
     const sb = getSupabase();
-    const { data } = (await sb?.auth.getSession()) ?? { data: { session: null } };
+    if (!sb) return;
+    const { data } = await sb.auth.getSession();
     if (!data.session) {
       // Сессия кончилась при открытой модалке — переключаем её в гостевой
       // режим (вход по кнопке), без принудительного редиректа.
@@ -533,10 +496,25 @@ const clapSound = s3Sound('clap.mp3');
     }
   });
 
-  // Живой баланс из BaseLayout: не хватает — кнопка гаснет/оттаивает.
-  onBalance((value) => {
-    balance = value;
-    renderBuyButton();
+  // Снапшот живых данных: свежий баланс для гейта и проекции открытого лота
+  // (цена/владелец) — по событию каталога, без отдельного канала.
+  live.subscribe((change) => {
+    if (change.kind === 'balance') {
+      balance = change.balance;
+      renderBuyButton();
+      return;
+    }
+    if (change.kind === 'catalog' && pending && change.changed.has(pending.slug)) {
+      const st = live.lot(pending.slug);
+      if (!st) return;
+      if (st.owner_login) pending.owner = st.owner_login;
+      // N неизвестна (вью отсутствует) — намерение несёт price: null: честный
+      // «…» и никакого сравнения с балансом; итог всё равно посчитает сервер.
+      pending.price = st.nextPrice;
+      if (modalText) modalText.textContent = modalTextFor(pending.price, pending.owner);
+      renderBuyButton();
+      void refreshPauseProjection(pending.slug);
+    }
   });
 
   /** Ждать появления кнопки покупки Лота: витрина/страница рисуют карточку
@@ -560,7 +538,6 @@ const clapSound = s3Sound('clap.mp3');
   // Возврат из логина (тикет 09): Чатерс залогинен — переоткрыть модалку того
   // же Лота. Лот не стираем, пока кнопка не найдена, — иначе возврат теряется.
   void (async () => {
-    if (!isSupabaseConfigured()) return;
     const sb = getSupabase();
     if (!sb) return;
     const { data } = await sb.auth.getSession();

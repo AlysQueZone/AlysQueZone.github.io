@@ -192,9 +192,8 @@ assertSupabaseConfigured();
       });
     </script>
     <script>
-      import { getSupabase, getSessionUid, isSupabaseConfigured } from '@/lib/supabase';
-      import { fetchMyBalance, subscribeMyBalance } from '@/lib/balance';
-      import { subscribeLive } from '@/lib/live';
+      import { getSupabase } from '@/lib/supabase';
+      import { live } from '@/lib/live';
       import { initOutbidNotice } from '@/lib/outbid-notice';
       import { initSubmissionNotice } from '@/lib/submission-notice';
       initOutbidNotice();
@@ -281,28 +280,26 @@ assertSupabaseConfigured();
         refreshingDeals = true;
         try {
           let line = '';
-          if (isSupabaseConfigured()) {
+          const sb = getSupabase();
+          if (sb) {
             try {
-              const sb = getSupabase();
-              if (sb) {
-                const { data, error } = await sb
-                  .from('purchases')
-                  .select('price_paid,buyer_login,created_at,lots(slug,title)')
-                  .order('created_at', { ascending: false })
-                  .order('id', { ascending: false })
-                  .limit(10);
-                if (!error && Array.isArray(data)) {
-                  line = (data as unknown as Record<string, unknown>[])
-                    .flatMap((row) => {
-                      const price = Number(row['price_paid']);
-                      const by = row['buyer_login'];
-                      const lot = row['lots'] as unknown as Record<string, unknown> | null;
-                      const title = lot && typeof lot['title'] === 'string' ? lot['title'] : null;
-                      if (!Number.isFinite(price) || typeof by !== 'string' || !title) return [];
-                      return [`${by} забрал «${title}» за ${price} 🍺`];
-                    })
-                    .join(' ★ ');
-                }
+              const { data, error } = await sb
+                .from('purchases')
+                .select('price_paid,buyer_login,created_at,lots(slug,title)')
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: false })
+                .limit(10);
+              if (!error && Array.isArray(data)) {
+                line = (data as unknown as Record<string, unknown>[])
+                  .flatMap((row) => {
+                    const price = Number(row['price_paid']);
+                    const by = row['buyer_login'];
+                    const lot = row['lots'] as unknown as Record<string, unknown> | null;
+                    const title = lot && typeof lot['title'] === 'string' ? lot['title'] : null;
+                    if (!Number.isFinite(price) || typeof by !== 'string' || !title) return [];
+                    return [`${by} забрал «${title}» за ${price} 🍺`];
+                  })
+                  .join(' ★ ');
               }
             } catch {
               // лог — best effort, падаем в правила
@@ -315,14 +312,8 @@ assertSupabaseConfigured();
         }
       }
 
-      if (isSupabaseConfigured()) {
+      if (getSupabase()) {
         void refreshDealLog();
-        // Канал маркизы — через общий реестр живых подписок (lib/live.ts).
-        // Realtime недоступен — виден последний подтянутый хвост.
-        subscribeLive({ table: 'purchases', event: 'INSERT' }, () => void refreshDealLog());
-        document.addEventListener('visibilitychange', () => {
-          if (!document.hidden) void refreshDealLog();
-        });
       } else {
         // Без ключей БД нет: сразу правила, скелетон не оставляем.
         swapTrack(RULES_TEXT);
@@ -341,12 +332,10 @@ assertSupabaseConfigured();
           else applyTrackSpeed();
         });
       });
-      // Баланс в шапке (тикет 11, contract): только из БД (таблица profiles,
-      // live-подписка). Гостю чип не показываем вообще; залогиненному без
+      // Баланс в шапке (тикет 11, contract): из снапшота живых данных
+      // (src/lib/live.ts). Гостю чип не показываем вообще; залогиненному без
       // строки (счёт ещё не создан триггером / офлайн) — прочерк, деньги целы.
-      // Локальный кошелёк удалён, межвкладочного storage-синка больше нет —
-      // тик даёт Realtime.
-      let unsubscribeDb: (() => void) | null = null;
+      // Локального кошелька и window-шины нет — тик и смена сессии у модуля.
       const setChipVisible = (visible: boolean): void => {
         document.querySelectorAll('[data-wallet-chip]').forEach((el) => {
           el.classList.toggle('hidden', !visible);
@@ -359,34 +348,26 @@ assertSupabaseConfigured();
           el.removeAttribute('title');
         });
       };
-      async function renderDbOrGuest(): Promise<void> {
-        const db = await fetchMyBalance();
-        if (db !== null) {
-          paint(String(db));
-          setChipVisible(true);
-          return;
-        }
-        // Различаем гостя и залогиненного без строки: гостю чип прячем,
-        // своему — показываем прочерк (деньги целы, строка подъедет).
-        const uid = await getSessionUid();
-        if (!uid) {
+      function renderChip(): void {
+        const uid = live.uid();
+        if (uid === null) {
           setChipVisible(false);
           return;
         }
-        paint('—');
+        // Ответа по балансу ещё нет — не мигаем прочерком, ждём событие.
+        if (!live.balanceKnown()) {
+          setChipVisible(false);
+          return;
+        }
+        const balance = live.balance();
+        paint(balance === null ? '—' : String(balance));
         setChipVisible(true);
       }
-      async function resubscribe(): Promise<void> {
-        unsubscribeDb?.();
-        unsubscribeDb = null;
-        await renderDbOrGuest();
-        const uid = await getSessionUid();
-        if (!uid || !getSupabase()) return;
-        unsubscribeDb = subscribeMyBalance(uid, (balance) => paint(String(balance)));
-      }
-      void resubscribe();
-      getSupabase()?.auth.onAuthStateChange(() => {
-        void resubscribe();
+      // Снапшот живых данных — единственный источник чипа и маркизы:
+      // баланс/uid — чип, событие сделки и синк — лог.
+      live.subscribe((change) => {
+        if (change.kind === 'uid' || change.kind === 'balance') renderChip();
+        if (change.kind === 'deals' || change.kind === 'sync') void refreshDealLog();
       });
     </script>
   </body>

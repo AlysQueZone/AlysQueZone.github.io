@@ -20,7 +20,7 @@
 import { setTitleEmotes } from './emotes';
 import { fillVideo, initLotVideos, type MediaOrientation } from './lot-video';
 import { buyAvailability, formatStaged, writeBuyIntent } from './buy-intent';
-import type { LotState } from './lots';
+import type { LotState } from './live';
 
 /** Адрес страницы Лота — один на все поверхности (`?id=` — slug). */
 export function lotUrl(slug: string): string {

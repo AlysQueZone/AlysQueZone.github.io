@@ -8,8 +8,8 @@
  *   Никаких `service_role`/DSN/паролей здесь нет и не будет.
  * - Провайдер Twitch и redirect-адреса настроены человеком в дашборде,
  *   код только вызывает signInWithOAuth/signOut и слушает сессию.
- * - Живые подписки Realtime открывает только lib/live.ts (реестр каналов);
- *   здесь — транспорт, сессия, хвост перепродаж и запись покупки.
+ * - Живые данные (снапшот каталога/лота/баланса/uid, каналы Realtime) — в
+ *   lib/live.ts; здесь транспорт Supabase, запись покупки и хвосты перепродаж.
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
@@ -21,15 +21,15 @@ export const PENDING_BUY_KEY = 'alysque:pending-buy';
 
 let client: SupabaseClient | null = null;
 
-/** true, если человек вбил публичные ключи (иначе кнопки деградируют честно). */
-export function isSupabaseConfigured(): boolean {
+/** true, если человек вбил публичные ключи (внутреннее для гейта/клиента). */
+function isSupabaseConfigured(): boolean {
   return Boolean(SUPABASE_URL && PUBLISHABLE_KEY);
 }
 
 /**
  * Билд-гейт: без публичных ключей сайт заведомо нерабочий (витрина и лоты —
  * проекция БД), поэтому на сборке падаем явно. Вызывается из BaseLayout —
- * отрисовка любой страницы. В рантайме деградация мягкая (isSupabaseConfigured).
+ * отрисовка любой страницы. В рантайме деградация мягкая (getSupabase вернёт null).
  */
 export function assertSupabaseConfigured(): void {
   if (!isSupabaseConfigured()) {
@@ -161,11 +161,10 @@ export function returnUrlForLot(lotId: string): string {
 // ---------------------------------------------------------------------------
 // Живая витрина (тикет 09, shared-state).
 //
-// Каталог (названия, video_url) живёт в БД (public.lots), живой слой поверх —
-// в lib/lots.ts (fetchLotCatalog: вью lots_with_next_price одним запросом).
-// Здесь остались хвост перепродаж и запись покупки; живые подписки — в
-// lib/live.ts. Без настроенных PUBLIC_SUPABASE_* — честная деградация: функции
-// возвращают пусто; на сборке такие ключи обязательны (assertSupabaseConfigured).
+// Каталог и лоты — снапшот живых данных (lib/live.ts, docs/adr/0003).
+// Здесь остались хвост перепродаж и запись покупки. Без настроенных
+// PUBLIC_SUPABASE_* — честная деградация: функции возвращают пусто; на сборке
+// такие ключи обязательны (assertSupabaseConfigured).
 // ---------------------------------------------------------------------------
 
 /** Одна запись общего хвоста перепродаж: from — предыдущий Владелец. */
@@ -175,18 +174,6 @@ export interface SharedHistoryEntry {
   price: number;
   buyer_uid: string;
   created_at: string;
-}
-
-/** uid текущей сессии (для бейджа «ТВОЙ»); null — Чатерс не вошёл. */
-export async function getSessionUid(): Promise<string | null> {
-  const sb = getSupabase();
-  if (!sb) return null;
-  try {
-    const { data } = await sb.auth.getSession();
-    return data.session?.user.id ?? null;
-  } catch {
-    return null;
-  }
 }
 
 /**

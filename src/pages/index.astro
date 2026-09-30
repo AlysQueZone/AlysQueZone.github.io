@@ -117,15 +117,14 @@ const base = import.meta.env.BASE_URL;
 </BaseLayout>
 
 <script>
-  // Случайные приветы — из живого каталога БД, выбор в браузере (не на билде).
-  // Карточки — каноничный LotCard (шаблон в разметке): слоты Лота и раскладку
-  // кадра заполняет lib/lot-view.ts, как на витрине; цена и покупка — в кнопке,
-  // модалка покупки на странице (BuyModal). Свой ручной miniCard удалён —
-  // одно представление Лота на всех поверхностях (docs/adr/0009).
-  import { getSessionUid, isSupabaseConfigured } from '@/lib/supabase';
-  import { fetchLotCatalogResult, onBought, type LotState } from '@/lib/lots';
+  // Случайные приветы — из живого каталога БД (снапшот lib/live.ts), выбор
+  // в браузере (не на билде). Карточки — каноничный LotCard (шаблон в разметке):
+  // слоты Лота и раскладку кадра заполняет lib/lot-view.ts, как на витрине;
+  // цена и покупка — в кнопке, модалка покупки на странице (BuyModal). Одно
+  // представление Лота на всех поверхностях (docs/adr/0009); тик, фокус и
+  // своя покупка — триггеры модуля живых данных.
+  import { live, type LotState } from '@/lib/live';
   import { fillLot } from '@/lib/lot-view';
-  import { fetchMyBalance, onBalance } from '@/lib/balance';
 
   const slot = document.querySelector('[data-random-lots]');
   const tpl = document.querySelector('[data-lot-card-template]');
@@ -135,9 +134,10 @@ const base = import.meta.env.BASE_URL;
 
   /** Баланс — зеркало гейта: не хватает — кнопки карточек гаснут. */
   let myBalance: number | null = null;
-  /** Показанные карточки и их состояния — для перекраски без нового выбора. */
+  /** Показанные карточки — для перекраски без нового выбора. */
   let rendered = new Map<string, HTMLElement>();
-  let lastStates = new Map<string, LotState>();
+  /** Первый непустой каталог уже нарисован: дальше не пересобираем выбор. */
+  let painted = false;
 
   function setNote(text: string | null): void {
     if (!(note instanceof HTMLElement)) return;
@@ -155,16 +155,22 @@ const base = import.meta.env.BASE_URL;
     slot?.querySelectorAll('[data-lot-skeleton]').forEach((el) => el.remove());
   }
 
-  /** Перекрасить уже показанные карточки из последнего снапшота. */
+  /** Перекрасить уже показанные карточки из снапшота; исчезнувшие — убрать. */
   function refill(): void {
-    for (const [slug, card] of rendered) {
-      const st = lastStates.get(slug);
-      if (st) fillLot(card, st, { balance: myBalance });
+    const states = live.catalog();
+    for (const [slug, card] of [...rendered]) {
+      const st = states.get(slug);
+      if (!st) {
+        card.remove();
+        rendered.delete(slug);
+        continue;
+      }
+      fillLot(card, st, { balance: myBalance });
     }
   }
 
   /** Выбрать случайные лоты и нарисовать их карточками LotCard. */
-  function paintCards(states: Map<string, LotState>): void {
+  function paintCards(states: ReadonlyMap<string, LotState>): void {
     if (!(slot instanceof HTMLElement) || !(tpl instanceof HTMLTemplateElement)) return;
     const pool = [...states.values()];
     for (let i = pool.length - 1; i > 0; i--) {
@@ -184,47 +190,35 @@ const base = import.meta.env.BASE_URL;
     slot.replaceChildren(...cards);
   }
 
-  async function renderRandom(): Promise<void> {
+  /** Отрисовка из снапшота: первый непустой каталог — выбор, дальше перекраска. */
+  function render(): void {
     if (!(slot instanceof HTMLElement)) return;
-    const uid = await getSessionUid();
-    myBalance = await fetchMyBalance();
-    const { ok, states } = await fetchLotCatalogResult(uid);
-    lastStates = states;
+    // Ответа БД ещё не было — скелетоны честнее «пусто/не загрузилось».
+    if (!live.catalogKnown()) return;
+    const states = live.catalog();
+    myBalance = live.balance();
+    if (!painted && states.size > 0) {
+      paintCards(states);
+      painted = true;
+    } else if (painted) {
+      refill();
+    }
     clearSkeletons();
-    paintCards(states);
     const msg =
       rendered.size > 0
         ? null
-        : ok
+        : live.catalogOk()
           ? 'Пока пусто — зайди на биржу'
           : 'Приветы не загрузились — проверь связь';
     setNote(msg);
     setStatus(msg ?? '');
   }
 
-  /** После своей покупки — свежий снапшот и перекраска тех же карточек.
-   *  Неудачное перечитывание не затирает последнее хорошее (как витрина). */
-  async function refreshCards(): Promise<void> {
-    if (!isSupabaseConfigured()) return;
-    const uid = await getSessionUid();
-    myBalance = await fetchMyBalance();
-    const { ok, states } = await fetchLotCatalogResult(uid);
-    if (!ok) return;
-    lastStates = states;
-    refill();
-  }
-
-  if (isSupabaseConfigured()) {
-    void renderRandom();
-    onBought(() => void refreshCards());
-    onBalance((value) => {
-      myBalance = value;
+  live.subscribe((change) => {
+    if (change.kind === 'catalog') render();
+    if (change.kind === 'balance') {
+      myBalance = change.balance;
       refill();
-    });
-  } else {
-    const msg = 'Приветы не загрузились — проверь связь';
-    clearSkeletons();
-    setNote(msg);
-    setStatus(msg);
-  }
+    }
+  });
 </script>

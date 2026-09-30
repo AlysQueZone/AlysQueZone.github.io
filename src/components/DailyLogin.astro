@@ -15,7 +15,8 @@
 <div id="daily-notice-root" aria-live="polite"></div>
 
 <script>
-  import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
+  import { getSupabase } from '@/lib/supabase';
+  import { live } from '@/lib/live';
   import {
     claimDaily,
     dayNumForStreak,
@@ -25,7 +26,6 @@
     todayUtcDate,
   } from '@/lib/daily';
   import { boom } from '@/lib/confetti';
-  import { paintBalance } from '@/lib/balance';
   import { createModal, type ModalHandle } from '@/lib/modal';
   import { errorText } from '@/lib/errors';
 
@@ -95,12 +95,11 @@
   /** Автоклейм: один раз в день при первом заходе залогиненного. */
   async function maybeAutoClaim(): Promise<void> {
     if (busy || typeof window === 'undefined') return;
-    if (!isSupabaseConfigured()) return;
+    const sb = getSupabase();
+    if (!sb) return;
     if (typeof navigator !== 'undefined' && !navigator.onLine) return;
     // Быстрая локальная сверка: сегодня уже отработали — вызовов в сеть нет.
     if (readAutoDailyDay() === todayUtcDate()) return;
-    const sb = getSupabase();
-    if (!sb) return;
     const { data } = await sb.auth.getSession();
     if (!data.session) return; // гость — ничего не получает и не видит
     busy = true;
@@ -114,7 +113,8 @@
       }
       const done = await claimDaily();
       markAutoDailyDay();
-      if (done.balance !== null) paintBalance(done.balance);
+      // Баланс из ответа сервера — в снапшот живых данных: шапка обновится событием.
+      if (done.balance !== null) live.reportBalance(done.balance);
       // Окно — только о факте новой выдачи; повторный (already)
       // ответ сервера молча гасим, чтобы не спамить дублями.
       if (!done.already) {

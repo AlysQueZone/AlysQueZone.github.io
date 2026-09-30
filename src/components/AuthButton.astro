@@ -27,13 +27,7 @@
 </div>
 
 <script>
-  import {
-    getSupabase,
-    isSupabaseConfigured,
-    displayLogin,
-    signInWithTwitch,
-    signOut,
-  } from '@/lib/supabase';
+  import { getSupabase, displayLogin, signInWithTwitch, signOut } from '@/lib/supabase';
 
   const root = document.querySelector('[data-auth]');
   const loginBtn = root?.querySelector('[data-auth-login]');
@@ -64,7 +58,7 @@
   }
 
   loginBtn?.addEventListener('click', async () => {
-    if (!isSupabaseConfigured()) {
+    if (!getSupabase()) {
       showHint('СТРИМ ВКЛЮЧИЛСЯ, А ТЫ? Вход пока спит — человек ещё не вбил ключи.');
       return;
     }
@@ -76,11 +70,12 @@
     render(null);
   });
 
-  if (!isSupabaseConfigured()) {
+  const sb = getSupabase();
+  if (!sb) {
     loginBtn?.setAttribute('title', 'Вход спит: не вбиты PUBLIC_SUPABASE_* (см. .env.example)');
   } else {
     void refresh();
-    getSupabase()?.auth.onAuthStateChange((_event, session) => {
+    sb.auth.onAuthStateChange((_event, session) => {
       render(session ? displayLogin(session.user) : null);
     });
   }

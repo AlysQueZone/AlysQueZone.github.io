@@ -60,16 +60,14 @@ import BrandHeadline from '@/components/BrandHeadline.astro';
 </BaseLayout>
 
 <script>
-  // Живая витрина: каталог + цены + «мой» флаг — из lib/lots.ts (fetchLotCatalog).
-  // Набор карточек строится/сносится по каталогу (INSERT/DELETE в lots), слоты
-  // карточки и раскладку кадра заполняет lib/lot-view.ts (fillLot); перерисовка
-  // от Realtime. «Мои приветы» — только из БД: лоты, где mine (owner_uid == uid
-  // сессии). Локальный инвентарь не читаем. Без PUBLIC_SUPABASE_* — честная
-  // деградация.
-  import { getSupabase, isSupabaseConfigured, getSessionUid } from '@/lib/supabase';
-  import { fetchLotCatalogResult, subscribeLots, onBought, type LotState } from '@/lib/lots';
+  // Живая витрина: каталог + цены + «мой» флаг — снапшот живых данных
+  // (lib/live.ts). Набор карточек строится/сносится по событиям каталога
+  // (INSERT/DELETE в lots), слоты карточки и раскладку кадра заполняет
+  // lib/lot-view.ts (fillLot). «Мои приветы» — только из БД: лоты, где mine
+  // (owner_uid == uid сессии). Локальный инвентарь не читаем; тик, фокус и
+  // смена сессии — триггеры модуля, поверхность только рисует снапшот.
+  import { live, type LotState } from '@/lib/live';
   import { fillLot, lotUrl } from '@/lib/lot-view';
-  import { fetchMyBalance, onBalance } from '@/lib/balance';
 
   const GUEST_TEXT = 'Войди через Twitch — тут будут твои приветы';
   const EMPTY_TEXT = 'Пока пусто — забери первый привет ниже';
@@ -77,7 +75,6 @@ import BrandHeadline from '@/components/BrandHeadline.astro';
   const FAIL_TEXT = 'Лоты не загрузились. Проверь связь и обнови страницу';
   /** Баланс — зеркало гейта: не хватает — кнопки гаснут. */
   let myBalance: number | null = null;
-  let lastStates: Map<string, LotState> = new Map();
 
   function showMyNote(text: string, count: number): void {
     const slot = document.querySelector('[data-my-privety]');
@@ -109,7 +106,7 @@ import BrandHeadline from '@/components/BrandHeadline.astro';
     document.querySelectorAll('[data-lot-skeleton]').forEach((el) => el.remove());
   }
 
-  function renderMyGreetings(states: Map<string, LotState>, uid: string | null): void {
+  function renderMyGreetings(states: ReadonlyMap<string, LotState>, uid: string | null): void {
     const slot = document.querySelector('[data-my-privety]');
     const counter = document.querySelector('[data-my-privety-count]');
     if (!slot) return;
@@ -152,7 +149,7 @@ import BrandHeadline from '@/components/BrandHeadline.astro';
   // slug → узел карточки: reconcile набора (создать/снести/обновить).
   const rendered = new Map<string, HTMLElement>();
 
-  function reconcile(states: Map<string, LotState>): void {
+  function reconcile(states: ReadonlyMap<string, LotState>): void {
     const grid = document.querySelector('[data-lot-grid]');
     const tpl = document.querySelector('[data-lot-card-template]');
     if (!(grid instanceof HTMLElement) || !(tpl instanceof HTMLTemplateElement)) return;
@@ -183,7 +180,11 @@ import BrandHeadline from '@/components/BrandHeadline.astro';
   // Витрина — от дешёвых к дорогим (новичок первым делом видит доступные лоты).
   // Новую карточку ставим по цене, уже нарисованные не двигаем: живой ресорт
   // не делаем, чтобы карточка не уезжала из-под курсора.
-  function insertSorted(grid: HTMLElement, card: HTMLElement, states: Map<string, LotState>): void {
+  function insertSorted(
+    grid: HTMLElement,
+    card: HTMLElement,
+    states: ReadonlyMap<string, LotState>
+  ): void {
     const price = states.get(card.dataset.lotCard ?? '')?.price ?? 0;
     const before = [...grid.querySelectorAll<HTMLElement>('[data-lot-card]')].find(
       (node) => node !== card && (states.get(node.dataset.lotCard ?? '')?.price ?? 0) > price
@@ -191,51 +192,38 @@ import BrandHeadline from '@/components/BrandHeadline.astro';
     grid.insertBefore(card, before ?? null);
   }
 
-  let refreshing = false;
-  async function refresh(): Promise<void> {
-    if (refreshing) return;
-    refreshing = true;
-    try {
-      const uid = await getSessionUid();
-      myBalance = await fetchMyBalance();
-      const { ok, states } = await fetchLotCatalogResult(uid);
-      lastStates = states;
-      reconcile(states);
-      const gridMsg = !ok ? FAIL_TEXT : states.size === 0 ? GRID_EMPTY_TEXT : null;
-      setGridNote(gridMsg);
-      setStatus(gridMsg ?? '');
-      clearSkeletons();
-      renderMyGreetings(states, uid);
-    } finally {
-      refreshing = false;
+  /** Полная перерисовка из снапшота: карточки, «мои приветы» и заметки. */
+  function render(): void {
+    // Ответа БД ещё не было — скелетоны честнее «пусто» и «не загрузилось».
+    if (!live.catalogKnown()) return;
+    const states = live.catalog();
+    const uid = live.uid();
+    myBalance = live.balance();
+    reconcile(states);
+    const empty = states.size === 0;
+    // Пусто ≠ не загрузилось: заметка честная, последнее хорошее не трём.
+    const gridMsg = !live.catalogOk() && empty ? FAIL_TEXT : empty ? GRID_EMPTY_TEXT : null;
+    setGridNote(gridMsg);
+    setStatus(gridMsg ?? '');
+    clearSkeletons();
+    renderMyGreetings(states, uid);
+  }
+
+  /** Баланс пришёл — перекрасить кнопки, не перезапрашивая каталог. */
+  function repaintCards(): void {
+    const states = live.catalog();
+    for (const [slug, el] of rendered) {
+      const st = states.get(slug);
+      if (st) fillCard(el, st);
     }
   }
 
-  if (isSupabaseConfigured()) {
-    void refresh();
-    subscribeLots(() => void refresh());
-    // Свежесть при возврате на вкладку (Realtime мог пропустить): перезапрос.
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) void refresh();
-    });
-    window.addEventListener('focus', () => void refresh());
-    // Своя покупка — перезапрос каталога (локальные данные события не используем).
-    onBought(() => void refresh());
-    // Вход/выход меняет только бейдж «ТВОЙ» и секцию «Мои приветы».
-    getSupabase()?.auth.onAuthStateChange(() => void refresh());
-  } else {
-    setGridNote(FAIL_TEXT);
-    setStatus(FAIL_TEXT);
-    clearSkeletons();
-    showMyNote(GUEST_TEXT, 0);
-  }
-
-  // Баланс пришёл из BaseLayout — перекрасить кнопки, не перезапрашивая каталог.
-  onBalance((value) => {
-    myBalance = value;
-    for (const [slug, el] of rendered) {
-      const st = lastStates.get(slug);
-      if (st) fillCard(el, st);
+  // Снапшот живых данных — единственный источник: каталог, uid и баланс.
+  live.subscribe((change) => {
+    if (change.kind === 'catalog' || change.kind === 'uid') render();
+    if (change.kind === 'balance') {
+      myBalance = change.balance;
+      repaintCards();
     }
   });
 </script>

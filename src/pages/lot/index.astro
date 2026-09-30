@@ -80,19 +80,12 @@ const base = import.meta.env.BASE_URL;
 </BaseLayout>
 
 <script>
-  // Страница лота: slug — из query (`?id=`), состояние и хвост перепродаж —
-  // из БД через lib/lots.ts и lib/supabase.ts. Перерисовка — от Realtime,
-  // фокуса/возврата на вкладку и своей покупки. Без PUBLIC_SUPABASE_* — «нет лота».
-  import {
-    getSupabase,
-    isSupabaseConfigured,
-    getSessionUid,
-    fetchSharedHistory,
-    type SharedHistoryEntry,
-  } from '@/lib/supabase';
-  import { fetchLotStateResult, subscribeLots, onBought, type LotState } from '@/lib/lots';
+  // Страница лота: slug — из query (`?id=`), состояние — снапшот живых данных
+  // (lib/live.ts), хвост перепродаж — из БД (lib/supabase.ts). Перерисовка —
+  // от событий снапшота: тик, фокус/возврат и смена сессии — его триггеры.
+  import { fetchSharedHistory, type SharedHistoryEntry } from '@/lib/supabase';
+  import { live, type LotState } from '@/lib/live';
   import { fillLot } from '@/lib/lot-view';
-  import { fetchMyBalance, onBalance } from '@/lib/balance';
 
   const slug = (new URLSearchParams(window.location.search).get('id') ?? '').trim();
 
@@ -106,9 +99,9 @@ const base = import.meta.env.BASE_URL;
   const statusEl = document.querySelector('[data-lot-status]');
   const list = document.querySelector('[data-history-list]');
   const emptyNote = document.querySelector('[data-history-empty]');
-  /** Баланс — зеркало гейта; `lastState` — для перекраски кнопки по балансу. */
-  let myBalance: number | null = null;
+  /** `lastState` — для перекраски по балансу; `lastEntries` — перерисовка по uid. */
   let lastState: LotState | null = null;
+  let lastEntries: SharedHistoryEntry[] = [];
 
   function toggle(el: Element | null, show: boolean): void {
     if (el instanceof HTMLElement) el.classList.toggle('hidden', !show);
@@ -151,7 +144,7 @@ const base = import.meta.env.BASE_URL;
     // кнопка) — общий lib/lot-view.ts; раскладку кадра страницы лота
     // (широкое — во всю ширину, портрет/квадрат — «телефонная») читает
     // global.css по data-media-orientation.
-    fillLot(view, st, { balance: myBalance });
+    fillLot(view, st, { balance: live.balance() });
     // Автор привета — только в подробностях лота, в списках подписи нет.
     if (suggestedEl instanceof HTMLElement) {
       suggestedEl.classList.toggle('hidden', !st.suggested_by_login);
@@ -180,52 +173,43 @@ const base = import.meta.env.BASE_URL;
   }
 
   let refreshing = false;
+  /** Полная перерисовка деталей из снапшота + хвост перепродаж из БД. */
   async function refreshDetail(): Promise<void> {
-    if (refreshing || !isSupabaseConfigured()) return;
+    if (refreshing) return;
     refreshing = true;
     try {
-      const uid = await getSessionUid();
-      myBalance = await fetchMyBalance();
       if (slug.length === 0) {
         showMissing();
         return;
       }
-      const { ok, state } = await fetchLotStateResult(slug, uid);
-      if (!ok) {
+      const st = live.lot(slug);
+      // Ответа БД ещё не было — не гадаем: держим скелетон.
+      if (!st && !live.catalogKnown()) return;
+      // Снапшот без ответа БД — не выдаём за «лота нет».
+      if (!st && !live.catalogOk()) {
         showError();
         return;
       }
-      if (!state) {
+      if (!st) {
         showMissing();
         return;
       }
-      fillDetail(state);
-      const tail = await fetchSharedHistory(slug, state.owner_login);
-      renderSharedHistory(tail, uid);
+      fillDetail(st);
+      lastEntries = await fetchSharedHistory(slug, st.owner_login);
+      renderSharedHistory(lastEntries, live.uid());
     } finally {
       refreshing = false;
     }
   }
 
-  if (isSupabaseConfigured()) {
-    void refreshDetail();
-    subscribeLots(() => void refreshDetail(), slug);
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) void refreshDetail();
-    });
-    window.addEventListener('focus', () => void refreshDetail());
-    // Своя покупка этого лота — перезапрос (локальные данные события не используем).
-    onBought((detail) => {
-      if (detail.id === slug) void refreshDetail();
-    });
-    getSupabase()?.auth.onAuthStateChange(() => void refreshDetail());
-  } else {
-    showError();
-  }
-
-  // Баланс пришёл из BaseLayout — перекрасить кнопку покупки.
-  onBalance((value) => {
-    myBalance = value;
-    if (lastState) fillLot(view, lastState, { balance: myBalance });
+  // Снапшот живых данных — единственный источник: лот, uid и баланс.
+  live.subscribe((change) => {
+    if (change.kind === 'catalog' && (change.changed.has(slug) || lastState === null)) {
+      void refreshDetail();
+    }
+    if (change.kind === 'uid') renderSharedHistory(lastEntries, change.uid);
+    if (change.kind === 'balance' && lastState) {
+      fillLot(view, lastState, { balance: change.balance });
+    }
   });
 </script>

@@ -130,12 +130,7 @@ const FIELD_CLASS =
 </div>
 
 <script>
-  import {
-    getSupabase,
-    isSupabaseConfigured,
-    displayLogin,
-    signInWithTwitch,
-  } from '@/lib/supabase';
+  import { getSupabase, displayLogin, signInWithTwitch } from '@/lib/supabase';
   import {
     submitSubmission,
     submissionErrorText,
@@ -307,7 +302,7 @@ const FIELD_CLASS =
   toggle?.addEventListener('click', () => openPanel(!panelOpen));
 
   loginBtn?.addEventListener('click', () => {
-    if (!isSupabaseConfigured()) {
+    if (!getSupabase()) {
       setNotice('error', 'Вход пока спит — человек ещё не вбил ключи (см. .env.example).');
       return;
     }
@@ -321,12 +316,12 @@ const FIELD_CLASS =
 
   resetBtn?.addEventListener('click', () => showForm());
 
-  if (isSupabaseConfigured()) {
-    const sb = getSupabase();
-    void sb?.auth.getSession().then(({ data }) => {
+  const sb = getSupabase();
+  if (sb) {
+    void sb.auth.getSession().then(({ data }) => {
       setAuth(data.session ? displayLogin(data.session.user) : null);
     });
-    sb?.auth.onAuthStateChange((_event, session) => {
+    sb.auth.onAuthStateChange((_event, session) => {
       setAuth(session ? displayLogin(session.user) : null);
     });
   } else {

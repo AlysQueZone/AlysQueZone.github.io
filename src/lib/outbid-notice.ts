@@ -1,8 +1,8 @@
 /**
  * Уведомление «твой лот перекупили» (polish-01/09, решение 06 + правки 2026-09-07).
  *
- * - триггер — Realtime-смена Владельца лота, где я был прошлым Владельцем
- *   («мои» = текущий Владелец, owner_uid == uid сессии);
+ * - событие считает модуль живых данных (src/lib/live.ts): перекуп — дифф
+ *   владельца каталога, где я был прошлым Владельцем (owner_uid == uid);
  * - текст раскрывает комиссию биржи (ребаланс, тикет 05): «получено N
  *   (комиссия M)» — сервер зачислил цену минус 7%;
  * - уведомление справа-снизу + звук с S3
@@ -20,13 +20,12 @@
  *   Метка просмотра — в localStorage per-uid: открытая панель гасит бейдж
  *   и переживает перезагрузку (непрочитанное между девайсами не синкается).
  *
- * Свой Realtime-канал на таблицу лотов (плюс общий тик через subscribeLots
- * из lib/lots.ts для живых цен кнопок возврата).
+ * Каналы, снапшот владельцев и живые N — в lib/live.ts: колокол подписан на
+ * его события и читает цены из снапшота (этап 3, docs/adr/0003).
  */
 
-import { getSessionUid, getSupabase, fetchOutbidCatchup } from './supabase';
-import { fetchLotCatalog, subscribeLots, onBought } from './lots';
-import { subscribeLive } from './live';
+import { fetchOutbidCatchup } from './supabase';
+import { live } from './live';
 import { readBuyIntent, updateBuyIntentPrice } from './buy-intent';
 import { sellerLine, type OutbidEvent } from './outbid-event';
 import { playOutbidSound } from './outbid-sound';
@@ -38,12 +37,6 @@ const BELL_ID = 'outbid-bell';
 const BELL_COUNT_ID = 'outbid-bell-count';
 const BELL_PANEL_ID = 'outbid-bell-panel';
 
-/** Живая N из каталога БД (src/lib/lots.ts): slug → следующая цена.
- *  Формулы в клиенте нет — карту наполняет refreshPrices() по подписке. */
-const liveNext = new Map<string, number>();
-/** Названия лотов из того же каталога — событие резолвится без чтения DOM. */
-const liveTitles = new Map<string, string>();
-
 /** Один раз за страницу. Повторный вызов — noop. */
 export function initOutbidNotice(): void {
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
@@ -52,18 +45,17 @@ export function initOutbidNotice(): void {
 
   let interacted = false;
   let uid: string | null = null;
-  const mine = new Set<string>();
   const history: OutbidEvent[] = [];
   const missed: OutbidEvent[] = [];
   let unread = 0;
 
-  /** Прочитанное — в localStorage per-uid: переживает перезагрузку.
-   *  Без сервера это лучший вариант для варианта А (без таблицы);
-   *  между девайсами непрочитанное не синкается — осознанный лимит. */
   function seenStorageKey(): string | null {
     return uid === null ? null : `alysque:outbid-seen:${uid}`;
   }
 
+  /** Прочитанное — в localStorage per-uid: переживает перезагрузку.
+   *  Без сервера это лучший вариант для варианта А (без таблицы);
+   *  между девайсами непрочитанное не синкается — осознанный лимит. */
   function loadSeenAt(): number {
     try {
       const key = seenStorageKey();
@@ -131,7 +123,7 @@ export function initOutbidNotice(): void {
       item.style.fontWeight = '700';
       const line = document.createElement('div');
       line.textContent = sellerLine(ev);
-      item.append(line, makeRebuyButton(ev, liveNext));
+      item.append(line, makeRebuyButton(ev));
       bellPanel.appendChild(item);
     }
   }
@@ -226,37 +218,17 @@ export function initOutbidNotice(): void {
     ensureBell();
   }
 
-  /** Живые кнопки возврата: текст и staged-цена из прайс-фида БД. */
+  /** Живые кнопки возврата: текст и staged-цена из снапшота каталога. */
   function refreshRebuyButtons(): void {
     document.querySelectorAll('button[data-rebuy-live]').forEach((node) => {
       if (!(node instanceof HTMLButtonElement)) return;
       const intent = readBuyIntent(node);
       if (!intent) return;
-      const next = liveNext.get(intent.slug);
-      if (next === undefined) return;
+      const next = live.lot(intent.slug)?.nextPrice;
+      if (typeof next !== 'number' || !Number.isFinite(next) || next <= 0) return;
       updateBuyIntentPrice(node, next);
       node.textContent = rebuyLabel(next);
     });
-  }
-
-  /** Перечитать каталог из БД и освежить живые кнопки (+ открытую панель колокола). */
-  async function refreshPrices(): Promise<void> {
-    try {
-      const catalog = await fetchLotCatalog(null);
-      liveNext.clear();
-      liveTitles.clear();
-      for (const [slug, st] of catalog) {
-        // null (вью отсутствует) — в карту не кладём: показ даст «…», не враньё на шаг.
-        if (typeof st.nextPrice === 'number' && Number.isFinite(st.nextPrice) && st.nextPrice > 0) {
-          liveNext.set(slug, st.nextPrice);
-        }
-        liveTitles.set(slug, st.title);
-      }
-      refreshRebuyButtons();
-      if (bellPanel && bellPanel.style.display !== 'none') renderPanel();
-    } catch {
-      // прайс — best effort, факт цены в уведомлении уже показан
-    }
   }
 
   function pushHistory(ev: OutbidEvent): void {
@@ -307,127 +279,55 @@ export function initOutbidNotice(): void {
       missed.push(ev);
       return;
     }
-    showOutbidNotice(ev, liveNext);
+    showOutbidNotice(ev);
   }
 
+  /** Показ накопленного, пока вкладка спала (свежие, до лимита). */
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) {
-      // показать накопленное, пока вкладка спала (свежие, до лимита)
-      const fresh = missed.splice(0).slice(-MAX_NOTICES);
-      for (const ev of fresh) showOutbidNotice(ev, liveNext);
-      void refreshMine();
-      void refreshPrices();
-      void catchUpOffline();
-    }
-  });
-  window.addEventListener('focus', () => {
-    void refreshMine().then(() => {
-      void catchUpOffline();
-    });
-    void refreshPrices();
+    if (document.hidden) return;
+    const fresh = missed.splice(0).slice(-MAX_NOTICES);
+    for (const ev of fresh) showOutbidNotice(ev);
   });
 
-  async function refreshMine(): Promise<void> {
-    try {
-      const nextUid = await getSessionUid();
-      uid = nextUid;
-      mine.clear();
-      if (uid !== null) {
-        const catalog = await fetchLotCatalog(uid);
-        for (const [slug, st] of catalog) {
-          if (st.mine) mine.add(slug);
-        }
-      }
-    } catch {
-      // слепок не собрался — канал всё равно заведём, триггер по old/new
+  // Снапшот живых данных — единственный источник событий колокола:
+  // смена uid, перекуп, своя покупка, тик каталога и синк (догон).
+  live.subscribe((change) => {
+    if (change.kind === 'uid') {
+      uid = change.uid;
+      syncBellVisibility();
+      void catchUpOffline();
+      return;
     }
-  }
-
-  interface LotRow {
-    slug?: unknown;
-    price?: unknown;
-    owner_login?: unknown;
-    owner_uid?: unknown;
-    video_url?: unknown;
-  }
-
-  function handleRow(next: LotRow, prev: LotRow | null): void {
-    if (uid === null) return;
-    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
-    if (typeof next.slug !== 'string') return;
-    const prevOwner = prev && typeof prev.owner_uid === 'string' ? prev.owner_uid : null;
-    const wasMine = prevOwner !== null ? prevOwner === uid : mine.has(next.slug);
-    const nextOwner = typeof next.owner_uid === 'string' ? next.owner_uid : null;
-    if (wasMine && nextOwner !== null && nextOwner !== uid) {
-      mine.delete(next.slug);
-      const price = Number(next.price);
-      if (!Number.isFinite(price)) return;
-      const by =
-        typeof next.owner_login === 'string' && next.owner_login.length > 0
-          ? next.owner_login
-          : 'Чатерс';
-      const video =
-        typeof next.video_url === 'string' && next.video_url.length > 0 ? next.video_url : null;
-      onOutbid({
-        slug: next.slug,
-        title: liveTitles.get(next.slug) ?? next.slug,
-        by,
-        price,
-        at: Date.now(),
-        video,
-      });
-    } else if (nextOwner === uid) {
-      mine.add(next.slug);
-    } else if (nextOwner !== null && nextOwner !== uid) {
-      mine.delete(next.slug);
+    if (change.kind === 'outbid') {
+      onOutbid(change.event);
+      return;
     }
-  }
-
-  let subscribed = false;
-
-  /** Канал колокола — через общий реестр живых подписок (lib/live.ts). */
-  function ensureSubscribed(): void {
-    if (subscribed || uid === null) return;
-    // Отписку не держим: колокол живёт до перезагрузки страницы (этап 3
-    // перестроит события). Нужна лишь проверка, что канал открылся.
-    const unsubscribe = subscribeLive({ table: 'lots', event: 'UPDATE' }, (payload) => {
-      handleRow(payload.new ?? {}, payload.old ?? null);
-    });
-    // Realtime недоступен — тихий noop, попробуем снова при смене сессии
-    if (!unsubscribe) return;
-    subscribed = true;
-  }
-
-  void (async () => {
-    await refreshMine();
-    syncBellVisibility();
-    ensureSubscribed();
-    // Живая N кнопок возврата: перечитываем каталог по каждому тику лотов.
-    void refreshPrices();
-    void catchUpOffline();
-    subscribeLots(() => {
-      void refreshPrices();
-    });
-    getSupabase()?.auth.onAuthStateChange(() => {
-      void refreshMine().then(() => {
-        syncBellVisibility();
-        ensureSubscribed();
-        void catchUpOffline();
-      });
-    });
-    // Купил обратно — записи про этот лот не актуальны: убрать из истории
-    // и закрыть висящие окошки.
-    onBought((detail) => {
-      const id = detail.id;
-      if (id.length === 0) return;
-      const before = history.length;
-      for (let i = history.length - 1; i >= 0; i--) {
-        if (history[i].slug === id) history.splice(i, 1);
-      }
-      unread = Math.max(0, unread - (before - history.length));
-      renderBell();
+    if (change.kind === 'purchase') {
+      removeBoughtFromHistory(change.id);
+      return;
+    }
+    if (change.kind === 'catalog') {
+      if (change.changed.size === 0) return;
+      refreshRebuyButtons();
       if (bellPanel && bellPanel.style.display !== 'none') renderPanel();
-      closeNotices(id);
-    });
-  })();
+      return;
+    }
+    if (change.kind === 'sync') {
+      void catchUpOffline();
+    }
+  });
+
+  /** Купил обратно — записи про этот лот не актуальны: убрать из истории
+   *  и закрыть висящие окошки. */
+  function removeBoughtFromHistory(id: string): void {
+    if (id.length === 0) return;
+    const before = history.length;
+    for (let i = history.length - 1; i >= 0; i--) {
+      if (history[i].slug === id) history.splice(i, 1);
+    }
+    unread = Math.max(0, unread - (before - history.length));
+    renderBell();
+    if (bellPanel && bellPanel.style.display !== 'none') renderPanel();
+    closeNotices(id);
+  }
 }

@@ -15,17 +15,17 @@
  * и стек, что у перекупов, — колокольчик и его окна не задеваем.
  */
 
-import { getSessionUid, getSupabase, isSupabaseConfigured, withAuthRetry } from './supabase';
+import { getSupabase, withAuthRetry } from './supabase';
 import { MAX_NOTICES, showCornerNotice } from './notice';
 
 async function run(): Promise<void> {
-  if (!isSupabaseConfigured()) return;
   if (typeof navigator !== 'undefined' && !navigator.onLine) return;
-  // Сессия из хранилища, без сетевого запроса: гость отсекается здесь же.
-  const uid = await getSessionUid();
-  if (!uid) return;
   const sb = getSupabase();
   if (!sb) return;
+  // Сессия из хранилища, без сетевого запроса: гость отсекается здесь же.
+  const { data: sessionData } = await sb.auth.getSession();
+  const uid = sessionData.session?.user.id ?? null;
+  if (!uid) return;
   try {
     const { data, error } = await withAuthRetry(() =>
       sb

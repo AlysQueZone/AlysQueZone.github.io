@@ -1,187 +1,18 @@
-import { getSupabase, withAuthRetry, buyLotShared } from './supabase';
-import { subscribeLive } from './live';
+import { getSupabase, buyLotShared } from './supabase';
+import { live } from './live';
 import { errorText, isNoAuthError, isOfflineError } from './errors';
 
 /**
- * Живое состояние Лота: каталог + прайс-фид + флаг «мой» за один запрос.
+ * Перекуп: выполнение покупки за одним швом.
  *
- * Раньше понятие было разорвано на три шва: SSG-каталог, shared-состояния
- * в supabase.ts и живые цены в prices.ts — витрина делала два запроса и сшивала
- * карты вручную. Теперь один запрос к вью `lots_with_next_price` (N считает БД
- * тем же выражением, что и BEFORE-триггер, клиент формулы не знает и не хранит).
+ * Контракт с БД (тикет 10, см. supabase/migrations/*_shared_lots.sql): клиент
+ * делает один INSERT в purchases только с lot_id + buyer_uid. Цену,
+ * identity, паузу, кап и гейт денег считает BEFORE-триггер — клиентские
+ * значения игнорируются, итог — всегда price_paid сервера.
  *
- * nextPrice null — N неизвестна (вью отсутствует, читаем таблицу lots):
- * показ рисует «…», а не price. mine — owner_uid == uid сессии
- * (uid передаёт caller, модуль сессию не читает).
- * Витрина и страница лота целиком рисуются из этой карты клиентом (см.
- * docs/adr/0002); запечённого на билде каталога нет.
+ * Живые чтения (каталог, лот, баланс, uid) и события — в lib/live.ts
+ * (docs/adr/0003): здесь только запись и маппинг её ошибок.
  */
-export interface LotState {
-  slug: string;
-  title: string;
-  video_url: string | null;
-  price: number;
-  nextPrice: number | null;
-  owner_login: string | null;
-  owner_uid: string | null;
-  /** Ник автора принятой заявки — только подробности лота, в списках не показываем. */
-  suggested_by_login: string | null;
-  mine: boolean;
-}
-
-type LotRow = Record<string, unknown>;
-
-function str(row: LotRow, key: string): string | null {
-  const value = row[key];
-  return typeof value === 'string' ? value : null;
-}
-
-function toLotState(row: LotRow, uid: string | null): LotState | null {
-  const slug = row['slug'];
-  const price = Number(row['price']);
-  if (typeof slug !== 'string' || !Number.isFinite(price)) return null;
-  const nextRaw = Number(row['next_price']);
-  const owner_uid = str(row, 'owner_uid');
-  return {
-    slug,
-    title: str(row, 'title') ?? slug,
-    video_url: str(row, 'video_url'),
-    price,
-    nextPrice: Number.isFinite(nextRaw) && nextRaw > 0 ? nextRaw : null,
-    owner_login: str(row, 'owner_login'),
-    owner_uid,
-    suggested_by_login: str(row, 'suggested_by_login'),
-    mine: uid !== null && owner_uid !== null && owner_uid === uid,
-  };
-}
-
-function fillCatalog(rows: unknown, uid: string | null): Map<string, LotState> {
-  const map = new Map<string, LotState>();
-  if (!Array.isArray(rows)) return map;
-  for (const row of rows as LotRow[]) {
-    const state = toLotState(row, uid);
-    if (state) map.set(state.slug, state);
-  }
-  return map;
-}
-
-const VIEW = 'lots_with_next_price';
-const VIEW_COLUMNS =
-  'slug,title,video_url,price,owner_login,owner_uid,suggested_by_login,next_price';
-const TABLE_COLUMNS = 'slug,title,video_url,price,owner_login,owner_uid,suggested_by_login';
-
-/** Каталог + признак «ответ от БД получен»: пустой каталог ≠ ошибка. */
-export interface CatalogResult {
-  ok: boolean;
-  states: Map<string, LotState>;
-}
-
-/**
- * Весь живой каталог одним запросом (витрина, колокол, уведомления).
- * Вью отсутствует (миграция ещё не применена) — фолбэк на таблицу `lots`
- * с nextPrice null (клиентской формулы нет и не будет).
- * Ошибка или ненастроенное хранилище → `ok: false` с пустой картой (витрина
- * отличает «пусто» от «не загрузилось»). Секретов здесь нет: только
- * publishable-ключ через getSupabase().
- */
-export async function fetchLotCatalogResult(uid: string | null): Promise<CatalogResult> {
-  const empty = new Map<string, LotState>();
-  const sb = getSupabase();
-  if (!sb) return { ok: false, states: empty };
-  try {
-    const fromView = await withAuthRetry(() => sb.from(VIEW).select(VIEW_COLUMNS));
-    if (!fromView.error && Array.isArray(fromView.data)) {
-      return { ok: true, states: fillCatalog(fromView.data, uid) };
-    }
-  } catch {
-    // вью нет — фолбэк ниже
-  }
-  try {
-    const fromTable = await withAuthRetry(() => sb.from('lots').select(TABLE_COLUMNS));
-    if (fromTable.error || !Array.isArray(fromTable.data)) return { ok: false, states: empty };
-    return { ok: true, states: fillCatalog(fromTable.data, uid) };
-  } catch {
-    return { ok: false, states: empty };
-  }
-}
-
-/** Живой каталог; ошибка/ненастроенное хранилище → пустая карта. */
-export async function fetchLotCatalog(uid: string | null): Promise<Map<string, LotState>> {
-  return (await fetchLotCatalogResult(uid)).states;
-}
-
-/** Один Лот + признак «ответ от БД получен»: нет строки ≠ БД недоступна. */
-export interface LotStateResult {
-  ok: boolean;
-  state: LotState | null;
-}
-
-/**
- * Живое состояние одного Лота (проекция модалки, свежая N перед записью).
- * Пробуем вью, затем таблицу. `state: null` при `ok: true` — строки нет;
- * `ok: false` — вью и таблица недоступны или хранилище не настроено.
- * `maybeSingle` вместо `single`: отсутствие строки — это null без ошибки,
- * а не PostgREST 406 (PGRST116) в логах.
- */
-export async function fetchLotStateResult(
-  slug: string,
-  uid: string | null
-): Promise<LotStateResult> {
-  const sb = getSupabase();
-  if (!sb) return { ok: false, state: null };
-  try {
-    const fromView = await withAuthRetry(() =>
-      sb.from(VIEW).select(VIEW_COLUMNS).eq('slug', slug).maybeSingle()
-    );
-    if (!fromView.error && fromView.data) {
-      return { ok: true, state: toLotState(fromView.data as unknown as LotRow, uid) };
-    }
-  } catch {
-    // вью нет — фолбэк ниже
-  }
-  try {
-    const fromTable = await withAuthRetry(() =>
-      sb.from('lots').select(TABLE_COLUMNS).eq('slug', slug).maybeSingle()
-    );
-    if (!fromTable.error && fromTable.data) {
-      return { ok: true, state: toLotState(fromTable.data as unknown as LotRow, uid) };
-    }
-    if (!fromTable.error) return { ok: true, state: null };
-    return { ok: false, state: null };
-  } catch {
-    return { ok: false, state: null };
-  }
-}
-
-/** Состояние одного Лота; нет строки/ошибка/не настроено → null. */
-export async function fetchLotState(slug: string, uid: string | null): Promise<LotState | null> {
-  return (await fetchLotStateResult(slug, uid)).state;
-}
-
-/**
- * Живая подписка на смену Лотов: тик таблицы `lots` (вью в Realtime-публикацию
- * не входит, поэтому по событию caller перечитывает каталог — см.
- * fetchLotCatalog). Канал открывает общий реестр lib/live.ts: витрина и
- * модалка на один slug делят один канал. Без настроенного хранилища —
- * noop-отписка. Возвращает функцию отписки.
- */
-export function subscribeLots(onChange: () => void, slug?: string): () => void {
-  return (
-    subscribeLive(
-      { table: 'lots', event: '*', ...(slug ? { filter: `slug=eq.${slug}` } : {}) },
-      () => onChange()
-    ) ?? (() => {})
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Перекуп: выполнение покупки за одним швом.
-//
-// Контракт с БД (тикет 10, см. supabase/migrations/*_shared_lots.sql): клиент
-// делает один INSERT в purchases только с lot_id + buyer_uid. Цену,
-// identity, паузу, кап и гейт денег считает BEFORE-триггер — клиентские
-// значения игнорируются, итог — всегда price_paid сервера.
-// ---------------------------------------------------------------------------
 
 export type BuyErrorKind =
   | 'cooldown'
@@ -267,54 +98,24 @@ export type BuyResult =
 /**
  * Перекуп одним вызовом: свежая N перед записью (проекция для показа —
  * итог всё равно посчитает сервер), затем INSERT с ожиданием confirm.
+ * Покупка объявляется модулю живых данных (`live.reportPurchase`): событие
+ * для поверхностей + перечитка каталога и баланса.
  * Доменные исходы не бросает — возвращает BuyResult; бросает только
- * при ненастроенном хранилище (caller guards через isSupabaseConfigured).
+ * при ненастроенном хранилище (caller guards через getSupabase).
  */
 export async function buyLot(slug: string): Promise<BuyResult> {
   const sb = getSupabase();
   if (!sb) throw new Error('supabase not configured');
   try {
-    const st = await fetchLotState(slug, null);
+    const st = await live.refreshLot(slug);
     const staged = st?.nextPrice ?? null;
     const done = await buyLotShared(slug);
     const paid =
       Number.isFinite(done.price_paid) && done.price_paid > 0 ? done.price_paid : (staged ?? 0);
+    void live.reportPurchase({ id: slug, price: paid });
     return { status: 'ok', paid, buyer: done.buyer_login };
   } catch (err) {
     const info = mapBuyError(err);
     return { status: 'blocked', kind: info.kind, retryAfterSec: info.retryAfterSec, raw: info.raw };
   }
-}
-
-// ---------------------------------------------------------------------------
-// Событие «лот куплен»: кидает модалка после успеха, слушают витрина,
-// страница лота и колокол перекупов. Payload типизирован здесь —
-// рассинхрон комментария и кода (кейс 2026-09-11) больше не молчит.
-// ---------------------------------------------------------------------------
-
-/** Payload события «лот куплен»: какой лот и за сколько ушёл серверу. */
-export interface BoughtDetail {
-  id: string;
-  price: number;
-}
-
-/** Объявить покупку (из модалки после успеха). */
-export function announceBought(detail: BoughtDetail): void {
-  window.dispatchEvent(new CustomEvent('alysque:bought', { detail }));
-}
-
-/**
- * Подписаться на покупки: чужая форма detail отбрасывается guard'ом.
- * Возвращает функцию отписки.
- */
-export function onBought(cb: (detail: BoughtDetail) => void): () => void {
-  const handler = (e: Event): void => {
-    const detail = (e as CustomEvent<unknown>).detail;
-    if (typeof detail !== 'object' || detail === null) return;
-    const { id, price } = detail as Record<string, unknown>;
-    if (typeof id !== 'string' || typeof price !== 'number') return;
-    cb({ id, price });
-  };
-  window.addEventListener('alysque:bought', handler);
-  return () => window.removeEventListener('alysque:bought', handler);
 }
