@@ -128,6 +128,8 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
   let balanceValue: number | null = null;
   /** Ответ по балансу уже был (для честного прочерка без мигания). */
   let balanceTried = false;
+  /** Последнее чтение баланса удалось; false — на экране последнее хорошее. */
+  let balanceFresh = false;
   let catalogValue = new Map<string, LotState>();
   let catalogFresh = false;
   let catalogKnown = false;
@@ -214,8 +216,14 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
    * Применить прочитанный каталог: «мой» флаг — под текущий uid (ответ мог
    * прийти уже после смены сессии), дифф владельца даёт событие перекупа
    * (только при неизменном uid — смена сессии не сделка), свежесть — флаг.
+   * `updateHealth=false` — одиночное чтение (refreshLot): строку вливаем,
+   * но здоровье всего каталога им не подменяем.
    */
-  function applyCatalog(next: ReadonlyMap<string, LotState>, ok: boolean): void {
+  function applyCatalog(
+    next: ReadonlyMap<string, LotState>,
+    ok: boolean,
+    updateHealth = true
+  ): void {
     const prev = catalogValue;
     const { merged, changed } = mergeCatalog(withMine(next, uidValue));
 
@@ -238,11 +246,16 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
     }
 
     catalogValue = merged;
-    const freshChanged = ok !== catalogFresh;
-    catalogFresh = ok;
-    if (changed.size > 0 || freshChanged || !catalogKnown) {
+    if (updateHealth) {
+      const freshChanged = ok !== catalogFresh;
+      catalogFresh = ok;
+      const wasKnown = catalogKnown;
       catalogKnown = true;
-      emit({ kind: 'catalog', changed, fresh: ok });
+      if (changed.size > 0 || freshChanged || !wasKnown) {
+        emit({ kind: 'catalog', changed, fresh: ok });
+      }
+    } else if (catalogKnown && changed.size > 0) {
+      emit({ kind: 'catalog', changed, fresh: catalogFresh });
     }
     // Перекуп — после каталога: кнопкам возврата уже видна свежая N.
     for (const event of outbids) emit({ kind: 'outbid', event });
@@ -252,6 +265,7 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
   function applyBalance(value: number | null): void {
     const first = !balanceTried;
     balanceTried = true;
+    balanceFresh = value !== null;
     if (value === null) {
       // Первый ответ «пусто/отказ» — честный прочерк; дальше последнее
       // хорошее просто остаётся на экране.
@@ -277,6 +291,7 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
       emit({ kind: 'balance', balance: null, fresh: false });
     }
     balanceTried = false;
+    balanceFresh = false;
   }
 
   // -------------------------------------------------------------------------
@@ -392,7 +407,7 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
       };
       if (uidKnown) prime({ kind: 'uid', uid: uidValue });
       if (balanceTried) {
-        prime({ kind: 'balance', balance: balanceValue, fresh: balanceValue !== null });
+        prime({ kind: 'balance', balance: balanceValue, fresh: balanceFresh });
       }
       if (catalogKnown) {
         prime({ kind: 'catalog', changed: new Set(catalogValue.keys()), fresh: catalogFresh });
@@ -441,7 +456,8 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
       const next = new Map(catalogValue);
       if (read.state) next.set(slug, read.state);
       else next.delete(slug);
-      applyCatalog(next, true);
+      // Одиночное чтение не выдаёт весь каталог за свежий (флаг здоровья — каталога).
+      applyCatalog(next, true, false);
       return read.state;
     },
 

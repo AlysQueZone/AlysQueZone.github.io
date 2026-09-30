@@ -354,11 +354,36 @@ describe('createLiveStore', () => {
     f.fail.balance = true;
     expect(await store.refreshBalance()).toBeNull();
     expect(store.balance()).toBe(1000);
+    // Новый подписчик видит последнее хорошее, но честно несвежее.
+    const primed = collect(store).find((event) => event.kind === 'balance');
+    expect(primed).toMatchObject({ balance: 1000, fresh: false });
 
     f.fail.balance = false;
     f.state.balance = 700;
     expect(await store.refreshBalance()).toBe(700);
     expect(store.balance()).toBe(700);
+    const after = collect(store).find((event) => event.kind === 'balance');
+    expect(after).toMatchObject({ balance: 700, fresh: true });
+  });
+
+  it('refreshLot не подменяет здоровье каталога одиночным чтением', async () => {
+    const f = fakeReaders();
+    f.state.catalog.set('lot-a', lot());
+    const store = createLiveStore(f.readers);
+    const events = collect(store);
+    await store.start();
+
+    f.fail.catalog = true;
+    await store.refreshCatalog();
+    expect(store.catalogOk()).toBe(false);
+
+    // Модалка открылась и прочитала один лот — каталог всё ещё несвежий.
+    f.fail.catalog = false;
+    f.state.lots.set('lot-a', lot({ price: 120, nextPrice: 130 }));
+    await store.refreshLot('lot-a');
+    expect(store.lot('lot-a')?.price).toBe(120);
+    expect(store.catalogOk()).toBe(false);
+    expect(events.at(-1)).toMatchObject({ kind: 'catalog', fresh: false });
   });
 
   it('refreshLot: одиночная строка сливается с каталогом, исчезнувшая — уходит', async () => {

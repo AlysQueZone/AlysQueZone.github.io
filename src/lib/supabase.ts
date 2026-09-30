@@ -1,5 +1,5 @@
 /**
- * Единственный шов к Supabase Auth (тикет 09, shared-state).
+ * Единственный шов к Supabase Auth (тикет 09).
  *
  * - Клиент создаётся один раз на страницу (singleton), сессия долгая:
  *   persistSession + autoRefreshToken + detectSessionInUrl.
@@ -159,7 +159,7 @@ export function returnUrlForLot(lotId: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Живая витрина (тикет 09, shared-state).
+// Живая витрина (тикет 09).
 //
 // Каталог и лоты — снапшот живых данных (lib/live.ts, docs/adr/0003).
 // Здесь остались хвост перепродаж и запись покупки. Без настроенных
@@ -328,7 +328,7 @@ export async function fetchOutbidCatchup(uid: string, limit = 10): Promise<Outbi
 }
 
 // ---------------------------------------------------------------------------
-// Shared-покупка (тикет 10, shared-state).
+// Shared-покупка (тикет 10).
 //
 // Контракт с БД (см. supabase/migrations/*_shared_lots.sql): клиент делает один
 // INSERT в purchases только с lot_id + buyer_uid. Цену (ceil +10%), identity

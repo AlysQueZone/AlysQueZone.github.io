@@ -11,7 +11,8 @@
  * Поверхности читают снапшот синхронно (`live.uid()`, `live.catalog()`, …)
  * и подписываются на изменения (`live.subscribe`); денежные гейты (гамба,
  * покупка) просят явную свежесть (`live.refreshBalance()`,
- * `live.refreshLot(slug)`). Первый вызов сам поднимает модуль.
+ * `live.refreshLot(slug)`). Модуль сам поднимается на первом subscribe /
+ * refresh / report — отдельного «старта» у поверхностей нет.
  */
 import { getSupabase, withAuthRetry } from './supabase';
 import { createLiveRegistry, type LivePayload, type LiveTransport } from './live-core';
@@ -70,6 +71,12 @@ function fillCatalog(rows: unknown, uid: string | null): Map<string, LotState> {
   return map;
 }
 
+/** Баланс из значения строки БД: конечное ≥ 0, иначе null (деньги целы). */
+function normalizeBalance(value: unknown): number | null {
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
 const VIEW = 'lots_with_next_price';
 const VIEW_COLUMNS =
   'slug,title,video_url,price,owner_login,owner_uid,suggested_by_login,next_price';
@@ -97,8 +104,7 @@ function supabaseReaders(): LiveReaders {
           sb.from('profiles').select('balance').eq('user_id', uid).single()
         );
         if (error || !data) return null;
-        const balance = Number((data as unknown as { balance: unknown }).balance);
-        return Number.isFinite(balance) && balance >= 0 ? balance : null;
+        return normalizeBalance((data as unknown as { balance: unknown }).balance);
       } catch {
         return null;
       }
@@ -208,8 +214,7 @@ const store = createLiveStore(supabaseReaders());
 /** Баланс из payload профиля: строка видна только своя (RLS) — без чтения. */
 function balanceFromPayload(payload: LivePayload): number | null {
   const row = (payload.new ?? {}) as Record<string, unknown>;
-  const value = Number(row['balance']);
-  return Number.isFinite(value) && value >= 0 ? value : null;
+  return normalizeBalance(row['balance']);
 }
 
 let wired = false;

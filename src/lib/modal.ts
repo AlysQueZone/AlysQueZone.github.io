@@ -71,16 +71,16 @@ function hide(root: HTMLElement): void {
 }
 
 if (typeof document !== 'undefined') {
-  // Escape — верхнему окну: нижнее не трогаем, иначе одно нажатие гасило бы всё.
+  // Клавиатура — верхнему окну: нижнее не трогаем (одно нажатие не гасит всё).
   document.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape') return;
-    topEntry()?.close();
-  });
-  // Tab не покидает верхнее окно: с первого элемента Shift+Tab уходит на последний.
-  document.addEventListener('keydown', (e) => {
-    if (e.key !== 'Tab') return;
     const top = topEntry();
     if (!top) return;
+    if (e.key === 'Escape') {
+      top.close();
+      return;
+    }
+    // Tab не покидает окно: с первого элемента Shift+Tab уходит на последний.
+    if (e.key !== 'Tab') return;
     const items = visibleItems(top.root);
     if (items.length === 0) {
       e.preventDefault();
