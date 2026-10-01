@@ -146,6 +146,36 @@ price = 800
 video_url = "https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-evilzerg57-double.webm"
 
 [[lots]]
+slug = "lot-privet-gospoza-mayoneznih-ozer"
+title = "Здраствуйте, госпожа Майонезных Озёр"
+price = 800
+video_url = "https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-gospoza-mayoneznih-ozer.webm"
+
+[[lots]]
+slug = "lot-privet-hail-to-the-queen"
+title = "Hail to the Queen"
+price = 800
+video_url = "https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-hail-to-the-queen.webm"
+
+[[lots]]
+slug = "lot-privet-inexizi"
+title = "Привет INexizI"
+price = 800
+video_url = "https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-inexizi.webm"
+
+[[lots]]
+slug = "lot-privet-kuri-puri"
+title = "Привет kuri_puri"
+price = 800
+video_url = "https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-kuri-puri.webm"
+
+[[lots]]
+slug = "lot-privet-nxver-existd"
+title = "Привет NXVER_EXISTD"
+price = 800
+video_url = "https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-nxver-existd.webm"
+
+[[lots]]
 slug = "lot-privet-olyacaramel"
 title = "Покупка olyacaramel"
 price = 800
