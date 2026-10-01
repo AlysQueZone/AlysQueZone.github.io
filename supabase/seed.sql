@@ -25,7 +25,7 @@ insert into public.lots (slug, title, price, video_url) values
   ('lot-privet-coolbeback', 'Привет coolbeback', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-coolbeback.webm'),
   ('lot-privet-kubiclego', 'Привет KubicLego', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-kubiclego.webm'),
   ('lot-privet-evilzerg57-double', 'Двойной привет evilzerg57', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-evilzerg57-double.webm'),
-  ('lot-privet-gospoza-mayoneznih-ozer', 'Здраствуйте, госпожа Майонезных Озёр', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-gospoza-mayoneznih-ozer.webm'),
+  ('lot-privet-gospoza-mayoneznih-ozer', 'Здраствуйте госпожа', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-gospoza-mayoneznih-ozer.webm'),
   ('lot-privet-hail-to-the-queen', 'Hail to the Queen', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-hail-to-the-queen.webm'),
   ('lot-privet-inexizi', 'Привет INexizI', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-inexizi.webm'),
   ('lot-privet-kuri-puri', 'Привет kuri_puri', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-kuri-puri.webm'),
