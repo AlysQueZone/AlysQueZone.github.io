@@ -87,6 +87,11 @@ lots-title *args:
 chatters-sync *args:
     python3 scripts/chatters_sync.py {{args}}
 
+# Найти автора привета по характерной фразе из чата VOD: печатает ник и канон.
+# Пример: just chatters-find --vod 2888034815 --until 1800 "надеюсь меня не переедут"
+chatters-find *args:
+    python3 scripts/chatters_find.py {{args}}
+
 # Приём заявки на привет: id -> скачивание -> медиа -> карточка -> синк -> лот.
 # Безопасный первый заход: just submission 12 --check (скачает и покажет, стоп).
 # Полный проход: just submission 12; --force — осознанный обход дубль-гейта.
