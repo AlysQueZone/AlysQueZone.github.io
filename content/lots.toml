@@ -5,7 +5,7 @@
 #   Уже живущие в проде лоты sync не трогает по цене/владельцу — это runtime-состояние
 #   триггеров покупки (см. docs/agents/economy.md).
 # video_url — финальный публичный URL. Свои видео — media/videos/<slug>.webm,
-#   тройку webm/mp4/webp готовит docs/agents/media-pipeline.md.
+#   тройку webm/mp4/webp готовит скилл `alysque-lot`.
 
 [[lots]]
 slug = "lot-meme-arhion24"

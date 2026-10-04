@@ -20,7 +20,7 @@
 - Цвет/визуальный стиль — один источник: палитра D1 в `design-system/alysquezone/MASTER.md`, токены — `@theme` в `src/styles/global.css`; hex в коде не хардкодим.
 - Контраст — часть стиля: muted-текст только `text-mist` (без `/60…80`), акцентный текст — `*-deep` или затемнённый токен (`melon`, `pivko`); проверка — `validate-tokens.cjs --dir src/` из скилла `design-system`.
 - UI/UX-скиллы (`.opencode/`) в гите нет: свежий клон — `npx uipro init --ai opencode`, обновление — `npx uipro update`.
-- Свои скиллы — в `.agents/skills/alysque-*` и в гите; чужие (`npx skills`, `uipro`) не в гите. Различает `.gitignore` по префиксу.
+- Свои скиллы (`.agents/skills/alysque-*`) — в гите и в зоне агента: поддерживать актуальность, править по своему усмотрению; при правке — по скиллу `writing-for-agents`. Чужие (`npx skills`, `uipro`) не в гите и не в зоне агента.
 
 ## TODO.md, NOTES.md и CHANGELOG.md
 
@@ -45,8 +45,6 @@
 - Гамба-звуки / комиссия / рост цены / награда за привет → `docs/agents/economy.md`.
 - Эмоуты / чат VOD / мемы / пасты / стата → `docs/agents/twitch-sources.md`.
 - Ники чатерсов / реестр / резолв написания → `docs/agents/chatters.md`.
-- Новый лот / `ffmpeg` / `media` / `content/lots.toml` → `docs/agents/media-pipeline.md`.
-- Заявки на привет / приём и отказ / `just submission` → `docs/agents/submissions.md`.
 - Telegram-уведомление о заявке / Vault / триггер → `docs/agents/telegram-notify.md`.
 - Issues-трекинг (`scratch/`) → `docs/agents/issue-tracker.md`.
 - Триаж-лейблы (`needs-triage` … `wontfix`) → `docs/agents/triage-labels.md`.

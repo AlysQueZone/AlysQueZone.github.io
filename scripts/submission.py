@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Приём заявки на привет: id -> лот на витрине (stdlib, без зависимостей).
 
-Это агент-ориентированный пайплайн из docs/agents/submissions.md. Команда
+Это агент-ориентированный пайплайн из скилла alysque-submission. Команда
 делает механическую часть, а смысловые решения (это привет? дубликат?) —
 за агентом: жёсткие ошибки и двусмысленности останавливают шаг с кодом 2,
 ничего не публикуя.
@@ -17,7 +17,7 @@
   python3 scripts/submission.py reward 12          # выплатить награду по принятой (идемпотентно)
 
 Шаги accept: заявка -> yt-dlp во временную папку -> ffmpeg-тройка по
-docs/agents/media-pipeline.md -> storage_upload.py в videos/<slug> -> [[lots]]
+скилл alysque-lot -> storage_upload.py в videos/<slug> -> [[lots]]
 в content/lots.toml -> lots_sync.py -> RPC accept_submission -> выплата награды
 (RPC pay_submission_reward). Заголовок и ник автора берутся из заявки с
 резолвом по реестру content/chatters.toml; слаг — новый уникальный, привязан
@@ -495,7 +495,7 @@ def run_ffmpeg(args):
 
 
 def build_triple(source, workdir, slug):
-    """Тройка webm/mp4/webp по docs/agents/media-pipeline.md (кэш по наличию)."""
+    """Тройка webm/mp4/webp по скиллу alysque-lot (кэш по наличию)."""
     webm = os.path.join(workdir, slug + ".webm")
     mp4 = os.path.join(workdir, slug + ".mp4")
     webp = os.path.join(workdir, slug + ".webp")

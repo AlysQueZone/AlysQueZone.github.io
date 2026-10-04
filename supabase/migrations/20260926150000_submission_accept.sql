@@ -54,7 +54,7 @@ grant select on public.lots_with_next_price to service_role;
 --    RPC только для service_role (вызывает служебный скрипт приёма).
 --    Принять можно только открытую заявку ('new'): повторное принятие
 --    решённой — ошибка, а не молчаливая перезапись чужого решения
---    (docs/agents/submissions.md). p_author_login — канон ника из реестра
+--    (скилл alysque-submission). p_author_login — канон ника из реестра
 --    ников, который передаёт агент; не null — переопределяет снимок
 --    author_login из заявки, null — оставляем снимок (US-24).
 --    Награда не начисляется — её добавит тикет 11.
@@ -114,7 +114,7 @@ grant execute on function public.accept_submission(bigint, bigint, text) to serv
 -- 4. Отказ/дубликат: разрешены только эти два статуса, без выплат.
 --    Решать можно только открытую заявку ('new'): отклонять принятую нельзя
 --    (лот уже на витрине), повторный отказ по решённой — ошибка. Идемпотентным
---    повторный вызов делает клиент (docs/agents/submissions.md), сервер строгий.
+--    повторный вызов делает клиент (скилл alysque-submission), сервер строгий.
 create or replace function public.reject_submission(
   p_submission_id bigint,
   p_status text
