@@ -20,6 +20,7 @@
 - Цвет/визуальный стиль — один источник: палитра D1 в `design-system/alysquezone/MASTER.md`, токены — `@theme` в `src/styles/global.css`; hex в коде не хардкодим.
 - Контраст — часть стиля: muted-текст только `text-mist` (без `/60…80`), акцентный текст — `*-deep` или затемнённый токен (`melon`, `pivko`); проверка — `validate-tokens.cjs --dir src/` из скилла `design-system`.
 - UI/UX-скиллы (`.opencode/`) в гите нет: свежий клон — `npx uipro init --ai opencode`, обновление — `npx uipro update`.
+- Свои скиллы — в `.agents/skills/alysque-*` и в гите; чужие (`npx skills`, `uipro`) не в гите. Различает `.gitignore` по префиксу.
 
 ## TODO.md, NOTES.md и CHANGELOG.md
 
@@ -37,7 +38,7 @@
 
 ## Указатели
 
-- Preview-проверка / деплой / релиз (`gh-pages`, миграции в `main`) → `docs/agents/shipping.md`.
+- Preview-проверка сборки (`preview` + `agent-browser`), гейт перед релизом → `docs/agents/shipping.md`.
 - Supabase-схема / RLS / миграции / отладка → `docs/agents/supabase.md`.
 - Стиль / импорты / рендер / комментарии / тесты / SQL-гайд / `just` → `docs/agents/code-style.md`.
 - Цвета / токены / типографика / компоненты → `design-system/alysquezone/MASTER.md`.

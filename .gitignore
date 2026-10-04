@@ -1,4 +1,8 @@
-.agents
+# Скиллы: чужие (npx skills) не в гите, свои (alysque-*) — в гите.
+.agents/*
+!.agents/skills
+.agents/skills/*
+!.agents/skills/alysque-*
 node_modules/
 dist/
 .astro/
