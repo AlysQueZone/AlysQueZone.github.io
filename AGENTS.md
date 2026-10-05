@@ -8,7 +8,7 @@
 - Бэкенд — в Supabase: схема — только миграциями; контент лотов — `content/lots.toml` + `just lots-sync` (публикуется без деплоя, не миграциями).
 - Новая таблица → в той же миграции гранты `anon`/`authenticated`/`service_role` и `usage` на sequence (с 30.10.2026 автоматом не выдаются); шаблон — `docs/agents/supabase.md`.
 - Витрина и страницы лотов — клиентская проекция БД (`docs/adr/0002`): билд без запроса к БД, но требует `PUBLIC_SUPABASE_*`.
-- Математика биржи — из одних рук: серверный рост цены — одна функция `public.next_lot_price` (`docs/adr/0007`); меняешь механику — обнови витрину и `CONTEXT.md`.
+- Математика биржи — из одних рук: серверный рост цены — одна функция `public.next_lot_price` (`docs/adr/0007`); меняешь механику — обнови витрину и канон в `docs/agents/economy.md`.
 - Баланс — из снапшота (`src/lib/live.ts`): перед действием гейты читают свежее значение (`live.refreshBalance()`); серверные значения (гамба, ежедневный вход, тик профиля) возвращаются в модуль; намерение покупки и «не хватает Пивкойнов» — `src/lib/buy-intent.ts` (гейт всё равно серверный).
 - Живые данные — один владелец: каналы, снапшот (uid, баланс, каталог, лот) и доменные события (покупка, перекуп, сделки) — в `src/lib/live.ts` + чистые ядра `live-core.ts` (реестр) и `live-store.ts` (снапшот); поверхности читают снапшот и подписываются, `sb.channel()` и window-шина живут только внутри — `docs/adr/0003`.
 - Тесты ядра — `just test` (vitest, без DOM): реестр живых подписок, снапшот, чистая логика; pre-commit гоняет типы, линт и их; все гейты разом — `just check`.
@@ -48,4 +48,4 @@
 - Telegram-уведомление о заявке / Vault / триггер → `docs/agents/telegram-notify.md`.
 - Issues-трекинг (`scratch/`) → `docs/agents/issue-tracker.md`.
 - Триаж-лейблы (`needs-triage` … `wontfix`) → `docs/agents/triage-labels.md`.
-- Термины / глоссарий / ADR / ADR-конфликт → `docs/agents/domain.md` (`CONTEXT.md` + `docs/adr/`).
+- Термины / глоссарий / ADR / ADR-конфликт → `docs/agents/domain.md` (`GLOSSARY.md` + `docs/adr/`).
