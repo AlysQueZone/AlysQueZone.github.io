@@ -303,6 +303,16 @@ export const live = {
     return store.refreshLot(slug);
   },
 
+  /**
+   * Придержать баланс под церемонию (гамба): оба источника (серверный ответ
+   * и тик профиля) копятся, снапшот и чип раскрываются на release. Возвращает
+   * идемпотентный release — конец крутки, закрытие окна или ошибка.
+   */
+  deferBalance(): () => void {
+    ensureWired();
+    return store.deferBalance();
+  },
+
   /** Серверный баланс (гамба, ежедневный вход): точное значение — в снапшот. */
   reportBalance(value: number): void {
     ensureWired();

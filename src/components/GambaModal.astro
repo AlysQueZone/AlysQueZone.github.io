@@ -203,6 +203,10 @@ const LOSE_POOL = GAMBA_LOSE_SOUNDS.map((f) => s3Sound(f)).join(',');
   // Запрос уже в полёте: синхронный лок от повторных кликов/зажатого Enter
   // (кнопку гасим сразу, до первого await — иначе пачка параллельных спинов).
   let pending = false;
+  // Церемония держит баланс: release раскрывает придержанное значение;
+  // ceremonyAborted — окно закрыли, крутить в пустоту не надо.
+  let releaseBalance: (() => void) | null = null;
+  let ceremonyAborted = false;
   // Пауза после rate-limit: кнопка остаётся disabled, пока таймер не истечёт.
   let lockTimer: ReturnType<typeof setTimeout> | undefined;
   let raf = 0;
@@ -354,6 +358,16 @@ const LOSE_POOL = GAMBA_LOSE_SOUNDS.map((f) => s3Sound(f)).join(',');
     if (spinBtn instanceof HTMLButtonElement) spinBtn.disabled = busy;
   }
 
+  /**
+   * Конец церемонии: раскрыть придержанный баланс. Идемпотентно — конец
+   * крутки, закрытие окна и ошибка зовут один и тот же выход; повторный
+   * вызов (закрытие после конца) ничего не ломает.
+   */
+  function endCeremony(): void {
+    releaseBalance?.();
+    releaseBalance = null;
+  }
+
   /** Исход в строку результата: return/small — 7TV aga, miss — 7TV SCAMBA, jackpot — 7TV suda. */
   function showOutcome(outcome: GambaOutcome): void {
     if (!result) return;
@@ -445,7 +459,9 @@ const LOSE_POOL = GAMBA_LOSE_SOUNDS.map((f) => s3Sound(f)).join(',');
         playOutcomePool('losePool');
       }
       if (result) showOutcome(outcome);
-      // Исход показан — ключ попытки истекает, следующий спин будет новым.
+      // Исход показан — церемония кончилась: баланс раскрываем тем же кадром,
+      // ключ попытки истекает, следующий спин будет новым.
+      endCeremony();
       attemptKey = null;
     };
     raf = requestAnimationFrame(frame);
@@ -455,6 +471,8 @@ const LOSE_POOL = GAMBA_LOSE_SOUNDS.map((f) => s3Sound(f)).join(',');
     onOpen() {
       // Повторное открытие снимает лок дня и паузу rate-limit. Если запрос
       // ещё в полёте — кнопку не включаем (иначе клик молча проглотится).
+      ceremonyAborted = false;
+      endCeremony();
       if (lockTimer) {
         clearTimeout(lockTimer);
         lockTimer = undefined;
@@ -478,11 +496,15 @@ const LOSE_POOL = GAMBA_LOSE_SOUNDS.map((f) => s3Sound(f)).join(',');
       })();
     },
     onClose() {
+      // Окно закрыли — церемонии больше нет: анимацию гасим, придержанный
+      // баланс раскрываем немедленно, ответ RPC в пустоту крутить не будем.
+      ceremonyAborted = true;
       if (spinning) {
         spinning = false;
         cancelAnimationFrame(raf);
         stopAll();
       }
+      endCeremony();
       if (lockTimer) {
         clearTimeout(lockTimer);
         lockTimer = undefined;
@@ -525,6 +547,9 @@ const LOSE_POOL = GAMBA_LOSE_SOUNDS.map((f) => s3Sound(f)).join(',');
       } catch {
         // баланс не прочитался — дальше правда сервера
       }
+      // Церемония с этого момента держит баланс: и явный ответ спина, и
+      // realtime-тик профиля копятся, чип раскроется в конце крутки.
+      releaseBalance = live.deferBalance();
       if (result) result.textContent = 'Стучимся к серверу за исходом…';
       let spinOutcome: GambaOutcome;
       let spinBalance: number | null;
@@ -538,6 +563,9 @@ const LOSE_POOL = GAMBA_LOSE_SOUNDS.map((f) => s3Sound(f)).join(',');
         spinOutcome = done.outcome;
         spinBalance = done.balance;
       } catch (err) {
+        // Ошибка спина — церемонии нет: придержанный баланс раскрываем сразу
+        // (при офлайн-повторе сервер мог записать движение — покажем правду).
+        endCeremony();
         const info = mapGambaError(err);
         if (!result) return;
         if (info.kind === 'insufficient-funds') {
@@ -573,10 +601,17 @@ const LOSE_POOL = GAMBA_LOSE_SOUNDS.map((f) => s3Sound(f)).join(',');
         setBusy(false);
         return;
       }
-      // Баланс из ответа сервера — сразу в снапшот живых данных: шапку и
-      // остальные поверхности обновит событие (realtime дотянет чужие вклады).
+      // Баланс из ответа сервера — в снапшот, но церемония его ещё держит:
+      // чип раскроется тем же кадром, что и исход (realtime-тик тоже копится).
       if (spinBalance !== null) live.reportBalance(spinBalance);
-      animateToOutcome(spinOutcome);
+      // Окно закрыли посреди RPC — церемонии нет, колесо в пустоту не крутим:
+      // придержанное значение уже раскрыто в onClose.
+      if (ceremonyAborted) {
+        endCeremony();
+        attemptKey = null;
+      } else {
+        animateToOutcome(spinOutcome);
+      }
     } finally {
       pending = false;
     }

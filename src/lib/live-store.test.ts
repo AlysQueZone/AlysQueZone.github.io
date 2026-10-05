@@ -366,6 +366,83 @@ describe('createLiveStore', () => {
     expect(after).toMatchObject({ balance: 700, fresh: true });
   });
 
+  it('церемония держит баланс: значения копятся, release раскрывает последнее', async () => {
+    const f = fakeReaders();
+    f.state.uid = 'u1';
+    f.state.balance = 1000;
+    const store = createLiveStore(f.readers);
+    const events = collect(store);
+    await store.start();
+    const balanceEvents = (): LiveChange[] => events.filter((e) => e.kind === 'balance');
+    expect(balanceEvents()).toHaveLength(1);
+
+    const release = store.deferBalance();
+    store.reportBalance(900);
+    store.reportBalance(950);
+
+    // Снапшот и события ещё держат прежнее значение.
+    expect(store.balance()).toBe(1000);
+    expect(balanceEvents()).toHaveLength(1);
+
+    release();
+
+    expect(store.balance()).toBe(950);
+    expect(balanceEvents()).toHaveLength(2);
+    expect(balanceEvents().at(-1)).toMatchObject({ kind: 'balance', balance: 950, fresh: true });
+  });
+
+  it('release идемпотентен: повторный вызов ничего не раскрывает и не эмитит', async () => {
+    const f = fakeReaders();
+    f.state.uid = 'u1';
+    f.state.balance = 1000;
+    const store = createLiveStore(f.readers);
+    const events = collect(store);
+    await store.start();
+
+    const release = store.deferBalance();
+    store.reportBalance(900);
+    release();
+    release();
+
+    expect(events.filter((e) => e.kind === 'balance')).toHaveLength(2);
+    expect(store.balance()).toBe(900);
+  });
+
+  it('refreshBalance под удержанием: гейт получает свежее, снапшот — нет; null не раскрывается', async () => {
+    const f = fakeReaders();
+    f.state.uid = 'u1';
+    f.state.balance = 1000;
+    const store = createLiveStore(f.readers);
+    await store.start();
+
+    const release = store.deferBalance();
+    f.fail.balance = true;
+    expect(await store.refreshBalance()).toBeNull();
+    f.fail.balance = false;
+    f.state.balance = 700;
+    expect(await store.refreshBalance()).toBe(700);
+    expect(store.balance()).toBe(1000); // придержано
+
+    release();
+    expect(store.balance()).toBe(700);
+  });
+
+  it('смена uid под церемонией: значение прежнего uid не раскрывается', async () => {
+    const f = fakeReaders();
+    f.state.uid = 'u1';
+    f.state.balance = 1000;
+    const store = createLiveStore(f.readers);
+    await store.start();
+
+    const release = store.deferBalance();
+    store.reportBalance(900);
+    store.applyUid('u2');
+    release();
+
+    expect(store.uid()).toBe('u2');
+    expect(store.balance()).toBeNull();
+  });
+
   it('refreshLot не подменяет здоровье каталога одиночным чтением', async () => {
     const f = fakeReaders();
     f.state.catalog.set('lot-a', lot());

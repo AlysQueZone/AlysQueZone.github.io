@@ -11,6 +11,8 @@
  *   триггер во время чтения не теряется — копится один догоняющий проход;
  * - неудача перечитывания не затирает последнее хорошее: данные остаются,
  *   свежесть — флаг `fresh` в событии (у каталога ещё и `catalogOk()`);
+ * - церемония может придержать баланс (`deferBalance`/release): значения
+ *   копятся, снапшот и события раскрываются в конце — последним значением;
  * - доменные события считаются из снапшота: «лот ушёл к другому» — дифф
  *   владельца каталога при неизменном uid, «покупка» — от buyLot.
  *
@@ -110,6 +112,12 @@ export interface LiveStore {
   // Явная свежесть для денежных гейтов (гамба, покупка).
   refreshBalance(): Promise<number | null>;
   refreshLot(slug: string): Promise<LotState | null>;
+  /**
+   * Придержать баланс под церемонию (гамба): значения копятся, снапшот
+   * и события — до release. Возвращает идемпотентный release: раскрыть
+   * последнее удержанное значение (или ничего, если так и не пришло).
+   */
+  deferBalance(): () => void;
   // Значения и события от производителей (гамба/дейли, buyLot).
   reportBalance(value: number): void;
   /** Своя покупка: событие сразу, перечитка — следом (промис — вся дорожка). */
@@ -130,6 +138,9 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
   let balanceTried = false;
   /** Последнее чтение баланса удалось; false — на экране последнее хорошее. */
   let balanceFresh = false;
+  /** Церемония придержала баланс: копим последнее раскрываемое значение. */
+  let balanceHeld = false;
+  let heldBalance: number | null = null;
   let catalogValue = new Map<string, LotState>();
   let catalogFresh = false;
   let catalogKnown = false;
@@ -263,6 +274,12 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
 
   /** Баланс пришёл (или не пришёл): null не затирает последнее хорошее. */
   function applyBalance(value: number | null): void {
+    // Церемония придержала баланс (гамба): копим последнее раскрываемое
+    // значение, снапшот и события — до release (см. deferBalance).
+    if (balanceHeld) {
+      if (value !== null) heldBalance = value;
+      return;
+    }
     const first = !balanceTried;
     balanceTried = true;
     balanceFresh = value !== null;
@@ -275,6 +292,18 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
     const changed = value !== balanceValue;
     balanceValue = value;
     if (first || changed) emit({ kind: 'balance', balance: value, fresh: true });
+  }
+
+  /**
+   * Конец церемонии: раскрыть последнее удержанное значение обычным путём.
+   * Идемпотентно — повторный release (закрытие окна после конца крутки) no-op.
+   */
+  function releaseBalance(): void {
+    if (!balanceHeld) return;
+    balanceHeld = false;
+    const value = heldBalance;
+    heldBalance = null;
+    if (value !== null) applyBalance(value);
   }
 
   /** Смена uid: пересобрать «мой» флаг, сбросить чужой баланс, объявить. */
@@ -292,6 +321,8 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
     }
     balanceTried = false;
     balanceFresh = false;
+    // Значение прежнего uid не раскроется под церемонией нового.
+    heldBalance = null;
   }
 
   // -------------------------------------------------------------------------
@@ -459,6 +490,15 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
       // Одиночное чтение не выдаёт весь каталог за свежий (флаг здоровья — каталога).
       applyCatalog(next, true, false);
       return read.state;
+    },
+
+    deferBalance() {
+      // Повторный defer подряд (не должен случаться) не теряет уже накопленное.
+      if (!balanceHeld) {
+        balanceHeld = true;
+        heldBalance = null;
+      }
+      return releaseBalance;
     },
 
     reportBalance(value) {
