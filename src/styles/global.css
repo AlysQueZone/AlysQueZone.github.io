@@ -361,11 +361,27 @@ video:-webkit-full-screen {
   grid-column: 1 / -1;
 }
 
+/* «Случайные приветы»: широкая карточка показывается одна. Как только у любой
+   карточки постер догрузился и оказался широким (lib/lot-view.ts ставит
+   data-media-orientation), узкие прячутся, а из широких остаётся первая —
+   четвёрка больше не оставляет пустую ячейку. Витрину не трогаем: там dense
+   забивает дыру соседями. Скрытые карточки остаются в DOM (display:none):
+   перекраска по балансу и состояния секции живут как прежде. Unlayered: иначе
+   utility grid-раскладки перебила бы правила. */
+[data-random-lots]:has(.lot-media-frame[data-media-orientation='wide'])
+  > [data-lot-card]:not(:has(.lot-media-frame[data-media-orientation='wide'])),
+[data-random-lots]
+  > [data-lot-card]:has(.lot-media-frame[data-media-orientation='wide'])
+  ~ [data-lot-card]:has(.lot-media-frame[data-media-orientation='wide']) {
+  display: none;
+}
+
 /* Плотная укладка сеток с карточками (витрина и «Случайные приветы»): широкая
    карточка переносится на отдельную строку и в конце предыдущей оставляет
    пустые ячейки (ряд из трёх показывает две). dense подтягивает в них
    следующие карточки; порядок по цене на витрине может сдвинуться на пару
-   позиций — дыры заметнее. */
+   позиций — дыры заметнее. На главной dense почти безразличен: широкую
+   карточку в «Случайных приветах» показываем одну (правило выше). */
 [data-lot-grid],
 [data-random-lots] {
   grid-auto-flow: dense;
