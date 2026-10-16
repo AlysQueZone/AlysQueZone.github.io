@@ -9,10 +9,13 @@
  * - Провайдер Twitch и redirect-адреса настроены человеком в дашборде,
  *   код только вызывает signInWithOAuth/signOut и слушает сессию.
  * - Живые данные (снапшот каталога/лота/баланса/uid, каналы Realtime) — в
- *   lib/live.ts; здесь транспорт Supabase, запись покупки и хвосты перепродаж.
+ *   lib/live.ts; разбор строк `purchases` в историю и события перекупа —
+ *   в lib/trade-history.ts; здесь транспорт Supabase, запись покупки и
+ *   запросы, которые кормят это чистое ядро.
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { historyEntries, outbidCatchup, type HistoryEntry, type TradeRow } from './trade-history';
+import type { LiveOutbid } from './live-store';
 
 const SUPABASE_URL = import.meta.env.PUBLIC_SUPABASE_URL as string | undefined;
 const PUBLISHABLE_KEY = import.meta.env.PUBLIC_SUPABASE_PUBLISHABLE_KEY as string | undefined;
@@ -172,8 +175,9 @@ export function returnUrlForLot(lotId: string): string {
  * История перепродаж Лота из purchases: хвост сделок целиком (триммера до 50
  * строк в БД больше нет). `from` каждой записи — продавец из сделки
  * (`purchases.seller_*`, см. миграцию `*_purchase_seller.sql`), а не
- * реконструкция цепочки на клиенте. Лот не переехал в хранилище / ошибка →
- * пустая история.
+ * реконструкция цепочки на клиенте. Читаем страницу целиком: пока нет
+ * пагинации, объём ограничен только потолком строк PostgREST — это не жёсткий
+ * лимит алгоритма. Лот не переехал в хранилище / ошибка → пустая история.
  */
 export async function fetchSharedHistory(slug: string): Promise<HistoryEntry[]> {
   const sb = getSupabase();
@@ -208,6 +212,12 @@ export async function fetchSharedHistory(slug: string): Promise<HistoryEntry[]> 
 const CATCHUP_OVERFETCH = 4;
 
 /**
+ * Форма события догона — та же, что у живого перекупа (`LiveOutbid`): чистое
+ * ядро уже возвращает `LiveOutbid[]`, второй копии полей не держим.
+ */
+export type OutbidCatchupEntry = LiveOutbid;
+
+/**
  * Оффлайн-догон колокольчика (без новой таблицы): один запрос по продавцу —
  * сделки, где я был продавцом, свежие сверху. Лот, выкупленный обратно,
  * исключает ядро (`lots.owner_uid == uid`), поэтому строк берётся с запасом
@@ -215,15 +225,6 @@ const CATCHUP_OVERFETCH = 4;
  * (epoch ms) — метка просмотра: отдаём только сделки новее неё, поэтому уже
  * виденное не всплывает при каждой загрузке страницы.
  */
-export interface OutbidCatchupEntry {
-  slug: string;
-  title: string;
-  by: string;
-  price: number;
-  at: number;
-  video: string | null;
-}
-
 export async function fetchOutbidCatchup(
   uid: string,
   limit = 10,
