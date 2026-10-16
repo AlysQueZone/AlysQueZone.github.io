@@ -134,6 +134,12 @@ price = 800
 video_url = "https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-coolbeback.webm"
 
 [[lots]]
+slug = "lot-privet-denchique"
+title = "Привет Denchique_"
+price = 800
+video_url = "https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-denchique.webm"
+
+[[lots]]
 slug = "lot-privet-kubiclego"
 title = "Привет KubicLego"
 price = 800

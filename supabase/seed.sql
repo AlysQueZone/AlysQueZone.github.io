@@ -23,6 +23,7 @@ insert into public.lots (slug, title, price, video_url) values
   ('lot-privet-axel', 'Привет AkseLWalkerQuE', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-axel.webm'),
   ('lot-privet-bradhi', 'Привет Bradhi', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-bradhi.webm'),
   ('lot-privet-coolbeback', 'Привет coolbeback', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-coolbeback.webm'),
+  ('lot-privet-denchique', 'Привет Denchique_', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-denchique.webm'),
   ('lot-privet-kubiclego', 'Привет KubicLego', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-kubiclego.webm'),
   ('lot-privet-evilzerg57-double', 'Двойной привет evilzerg57', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-evilzerg57-double.webm'),
   ('lot-privet-gospoza-mayoneznih-ozer', 'Здраствуйте госпожа', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-gospoza-mayoneznih-ozer.webm'),
