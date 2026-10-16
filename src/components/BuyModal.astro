@@ -327,7 +327,7 @@ const clapSound = s3Sound('clap.mp3');
     try {
       const uid = live.uid();
       if (!uid || !pending || pending.slug !== lotId) return;
-      const history = await fetchSharedHistory(lotId, pending.owner);
+      const history = await fetchSharedHistory(lotId);
       for (let i = history.length - 1; i >= 0; i -= 1) {
         const entry = history[i];
         if (!entry || entry.buyer_uid !== uid) continue;
