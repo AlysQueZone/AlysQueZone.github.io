@@ -1,0 +1,1198 @@
+<!doctype html>
+<!--
+  ПРОТОТИП (throwaway) — подача подписи «Привет добавил <ник>» (Автор привета).
+
+  Вопрос: как показать автора привета на открытой карточке лота? Первая версия
+  (в общем прототипе lot-detail.html) забракована: ник тёплым «мутно-коричневым»
+  акцентом (--color-ember-deep), читается плохо и не нравится.
+
+  Этот файл показывает ОДНУ надпись в живом контексте раскладки B: медиа слева,
+  заголовок → надпись → кнопка покупки справа, история снизу. Меняется только
+  надпись; всё остальное зафиксировано, чтобы сравнивать честно.
+
+  Варианты (переключатель ← → или ?variant=1..5), описание — сверху:
+    1 «Тихая строка»   — без рамки: подпись капсом + ник чернилами.
+    2 «Чип, чернила»    — геометрия кнопки, ник чернилами (без цветного акцента).
+    3 «Чип, маджента»   — то же, ник маджентой канала (--color-stream).
+    4 «Тёмная плашка»   — инверсия: тёмная подложка, ник кремом.
+    5 «Полоса + автор»   — светлая плашка с толстой левой полосой и бейджем «автор».
+
+  Цвета ника по вариантам названы в описании явно: это главный предмет выбора.
+
+  Оговорки throwaway (как у соседей в scratch/):
+    - НЕ часть сборки, отдельный HTML вне Astro;
+    - токены/шрифты повторены вручную (Tailwind в файле нет);
+    - данные — статический слепок прод-БД (лот с автором в проде ровно один);
+    - постер/видео — хотлинком с CDN канала.
+-->
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Прототип · Подпись автора привета — AlysQueZone</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rubik:wght@400;700;800;900&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --color-void: #fff6bf;
+        --color-panel: #ffe6ac;
+        --color-card: #f0c46c;
+        --color-milk: #422006;
+        --color-mist: #744210;
+        --color-stream: #c2187b;
+        --color-legend: #b3127a;
+        --color-cream: #fffbea;
+        --color-pivko: #7a5f00;
+        --font-display: 'Press Start 2P', 'Rubik', system-ui, sans-serif;
+        --font-sans: 'Rubik', system-ui, -apple-system, sans-serif;
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background-color: var(--color-void);
+        color: var(--color-milk);
+        font-family: var(--font-sans);
+        min-height: 100vh;
+        padding-bottom: 8rem;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .muted {
+        color: var(--color-mist);
+      }
+
+      /* Шапка прототипа + нижний переключатель (не часть макета). */
+      .proto-top {
+        position: sticky;
+        top: 0;
+        z-index: 40;
+        background: var(--color-milk);
+        color: var(--color-cream);
+        padding: 0.6rem 0.9rem;
+        border-bottom: 3px solid var(--color-milk);
+      }
+
+      .proto-top .brand {
+        font-family: var(--font-display);
+        font-size: 10px;
+        line-height: 1.7;
+        text-transform: uppercase;
+      }
+
+      .proto-top .desc {
+        margin-top: 0.35rem;
+        font-size: 13px;
+        font-weight: 700;
+        max-width: 60rem;
+        line-height: 1.45;
+      }
+
+      .proto-top .desc b {
+        color: #ffd98a;
+      }
+
+      .proto-bottom {
+        position: fixed;
+        left: 50%;
+        bottom: 0.9rem;
+        transform: translateX(-50%);
+        z-index: 50;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: var(--color-milk);
+        color: var(--color-cream);
+        border: 3px solid var(--color-cream);
+        border-radius: 8px;
+        box-shadow: 4px 4px 0 rgba(66, 32, 6, 0.35);
+        padding: 0.35rem 0.5rem;
+      }
+
+      .proto-bottom button {
+        font: inherit;
+        font-weight: 900;
+        font-size: 16px;
+        line-height: 1;
+        width: 2rem;
+        height: 2rem;
+        border: 2px solid var(--color-cream);
+        border-radius: 5px;
+        background: transparent;
+        color: var(--color-cream);
+        cursor: pointer;
+      }
+
+      .proto-bottom button:hover {
+        background: rgba(255, 251, 234, 0.18);
+      }
+
+      .proto-bottom .label {
+        min-width: 13rem;
+        text-align: center;
+        font-size: 12px;
+      }
+
+      .proto-bottom .label b {
+        font-family: var(--font-display);
+        font-size: 10px;
+      }
+
+      /* Токены макета (повтор global.css). */
+      .card-pixel {
+        background-color: var(--color-panel);
+        border: 3px solid var(--color-milk);
+        box-shadow: 6px 6px 0 var(--color-milk);
+        border-radius: 4px;
+      }
+
+      .badge-pixel {
+        display: inline-block;
+        font-family: var(--font-display);
+        font-size: 9px;
+        line-height: 1.7;
+        padding: 4px 8px;
+        border-radius: 2px;
+        text-transform: uppercase;
+      }
+
+      .btn-arcade {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.25rem;
+        min-height: 2.75rem;
+        border: 3px solid var(--color-milk);
+        box-shadow: 4px 4px 0 var(--color-milk);
+        border-radius: 4px;
+        font-weight: 900;
+        text-transform: uppercase;
+        cursor: pointer;
+        font-size: 1rem;
+        font-family: inherit;
+        padding: 0.5rem 1.2rem;
+      }
+
+      .btn-arcade-primary {
+        background-color: var(--color-stream);
+        color: var(--color-cream);
+      }
+
+      .wrap {
+        max-width: 60rem;
+        margin: 0 auto;
+        padding: 1rem;
+      }
+
+      .back {
+        font-size: 14px;
+        font-weight: 800;
+        color: var(--color-stream);
+      }
+
+      .lot-title {
+        font-size: 1.5rem;
+        font-weight: 900;
+        line-height: 1.25;
+      }
+
+      /* Раскладка B. */
+      .b-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1.25rem;
+        align-items: start;
+        margin-top: 1rem;
+      }
+
+      .b-info {
+        display: flex;
+        flex-direction: column;
+        gap: 0.9rem;
+      }
+
+      .b-deal {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 0.15rem 0.6rem;
+        align-items: baseline;
+        border: 2px solid var(--color-milk);
+        background: var(--color-void);
+        padding: 0.45rem 0.6rem;
+      }
+
+      .b-deal + .b-deal {
+        margin-top: 0.4rem;
+      }
+
+      .b-deal .when {
+        grid-column: 1 / -1;
+        color: var(--color-mist);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .who {
+        font-weight: 800;
+      }
+
+      .arrow {
+        color: var(--color-mist);
+        margin: 0 0.3rem;
+      }
+
+      .price {
+        font-weight: 900;
+        color: var(--color-pivko);
+        white-space: nowrap;
+      }
+
+      .hist-head {
+        font-family: var(--font-display);
+        font-size: 10px;
+        line-height: 1.7;
+        text-transform: uppercase;
+      }
+
+      .mark {
+        display: inline-block;
+        font-family: var(--font-display);
+        font-size: 8px;
+        line-height: 1.7;
+        padding: 1px 5px;
+        border-radius: 2px;
+        text-transform: uppercase;
+      }
+
+      .mark-author {
+        background: var(--color-legend);
+        color: var(--color-cream);
+      }
+
+      .mark-mine {
+        background: var(--color-pivko);
+        color: var(--color-cream);
+      }
+
+      /* Кадр + бейджи (упрощённый lot-media-frame). */
+      .frame {
+        position: relative;
+        width: 100%;
+        max-width: 28rem;
+        overflow: hidden;
+        border: 2px solid var(--color-milk);
+        background: #000;
+        aspect-ratio: 1 / 1;
+      }
+
+      .frame img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+
+      .frame .play {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.35);
+        border: 0;
+        cursor: pointer;
+      }
+
+      .frame .play span {
+        background: var(--color-stream);
+        color: var(--color-cream);
+        border: 3px solid var(--color-milk);
+        box-shadow: 3px 3px 0 var(--color-milk);
+        padding: 0.4rem 0.8rem;
+        font-weight: 900;
+        text-transform: uppercase;
+        font-size: 12px;
+      }
+
+      .frame .badge-pixel {
+        position: absolute;
+      }
+
+      .frame .owner-badge {
+        top: 0.5rem;
+        left: 0.5rem;
+        background: var(--color-milk);
+        color: var(--color-cream);
+        max-width: 85%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .frame .mine-badge {
+        top: 0.5rem;
+        right: 0.5rem;
+        background: var(--color-pivko);
+        color: var(--color-cream);
+      }
+
+      /* ================= Подпись автора: пять вариантов ================= */
+
+      .al {
+        align-self: flex-start;
+        max-width: 100%;
+      }
+
+      .al-cap {
+        font-family: var(--font-display);
+        font-size: 8px;
+        line-height: 1.7;
+        text-transform: uppercase;
+        color: var(--color-mist);
+      }
+
+      .al-nick {
+        font-weight: 900;
+        font-size: 1.05rem;
+        word-break: break-all;
+      }
+
+      /* 1 «Тихая строка» — без рамки, ник чернилами. */
+      .al-plain {
+        display: flex;
+        flex-direction: column;
+        gap: 0.15rem;
+      }
+
+      .al-plain .al-nick {
+        color: var(--color-milk);
+      }
+
+      /* Чип: геометрия кнопки (общая часть 2, 3). */
+      .al-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        min-height: 2.75rem;
+        border: 3px solid var(--color-milk);
+        border-radius: 4px;
+        box-shadow: 4px 4px 0 color-mix(in srgb, var(--color-milk) 30%, transparent);
+        padding: 0.4rem 0.8rem;
+        background: var(--color-void);
+      }
+
+      /* 2 «Чип, чернила» — ник основным цветом текста. */
+      .al-chip .al-nick {
+        color: var(--color-milk);
+      }
+
+      /* 3 «Чип, маджента» — ник цветом кнопки покупки. */
+      .al-chip-magenta .al-nick {
+        color: var(--color-stream);
+      }
+
+      /* 4 «Тёмная плашка» — инверсия, ник кремом. */
+      .al-dark {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        min-height: 2.75rem;
+        border: 3px solid var(--color-milk);
+        border-radius: 4px;
+        box-shadow: 4px 4px 0 color-mix(in srgb, var(--color-milk) 30%, transparent);
+        padding: 0.4rem 0.8rem;
+        background: var(--color-milk);
+      }
+
+      .al-dark .al-cap {
+        color: var(--color-cream);
+      }
+
+      .al-dark .al-nick {
+        color: var(--color-cream);
+      }
+
+      /* 5 «Полоса + автор» — светлая плашка, толстая левая полоса, бейдж. */
+      .al-bar {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        min-height: 2.75rem;
+        border: 3px solid var(--color-milk);
+        border-left: 10px solid var(--color-legend);
+        border-radius: 4px;
+        box-shadow: 4px 4px 0 color-mix(in srgb, var(--color-milk) 30%, transparent);
+        padding: 0.4rem 0.8rem;
+        background: var(--color-void);
+      }
+
+      .al-bar .al-nick {
+        color: var(--color-milk);
+      }
+
+      .al-tag {
+        background: var(--color-legend);
+        color: var(--color-cream);
+      }
+
+      @media (min-width: 900px) {
+        .b-grid {
+          grid-template-columns: minmax(0, 26rem) minmax(0, 1fr);
+          grid-template-areas:
+            'media info'
+            'media history';
+        }
+
+        .b-media {
+          grid-area: media;
+        }
+
+        .b-info {
+          grid-area: info;
+        }
+
+        .b-history {
+          grid-area: history;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="proto-top">
+      <span class="brand">AlysQueZone · прототип</span>
+      <p class="desc" data-desc></p>
+    </header>
+
+    <main id="app" class="wrap"></main>
+
+    <nav class="proto-bottom" aria-label="Переключатель вариантов">
+      <button type="button" data-act="prev" aria-label="Предыдущий вариант">←</button>
+      <span class="label" data-variant-label></span>
+      <button type="button" data-act="next" aria-label="Следующий вариант">→</button>
+    </nav>
+
+    <script>
+      const RAW = /*__DATA__*/ {
+        view: [
+          {
+            slug: 'lot-privet-olyacaramel',
+            title: 'Покупка olyacaramel',
+            video_url:
+              'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-olyacaramel.webm',
+            price: 3426,
+            next_price: 3427,
+            owner_login: 'dyadyapog',
+            owner_uid: '08019321-2ff9-4a51-8666-2902ea6cdc61',
+            suggested_by_login: null,
+          },
+          {
+            slug: 'lot-privet-evilzerg57-double',
+            title: 'Двойной привет evilzerg57',
+            video_url:
+              'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-evilzerg57-double.webm',
+            price: 3045,
+            next_price: 3350,
+            owner_login: 'feistyman333',
+            owner_uid: '13613931-3395-4c1b-8ba9-37146e9eb01b',
+            suggested_by_login: null,
+          },
+          {
+            slug: 'lot-privet-purpletie',
+            title: 'Привет PurpleTie',
+            video_url:
+              'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-purpletie.webm',
+            price: 880,
+            next_price: 968,
+            owner_login: 'foxindique',
+            owner_uid: '49b31e9c-f2c5-4117-9f75-7023f6b57427',
+            suggested_by_login: null,
+          },
+          {
+            slug: 'lot-sub-melkij-strateg-2',
+            title: 'Привет офлайн чатыку',
+            video_url:
+              'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-sub-melkij-strateg-2.webm',
+            price: 1419,
+            next_price: 1561,
+            owner_login: 'spiritbanbanban',
+            owner_uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+            suggested_by_login: 'melkij_strateg',
+          },
+        ],
+        history: {
+          'lot-sub-melkij-strateg-2': [
+            {
+              seller: 'melkij_strateg',
+              buyer: 'foxindique',
+              uid: '49b31e9c-f2c5-4117-9f75-7023f6b57427',
+              price: 880,
+              at: '2026-10-14T18:18:35.354531+00:00',
+            },
+            {
+              seller: 'foxindique',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 968,
+              at: '2026-10-15T02:02:29.195209+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'gedo0',
+              uid: 'eac22c2b-8888-45f1-aa74-8c58e77cbcc6',
+              price: 1065,
+              at: '2026-10-15T07:55:40.348537+00:00',
+            },
+            {
+              seller: 'gedo0',
+              buyer: '4deli',
+              uid: '38441380-8e28-458d-8785-375c54dd8edd',
+              price: 1172,
+              at: '2026-10-15T07:57:34.721645+00:00',
+            },
+            {
+              seller: '4deli',
+              buyer: 'gedo0',
+              uid: 'eac22c2b-8888-45f1-aa74-8c58e77cbcc6',
+              price: 1290,
+              at: '2026-10-15T07:58:03.769099+00:00',
+            },
+            {
+              seller: 'gedo0',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 1419,
+              at: '2026-10-16T01:47:04.622504+00:00',
+            },
+          ],
+          'lot-privet-olyacaramel': [
+            {
+              seller: null,
+              buyer: 'dyadyapog',
+              uid: '08019321-2ff9-4a51-8666-2902ea6cdc61',
+              price: 3377,
+              at: '2026-09-23T13:39:32.033785+00:00',
+            },
+            {
+              seller: 'dyadyapog',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3378,
+              at: '2026-09-24T01:03:07.93987+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: '4deli',
+              uid: '38441380-8e28-458d-8785-375c54dd8edd',
+              price: 3379,
+              at: '2026-09-24T03:36:51.367639+00:00',
+            },
+            {
+              seller: '4deli',
+              buyer: 'dyadyapog',
+              uid: '08019321-2ff9-4a51-8666-2902ea6cdc61',
+              price: 3380,
+              at: '2026-09-24T07:59:03.303131+00:00',
+            },
+            {
+              seller: 'dyadyapog',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3381,
+              at: '2026-09-24T14:32:50.477692+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'foxindique',
+              uid: '49b31e9c-f2c5-4117-9f75-7023f6b57427',
+              price: 3382,
+              at: '2026-09-24T15:32:07.067011+00:00',
+            },
+            {
+              seller: 'foxindique',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3383,
+              at: '2026-09-25T11:57:19.799832+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'foxindique',
+              uid: '49b31e9c-f2c5-4117-9f75-7023f6b57427',
+              price: 3384,
+              at: '2026-09-25T13:17:33.992303+00:00',
+            },
+            {
+              seller: 'foxindique',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3385,
+              at: '2026-09-25T13:34:58.681381+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'dyadyapog',
+              uid: '08019321-2ff9-4a51-8666-2902ea6cdc61',
+              price: 3386,
+              at: '2026-09-27T12:30:55.814628+00:00',
+            },
+            {
+              seller: 'dyadyapog',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3387,
+              at: '2026-09-27T13:45:44.980276+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'dyadyapog',
+              uid: '08019321-2ff9-4a51-8666-2902ea6cdc61',
+              price: 3388,
+              at: '2026-09-28T00:32:07.566485+00:00',
+            },
+            {
+              seller: 'dyadyapog',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3389,
+              at: '2026-09-28T01:20:28.870359+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'dyadyapog',
+              uid: '08019321-2ff9-4a51-8666-2902ea6cdc61',
+              price: 3390,
+              at: '2026-09-28T09:57:45.755466+00:00',
+            },
+            {
+              seller: 'dyadyapog',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3391,
+              at: '2026-09-29T03:14:34.925455+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'foxindique',
+              uid: '49b31e9c-f2c5-4117-9f75-7023f6b57427',
+              price: 3392,
+              at: '2026-09-29T05:48:45.763573+00:00',
+            },
+            {
+              seller: 'foxindique',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3393,
+              at: '2026-09-29T07:24:54.416822+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'gedo0',
+              uid: 'eac22c2b-8888-45f1-aa74-8c58e77cbcc6',
+              price: 3394,
+              at: '2026-09-29T08:14:34.64744+00:00',
+            },
+            {
+              seller: 'gedo0',
+              buyer: 'dyadyapog',
+              uid: '08019321-2ff9-4a51-8666-2902ea6cdc61',
+              price: 3395,
+              at: '2026-09-29T09:19:40.97952+00:00',
+            },
+            {
+              seller: 'dyadyapog',
+              buyer: 'foxindique',
+              uid: '49b31e9c-f2c5-4117-9f75-7023f6b57427',
+              price: 3396,
+              at: '2026-09-29T11:04:39.721404+00:00',
+            },
+            {
+              seller: 'foxindique',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3397,
+              at: '2026-09-29T16:40:44.735211+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'foxindique',
+              uid: '49b31e9c-f2c5-4117-9f75-7023f6b57427',
+              price: 3398,
+              at: '2026-09-29T16:49:24.209047+00:00',
+            },
+            {
+              seller: 'foxindique',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3399,
+              at: '2026-09-29T23:23:18.275556+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'foxindique',
+              uid: '49b31e9c-f2c5-4117-9f75-7023f6b57427',
+              price: 3400,
+              at: '2026-09-30T02:54:53.49621+00:00',
+            },
+            {
+              seller: 'foxindique',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3401,
+              at: '2026-09-30T03:30:04.564866+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'gedo0',
+              uid: 'eac22c2b-8888-45f1-aa74-8c58e77cbcc6',
+              price: 3402,
+              at: '2026-09-30T08:10:27.586072+00:00',
+            },
+            {
+              seller: 'gedo0',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3403,
+              at: '2026-09-30T21:28:55.644467+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'dyadyapog',
+              uid: '08019321-2ff9-4a51-8666-2902ea6cdc61',
+              price: 3404,
+              at: '2026-10-01T06:35:05.969391+00:00',
+            },
+            {
+              seller: 'dyadyapog',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3405,
+              at: '2026-10-01T20:13:32.618531+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'dyadyapog',
+              uid: '08019321-2ff9-4a51-8666-2902ea6cdc61',
+              price: 3406,
+              at: '2026-10-02T13:04:40.060804+00:00',
+            },
+            {
+              seller: 'dyadyapog',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3407,
+              at: '2026-10-03T00:29:00.767942+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'dyadyapog',
+              uid: '08019321-2ff9-4a51-8666-2902ea6cdc61',
+              price: 3408,
+              at: '2026-10-04T00:02:51.708393+00:00',
+            },
+            {
+              seller: 'dyadyapog',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3409,
+              at: '2026-10-04T03:38:59.734868+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'dyadyapog',
+              uid: '08019321-2ff9-4a51-8666-2902ea6cdc61',
+              price: 3410,
+              at: '2026-10-05T18:30:29.725031+00:00',
+            },
+            {
+              seller: 'dyadyapog',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3411,
+              at: '2026-10-06T00:30:25.549666+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'dyadyapog',
+              uid: '08019321-2ff9-4a51-8666-2902ea6cdc61',
+              price: 3412,
+              at: '2026-10-07T21:45:43.060411+00:00',
+            },
+            {
+              seller: 'dyadyapog',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3413,
+              at: '2026-10-08T07:47:23.753625+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'dyadyapog',
+              uid: '08019321-2ff9-4a51-8666-2902ea6cdc61',
+              price: 3414,
+              at: '2026-10-08T09:00:03.948269+00:00',
+            },
+            {
+              seller: 'dyadyapog',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3415,
+              at: '2026-10-08T18:33:22.9369+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'dyadyapog',
+              uid: '08019321-2ff9-4a51-8666-2902ea6cdc61',
+              price: 3416,
+              at: '2026-10-08T18:36:52.375975+00:00',
+            },
+            {
+              seller: 'dyadyapog',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3417,
+              at: '2026-10-11T02:46:28.915639+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'dyadyapog',
+              uid: '08019321-2ff9-4a51-8666-2902ea6cdc61',
+              price: 3418,
+              at: '2026-10-12T14:07:08.070837+00:00',
+            },
+            {
+              seller: 'dyadyapog',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3419,
+              at: '2026-10-13T00:23:46.891647+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: '4deli',
+              uid: '38441380-8e28-458d-8785-375c54dd8edd',
+              price: 3420,
+              at: '2026-10-13T01:50:24.192295+00:00',
+            },
+            {
+              seller: '4deli',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3421,
+              at: '2026-10-14T08:07:24.584448+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'dyadyapog',
+              uid: '08019321-2ff9-4a51-8666-2902ea6cdc61',
+              price: 3422,
+              at: '2026-10-14T12:19:08.100771+00:00',
+            },
+            {
+              seller: 'dyadyapog',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3423,
+              at: '2026-10-14T23:40:50.383758+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: '4deli',
+              uid: '38441380-8e28-458d-8785-375c54dd8edd',
+              price: 3424,
+              at: '2026-10-15T07:56:22.955813+00:00',
+            },
+            {
+              seller: '4deli',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3425,
+              at: '2026-10-16T01:46:39.351159+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'dyadyapog',
+              uid: '08019321-2ff9-4a51-8666-2902ea6cdc61',
+              price: 3426,
+              at: '2026-10-16T02:59:52.950972+00:00',
+            },
+          ],
+          'lot-privet-evilzerg57-double': [
+            {
+              seller: null,
+              buyer: 'melkij_strateg',
+              uid: 'a7976846-8d9d-46f4-9d76-fd9f4675e0bb',
+              price: 880,
+              at: '2026-09-15T13:42:15.994067+00:00',
+            },
+            {
+              seller: 'melkij_strateg',
+              buyer: 'foxindique',
+              uid: '49b31e9c-f2c5-4117-9f75-7023f6b57427',
+              price: 968,
+              at: '2026-09-16T05:48:11.680287+00:00',
+            },
+            {
+              seller: 'foxindique',
+              buyer: 'gedo0',
+              uid: 'eac22c2b-8888-45f1-aa74-8c58e77cbcc6',
+              price: 1065,
+              at: '2026-09-16T06:11:37.961981+00:00',
+            },
+            {
+              seller: 'gedo0',
+              buyer: '4deli',
+              uid: '38441380-8e28-458d-8785-375c54dd8edd',
+              price: 1172,
+              at: '2026-09-16T06:35:15.659129+00:00',
+            },
+            {
+              seller: '4deli',
+              buyer: 'gedo0',
+              uid: 'eac22c2b-8888-45f1-aa74-8c58e77cbcc6',
+              price: 1290,
+              at: '2026-09-16T13:58:36.17782+00:00',
+            },
+            {
+              seller: 'gedo0',
+              buyer: 'feistyman333',
+              uid: '13613931-3395-4c1b-8ba9-37146e9eb01b',
+              price: 1419,
+              at: '2026-09-16T17:11:03.258433+00:00',
+            },
+            {
+              seller: 'feistyman333',
+              buyer: 'gedo0',
+              uid: 'eac22c2b-8888-45f1-aa74-8c58e77cbcc6',
+              price: 1561,
+              at: '2026-09-17T12:05:27.302907+00:00',
+            },
+            {
+              seller: 'gedo0',
+              buyer: 'vandalque',
+              uid: '4e836bb6-9b14-4d9b-a93b-643f33785b83',
+              price: 1718,
+              at: '2026-09-17T12:11:55.386364+00:00',
+            },
+            {
+              seller: 'vandalque',
+              buyer: 'gedo0',
+              uid: 'eac22c2b-8888-45f1-aa74-8c58e77cbcc6',
+              price: 1890,
+              at: '2026-09-17T12:38:20.72902+00:00',
+            },
+            {
+              seller: 'gedo0',
+              buyer: 'feistyman333',
+              uid: '13613931-3395-4c1b-8ba9-37146e9eb01b',
+              price: 2079,
+              at: '2026-09-17T17:16:52.228438+00:00',
+            },
+            {
+              seller: 'feistyman333',
+              buyer: 'evilzerg57',
+              uid: 'be9fb817-1bcc-430d-92ea-4b62eaf18018',
+              price: 2287,
+              at: '2026-09-21T21:32:13.164603+00:00',
+            },
+            {
+              seller: 'evilzerg57',
+              buyer: 'feistyman333',
+              uid: '13613931-3395-4c1b-8ba9-37146e9eb01b',
+              price: 2516,
+              at: '2026-09-21T21:35:53.890025+00:00',
+            },
+            {
+              seller: 'feistyman333',
+              buyer: 'evilzerg57',
+              uid: 'be9fb817-1bcc-430d-92ea-4b62eaf18018',
+              price: 2768,
+              at: '2026-09-23T13:33:06.481531+00:00',
+            },
+            {
+              seller: 'evilzerg57',
+              buyer: 'feistyman333',
+              uid: '13613931-3395-4c1b-8ba9-37146e9eb01b',
+              price: 3045,
+              at: '2026-09-23T18:18:56.243284+00:00',
+            },
+          ],
+          'lot-privet-purpletie': [
+            {
+              seller: null,
+              buyer: 'foxindique',
+              uid: '49b31e9c-f2c5-4117-9f75-7023f6b57427',
+              price: 880,
+              at: '2026-10-16T14:45:16.238936+00:00',
+            },
+          ],
+        },
+      };
+      const ME = '869d27b7-833e-4b66-9594-befdb5c5ea03';
+      const AUTHOR_SLUG = 'lot-sub-melkij-strateg-2';
+
+      const VARIANTS = [
+        {
+          key: '1',
+          name: 'Тихая строка',
+          desc: 'Без рамки и тени: подпись капсом, ник <b>чернилами</b> (--color-milk). Самый спокойный вариант — «ещё одна строка текста» под заголовком.',
+        },
+        {
+          key: '2',
+          name: 'Чип, чернила',
+          desc: 'Геометрия кнопки (рамка, высота, тень), но ник <b>чернилами</b> (--color-milk): выделяет только рамка, цвета ника нет.',
+        },
+        {
+          key: '3',
+          name: 'Чип, маджента',
+          desc: 'Как вариант 2, ник <b>маджентой канала</b> (--color-stream, тот же цвет, что у кнопки «Забрать») — контраст 5.2:1.',
+        },
+        {
+          key: '4',
+          name: 'Тёмная плашка',
+          desc: 'Инверсия: тёмная подложка (--color-milk), ник <b>кремом</b> (--color-cream). Самый «весомый» вариант; но тёмная плашка — тот же приём, что у бейджа владельца.',
+        },
+        {
+          key: '5',
+          name: 'Полоса + автор',
+          desc: 'Светлая плашка с толстой левой полосой (--color-legend) и бейджем «автор» — тем же, что в истории перепродаж. Ник <b>чернилами</b>.',
+        },
+      ];
+
+      const S = { variant: '1' };
+
+      function fmtRel(iso) {
+        const d = new Date(iso);
+        const sec = Math.max(0, (Date.now() - d.getTime()) / 1000);
+        if (sec < 60) return 'только что';
+        const min = Math.floor(sec / 60);
+        if (min < 60) return `${min} мин назад`;
+        const hr = Math.floor(min / 60);
+        if (hr < 24) return `${hr} ч назад`;
+        const day = Math.floor(hr / 24);
+        if (day === 1) return 'вчера';
+        if (day < 7) return `${day} дн назад`;
+        return new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short' }).format(d);
+      }
+
+      function esc(s) {
+        return String(s ?? '').replace(
+          /[&<>"']/g,
+          (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
+        );
+      }
+
+      const VIEW = RAW.view.find((v) => v.slug === AUTHOR_SLUG) ?? RAW.view[0];
+      const HISTORY = (RAW.history[AUTHOR_SLUG] || []).slice().reverse();
+      const AUTHOR = VIEW.suggested_by_login;
+
+      /** Пять разметок одной надписи — разница только в обёртке/цвете ника. */
+      function authorLabel(variant) {
+        const nick = `<span class="al-nick">${esc(AUTHOR)}</span>`;
+        const cap = '<span class="al-cap">Привет добавил</span>';
+        switch (variant) {
+          case '1':
+            return `<p class="al al-plain">${cap}${nick}</p>`;
+          case '2':
+            return `<span class="al al-chip">${cap}${nick}</span>`;
+          case '3':
+            return `<span class="al al-chip al-chip-magenta">${cap}${nick}</span>`;
+          case '4':
+            return `<span class="al al-dark">${cap}${nick}</span>`;
+          case '5':
+            return `<span class="al al-bar">${cap}${nick}<span class="badge-pixel al-tag">автор</span></span>`;
+          default:
+            return '';
+        }
+      }
+
+      function historyBlock() {
+        const rows = HISTORY.map((d) => {
+          const mine = d.uid === ME ? '<span class="mark mark-mine">ТВОЙ</span>' : '';
+          const isAuthor = d.seller === AUTHOR ? '<span class="mark mark-author">автор</span>' : '';
+          return `<li class="b-deal">
+              <span><span class="who">${esc(d.seller ?? 'Биржа')}</span><span class="arrow">→</span><span class="who">${esc(d.buyer)}</span> ${mine}${isAuthor}</span>
+              <span class="price">${d.price} 🍺</span>
+              <span class="when">${fmtRel(d.at)}</span>
+            </li>`;
+        }).join('');
+        return `<ul>${rows}</ul>`;
+      }
+
+      function render() {
+        const html = `<div class="lot">
+          <a class="back" href="#">← Назад на биржу</a>
+          <div class="b-grid">
+            <div class="card-pixel b-media" style="padding:1rem">
+              <div class="frame">
+                <img src="${esc(VIEW.video_url.replace(/\.webm$/, '.webp'))}" alt="${esc(VIEW.title)}" />
+                <button class="play" type="button"><span>▶ смотреть</span></button>
+                <span class="badge-pixel owner-badge">👑 ${esc(VIEW.owner_login)}</span>
+                <span class="badge-pixel mine-badge">Твой</span>
+              </div>
+            </div>
+            <article class="card-pixel b-info" style="padding:1.25rem">
+              <h1 class="lot-title">${esc(VIEW.title)}</h1>
+              ${authorLabel(S.variant)}
+              <div><button class="btn-arcade" type="button" disabled>Твой привет</button></div>
+            </article>
+            <section class="card-pixel b-history" style="padding:1rem">
+              <h2 class="hist-head">История перепродаж</h2>
+              <div style="margin-top:.75rem">${historyBlock()}</div>
+            </section>
+          </div>
+        </div>`;
+        document.getElementById('app').innerHTML = html;
+        const v = VARIANTS.find((x) => x.key === S.variant);
+        document.querySelector('[data-variant-label]').innerHTML = `<b>${v.key}</b> · ${v.name}`;
+        document.querySelector('[data-desc]').innerHTML = v.desc;
+      }
+
+      function syncUrl() {
+        const url = new URL(location.href);
+        url.searchParams.set('variant', S.variant);
+        history.replaceState(null, '', url);
+      }
+
+      document.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-act]');
+        if (!btn) return;
+        if (btn.dataset.act === 'prev' || btn.dataset.act === 'next') {
+          const i = VARIANTS.findIndex((v) => v.key === S.variant);
+          const next =
+            (i + (btn.dataset.act === 'next' ? 1 : VARIANTS.length - 1)) % VARIANTS.length;
+          S.variant = VARIANTS[next].key;
+          syncUrl();
+          render();
+        }
+      });
+
+      (function init() {
+        const v = new URLSearchParams(location.search).get('variant');
+        if (VARIANTS.some((x) => x.key === v)) S.variant = v;
+        render();
+      })();
+    </script>
+  </body>
+</html>
