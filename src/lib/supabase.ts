@@ -200,11 +200,20 @@ export async function fetchSharedHistory(slug: string): Promise<HistoryEntry[]> 
 }
 
 /**
+ * Запас строк на догоне: выкупленные обратно лоты отсеивает ядро уже после
+ * запроса, поэтому без запаса свежие строки, сплошь выкупленные, отдали бы
+ * меньше `limit` событий. Берём с запасом, а не вторым запросом: догон
+ * остаётся одним обращением к БД.
+ */
+const CATCHUP_OVERFETCH = 4;
+
+/**
  * Оффлайн-догон колокольчика (без новой таблицы): один запрос по продавцу —
  * сделки, где я был продавцом, свежие сверху. Лот, выкупленный обратно,
- * исключает ядро (`lots.owner_uid == uid`). `since` (epoch ms) — метка
- * просмотра: отдаём только сделки новее неё, поэтому уже виденное не всплывает
- * при каждой загрузке страницы.
+ * исключает ядро (`lots.owner_uid == uid`), поэтому строк берётся с запасом
+ * (`CATCHUP_OVERFETCH`), чтобы `limit` событий не худел на них. `since`
+ * (epoch ms) — метка просмотра: отдаём только сделки новее неё, поэтому уже
+ * виденное не всплывает при каждой загрузке страницы.
  */
 export interface OutbidCatchupEntry {
   slug: string;
@@ -229,7 +238,7 @@ export async function fetchOutbidCatchup(
       .eq('seller_uid', uid)
       .order('created_at', { ascending: false })
       .order('id', { ascending: false })
-      .limit(Math.max(1, limit));
+      .limit(Math.max(1, limit) * CATCHUP_OVERFETCH);
     if (typeof since === 'number' && Number.isFinite(since) && since > 0) {
       query = query.gt('created_at', new Date(since).toISOString());
     }

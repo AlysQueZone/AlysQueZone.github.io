@@ -133,6 +133,33 @@ describe('outbidCatchup', () => {
     expect(events).toEqual([]);
   });
 
+  it('ничейный лот: продавца не было, но продажа моя — событие остаётся', () => {
+    const events = outbidCatchup(
+      [mine({ lots: lot({ slug: 'ownerless', owner_uid: null }) })],
+      me,
+      10
+    );
+    expect(events.map((event) => event.slug)).toEqual(['ownerless']);
+  });
+
+  it('выкупленный обратно лот среди свежих не съедает лимит', () => {
+    const events = outbidCatchup(
+      [
+        mine({ created_at: '2026-10-15T12:00:00.000Z', lots: lot({ owner_uid: me }) }),
+        mine({ created_at: '2026-10-14T12:00:00.000Z', lots: lot({ slug: 'b' }) }),
+        mine({ created_at: '2026-10-13T12:00:00.000Z', lots: lot({ slug: 'a' }) }),
+      ],
+      me,
+      2
+    );
+    expect(events.map((event) => event.slug)).toEqual(['b', 'a']);
+  });
+
+  it('лимит <= 0 — пусто', () => {
+    expect(outbidCatchup([mine({ lots: lot({ slug: 'x' }) })], me, 0)).toEqual([]);
+    expect(outbidCatchup([mine({ lots: lot({ slug: 'x' }) })], me, -3)).toEqual([]);
+  });
+
   it('покупатель и время берутся из строки (форма LiveOutbid)', () => {
     const events = outbidCatchup(
       [
