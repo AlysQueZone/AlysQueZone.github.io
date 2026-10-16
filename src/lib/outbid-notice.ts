@@ -244,13 +244,14 @@ export function initOutbidNotice(): void {
 
   /** Оффлайн-догон: сделки, где меня перекупили без открытого канала
    *  (закрыта вкладка). Best effort, дедуп по событию, свежие — первыми.
-   *  Непрочитанными считаются только события новее метки просмотра. */
+   *  Метка просмотра уходит флором в запрос: уже виденное не возвращается,
+   *  поэтому непрочитанные — ровно пришедшие новее метки. */
   async function catchUpOffline(): Promise<void> {
     if (uid === null) return;
     try {
-      const found = await fetchOutbidCatchup(uid, MAX_HISTORY);
-      if (found.length === 0) return;
       const seenAt = loadSeenAt();
+      const found = await fetchOutbidCatchup(uid, MAX_HISTORY, seenAt);
+      if (found.length === 0) return;
       const known = new Set(history.map(eventKey));
       for (const m of missed) known.add(eventKey(m));
       let added = 0;

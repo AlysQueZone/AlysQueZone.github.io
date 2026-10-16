@@ -12,6 +12,7 @@
  *   lib/live.ts; здесь транспорт Supabase, запись покупки и хвосты перепродаж.
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { historyEntries, outbidCatchup, type HistoryEntry, type TradeRow } from './trade-history';
 
 const SUPABASE_URL = import.meta.env.PUBLIC_SUPABASE_URL as string | undefined;
 const PUBLISHABLE_KEY = import.meta.env.PUBLIC_SUPABASE_PUBLISHABLE_KEY as string | undefined;
@@ -167,24 +168,14 @@ export function returnUrlForLot(lotId: string): string {
 // такие ключи обязательны (assertSupabaseConfigured).
 // ---------------------------------------------------------------------------
 
-/** Одна запись общего хвоста перепродаж: from — предыдущий Владелец. */
-export interface SharedHistoryEntry {
-  from: string;
-  to: string;
-  price: number;
-  buyer_uid: string;
-  created_at: string;
-}
-
 /**
- * Общий хвост перепродаж Лота из purchases (до 50, как режет AFTER-триггер).
- * from первой записи — staticOwner (Владелец из каталога), дальше цепочка:
- * from[i] = to[i-1]. Лот не переехал в хранилище / ошибка → пустой хвост.
+ * История перепродаж Лота из purchases: хвост сделок целиком (триммера до 50
+ * строк в БД больше нет). `from` каждой записи — продавец из сделки
+ * (`purchases.seller_*`, см. миграцию `*_purchase_seller.sql`), а не
+ * реконструкция цепочки на клиенте. Лот не переехал в хранилище / ошибка →
+ * пустая история.
  */
-export async function fetchSharedHistory(
-  slug: string,
-  staticOwner: string | null
-): Promise<SharedHistoryEntry[]> {
+export async function fetchSharedHistory(slug: string): Promise<HistoryEntry[]> {
   const sb = getSupabase();
   if (!sb) return [];
   try {
@@ -196,42 +187,24 @@ export async function fetchSharedHistory(
     const { data, error } = await withAuthRetry(() =>
       sb
         .from('purchases')
-        .select('buyer_login,buyer_uid,price_paid,created_at')
+        .select('seller_login,buyer_login,buyer_uid,price_paid,created_at')
         .eq('lot_id', lotId)
         .order('created_at', { ascending: true })
         .order('id', { ascending: true })
-        .limit(50)
     );
     if (error || !Array.isArray(data)) return [];
-    const rows = data as unknown as Record<string, unknown>[];
-    let prev = staticOwner && staticOwner.length > 0 ? staticOwner : '—';
-    return rows.flatMap((row) => {
-      const to = row['buyer_login'];
-      const price = Number(row['price_paid']);
-      if (typeof to !== 'string' || !Number.isFinite(price)) return [];
-      const entry: SharedHistoryEntry = {
-        from: prev,
-        to,
-        price,
-        buyer_uid: typeof row['buyer_uid'] === 'string' ? (row['buyer_uid'] as string) : '',
-        created_at: typeof row['created_at'] === 'string' ? (row['created_at'] as string) : '',
-      };
-      prev = to;
-      return [entry];
-    });
+    return historyEntries(data as unknown as TradeRow[]);
   } catch {
     return [];
   }
 }
 
 /**
- * Оффлайн-догон колокольчика (без новой таблицы).
- * Находит сделки, где я был продавцом: цепочка покупок лота, в которой
- * предыдущий покупатель — я, а следующий — уже не я. Текущие мои лоты
- * (lots.owner_uid == uid) исключаются — их уже выкупил обратно.
- * Первая продажа владельца-не-покупателя (сид или автор привета) не
- * покрывается: продавец там вне цепочки purchases. Возвращает до `limit`
- * свежих событий.
+ * Оффлайн-догон колокольчика (без новой таблицы): один запрос по продавцу —
+ * сделки, где я был продавцом, свежие сверху. Лот, выкупленный обратно,
+ * исключает ядро (`lots.owner_uid == uid`). `since` (epoch ms) — метка
+ * просмотра: отдаём только сделки новее неё, поэтому уже виденное не всплывает
+ * при каждой загрузке страницы.
  */
 export interface OutbidCatchupEntry {
   slug: string;
@@ -242,87 +215,27 @@ export interface OutbidCatchupEntry {
   video: string | null;
 }
 
-export async function fetchOutbidCatchup(uid: string, limit = 10): Promise<OutbidCatchupEntry[]> {
+export async function fetchOutbidCatchup(
+  uid: string,
+  limit = 10,
+  since?: number
+): Promise<OutbidCatchupEntry[]> {
   const sb = getSupabase();
   if (!sb || !uid) return [];
   try {
-    const { data: mine, error: mineError } = await withAuthRetry(() =>
-      sb
-        .from('purchases')
-        .select('lot_id')
-        .eq('buyer_uid', uid)
-        .order('id', { ascending: false })
-        .limit(200)
-    );
-    if (mineError || !Array.isArray(mine) || mine.length === 0) return [];
-    const lotIds = [
-      ...new Set(
-        (mine as unknown as Record<string, unknown>[])
-          .map((row) => Number(row['lot_id']))
-          .filter((id) => Number.isFinite(id) && id > 0)
-      ),
-    ];
-    if (lotIds.length === 0) return [];
-    const { data, error } = await withAuthRetry(() =>
-      sb
-        .from('purchases')
-        .select(
-          'lot_id,buyer_uid,buyer_login,price_paid,created_at,lots(slug,title,video_url,owner_uid)'
-        )
-        .in('lot_id', lotIds)
-        .order('created_at', { ascending: true })
-        .order('id', { ascending: true })
-        .limit(500)
-    );
+    let query = sb
+      .from('purchases')
+      .select('seller_uid,buyer_login,price_paid,created_at,lots(slug,title,video_url,owner_uid)')
+      .eq('seller_uid', uid)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(Math.max(1, limit));
+    if (typeof since === 'number' && Number.isFinite(since) && since > 0) {
+      query = query.gt('created_at', new Date(since).toISOString());
+    }
+    const { data, error } = await withAuthRetry(() => query);
     if (error || !Array.isArray(data)) return [];
-    const byLot = new Map<number, Record<string, unknown>[]>();
-    for (const row of data as unknown as Record<string, unknown>[]) {
-      const lotId = Number(row['lot_id']);
-      if (!Number.isFinite(lotId)) continue;
-      const list = byLot.get(lotId) ?? [];
-      list.push(row);
-      byLot.set(lotId, list);
-    }
-    const events: OutbidCatchupEntry[] = [];
-    for (const rows of byLot.values()) {
-      let prevBuyer: string | null = null;
-      for (const row of rows) {
-        const curBuyer = typeof row['buyer_uid'] === 'string' ? (row['buyer_uid'] as string) : '';
-        const lot = row['lots'] as unknown as Record<string, unknown> | null;
-        const slug = lot && typeof lot['slug'] === 'string' ? (lot['slug'] as string) : null;
-        if (prevBuyer === uid && curBuyer !== uid && slug) {
-          const price = Number(row['price_paid']);
-          const created =
-            typeof row['created_at'] === 'string' ? Date.parse(row['created_at']) : NaN;
-          const ownerUid =
-            lot && typeof lot['owner_uid'] === 'string' ? (lot['owner_uid'] as string) : null;
-          // Лот уже выкуплен обратно — не тащим в историю.
-          if (ownerUid !== uid && Number.isFinite(price) && price > 0) {
-            events.push({
-              slug,
-              title:
-                lot && typeof lot['title'] === 'string' && (lot['title'] as string).length > 0
-                  ? (lot['title'] as string)
-                  : slug,
-              by:
-                typeof row['buyer_login'] === 'string' && (row['buyer_login'] as string).length > 0
-                  ? (row['buyer_login'] as string)
-                  : 'Чатерс',
-              price,
-              at: Number.isFinite(created) ? created : Date.now(),
-              video:
-                lot &&
-                typeof lot['video_url'] === 'string' &&
-                (lot['video_url'] as string).length > 0
-                  ? (lot['video_url'] as string)
-                  : null,
-            });
-          }
-        }
-        prevBuyer = curBuyer || prevBuyer;
-      }
-    }
-    return events.sort((a, b) => b.at - a.at).slice(0, Math.max(1, limit));
+    return outbidCatchup(data as unknown as TradeRow[], uid, limit);
   } catch {
     return [];
   }
