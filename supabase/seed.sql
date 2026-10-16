@@ -32,9 +32,11 @@ insert into public.lots (slug, title, price, video_url) values
   ('lot-privet-nxver-existd', 'Привет NXVER_EXISTD', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-nxver-existd.webm'),
   ('lot-privet-olyacaramel', 'Покупка olyacaramel', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-olyacaramel.webm'),
   ('lot-privet-onghanntto', 'Привет Onghanntto', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-onghanntto.webm'),
+  ('lot-privet-purpletie', 'Привет PurpleTie', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-purpletie.webm'),
   ('lot-privet-revixit', 'Привет Revixit', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-revixit.webm'),
   ('lot-privet-sooblonde', 'Привет sooblonde', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-sooblonde.webm'),
   ('lot-privet-spirit', 'Привет spiritbanbanban', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-spirit.webm'),
   ('lot-privet-vandalque', 'Привет VandaLQuE', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-vandalque.webm'),
-  ('lot-privet-virratu', 'Привет Virratu', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-virratu.webm')
+  ('lot-privet-virratu', 'Привет Virratu', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-virratu.webm'),
+  ('lot-sub-melkij-strateg-2', 'Привет офлайн чатыку', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-sub-melkij-strateg-2.webm')
 on conflict (slug) do nothing;
