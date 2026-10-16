@@ -246,21 +246,18 @@ const base = import.meta.env.BASE_URL;
   function entryRow(entry: HistoryEntry, uid: string | null, author: string | null): HTMLLIElement {
     const li = document.createElement('li');
     li.setAttribute('data-shared-entry', 'true');
-    li.className = 'border-2 border-stream bg-void px-3 py-2 shadow-[3px_3px_0_var(--color-milk)]';
+    li.className = 'border-2 border-milk bg-void px-3 py-2 shadow-[3px_3px_0_var(--color-milk)]';
     const line = document.createElement('div');
     line.className = 'flex flex-wrap items-baseline justify-between gap-x-3';
     const who = document.createElement('span');
     who.className = 'break-all';
-    who.append(
-      textEl('b', '', entry.from),
-      textEl('span', 'text-mist', ' → '),
-      textEl('b', '', entry.to)
-    );
+    // Пометки стоят у своего ника, а не в конце строки: «автор» — у продавца
+    // (в сделке автора он и есть продавец), «ТВОЙ» — у покупателя.
+    who.append(textEl('b', '', entry.from));
+    if (author !== null && entry.from === author) who.append(mark('автор', 'bg-legend'));
+    who.append(textEl('span', 'text-mist', ' → '), textEl('b', '', entry.to));
     if (uid !== null && entry.buyer_uid !== '' && entry.buyer_uid === uid) {
       who.append(mark('ТВОЙ', 'bg-pivko'));
-    }
-    if (author !== null && entry.from === author) {
-      who.append(mark('автор', 'bg-legend'));
     }
     const price = textEl('span', 'font-black whitespace-nowrap text-pivko', `${entry.price} 🍺`);
     line.append(who, price);
