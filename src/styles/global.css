@@ -187,6 +187,48 @@ html[data-plaska='on'] main {
     cursor: default;
   }
 
+  /* Страница лота: раскладка «медиа + информация и история». На широком
+     экране медиа занимает левую колонку на обе строки, информация и история
+     идут справа; широкое (16:9) видео вырывается на всю ширину над колонками —
+     как полоса витрины. Переключает раскладку `data-media-orientation` кадра
+     (его ставит lib/lot-view.ts), поэтому поверхность не решает ориентацию.
+     Раскладка одна у скелетона и карточки: оба контейнера зовут `data-lot-detail`
+     внутри скрываемого родителя (`hidden`), поэтому загрузка не прыгает. */
+  [data-lot-detail] {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'media'
+      'info'
+      'history';
+  }
+
+  [data-lot-detail] > [data-lot-cell='media'] {
+    grid-area: media;
+  }
+
+  [data-lot-detail] > [data-lot-cell='info'] {
+    grid-area: info;
+  }
+
+  [data-lot-detail] > [data-lot-cell='history'] {
+    grid-area: history;
+  }
+
+  @media (min-width: 64rem) {
+    [data-lot-detail] {
+      grid-template-columns: minmax(0, 28rem) minmax(0, 1fr);
+      grid-template-areas:
+        'media info'
+        'media history';
+    }
+
+    [data-lot-detail]:has(.lot-media-frame[data-media-orientation='wide']) {
+      grid-template-areas:
+        'media media'
+        'info history';
+    }
+  }
+
   /* Пиксельный бейдж: только короткие слова, кегль ≤11px. */
   .badge-pixel {
     display: inline-block;

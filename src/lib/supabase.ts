@@ -14,7 +14,14 @@
  *   запросы, которые кормят это чистое ядро.
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { historyEntries, outbidCatchup, type HistoryEntry, type TradeRow } from './trade-history';
+import {
+  HISTORY_PAGE_SIZE,
+  historyEntries,
+  outbidCatchup,
+  type HistoryCursor,
+  type HistoryEntry,
+  type TradeRow,
+} from './trade-history';
 import type { LiveOutbid } from './live-store';
 
 const SUPABASE_URL = import.meta.env.PUBLIC_SUPABASE_URL as string | undefined;
@@ -172,14 +179,20 @@ export function returnUrlForLot(lotId: string): string {
 // ---------------------------------------------------------------------------
 
 /**
- * История перепродаж Лота из purchases: хвост сделок целиком (триммера до 50
- * строк в БД больше нет). `from` каждой записи — продавец из сделки
- * (`purchases.seller_*`, см. миграцию `*_purchase_seller.sql`), а не
- * реконструкция цепочки на клиенте. Читаем страницу целиком: пока нет
- * пагинации, объём ограничен только потолком строк PostgREST — это не жёсткий
- * лимит алгоритма. Лот не переехал в хранилище / ошибка → пустая история.
+ * История перепродаж Лота из purchases: одна страница сделок, новые первыми.
+ * `from` каждой записи — продавец из сделки (`purchases.seller_*`, см. миграцию
+ * `*_purchase_seller.sql`), а не реконструкция цепочки на клиенте. Без курсора
+ * отдаётся первая страница; с курсором (`historyCursor`) — следующая: keyset по
+ * паре `(created_at, id)`, поэтому живые вставки не сдвигают границу страниц
+ * (offset бы сдвинул). Существующий индекс `purchases_lot_time_idx` покрывает
+ * предикат `lot_id` — новых индексов не заводим. Лот не переехал в хранилище /
+ * ошибка → пустая история.
  */
-export async function fetchSharedHistory(slug: string): Promise<HistoryEntry[]> {
+export async function fetchSharedHistory(
+  slug: string,
+  limit: number = HISTORY_PAGE_SIZE,
+  cursor: HistoryCursor | null = null
+): Promise<HistoryEntry[]> {
   const sb = getSupabase();
   if (!sb) return [];
   try {
@@ -188,13 +201,20 @@ export async function fetchSharedHistory(slug: string): Promise<HistoryEntry[]> 
     );
     if (lotError || !lot) return [];
     const lotId = (lot as unknown as { id: number }).id;
+    let query = sb
+      .from('purchases')
+      .select('id,seller_login,buyer_login,buyer_uid,price_paid,created_at')
+      .eq('lot_id', lotId);
+    if (cursor && cursor.created_at.length > 0) {
+      query = query.or(
+        `created_at.lt.${cursor.created_at},and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`
+      );
+    }
     const { data, error } = await withAuthRetry(() =>
-      sb
-        .from('purchases')
-        .select('seller_login,buyer_login,buyer_uid,price_paid,created_at')
-        .eq('lot_id', lotId)
-        .order('created_at', { ascending: true })
-        .order('id', { ascending: true })
+      query
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .limit(Math.max(1, Math.floor(limit)))
     );
     if (error || !Array.isArray(data)) return [];
     return historyEntries(data as unknown as TradeRow[]);

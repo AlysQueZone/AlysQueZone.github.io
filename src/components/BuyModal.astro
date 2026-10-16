@@ -320,7 +320,10 @@ const clapSound = s3Sound('clap.mp3');
   /**
    * Проекция паузы из shared-истории: моя последняя покупка ЭТОГО лота.
    * Чужой выкуп сюда не попадает (фильтр по buyer_uid), так что таймер не трогает.
-   * Серверная ошибка — правда в последней инстанции (см. startPause в обработчике).
+   * Страница истории — новые первыми (одна страница, а не вся история): пауза
+   * короткая, поэтому моя последняя покупка почти всегда в первой же странице,
+   * и первая моя строка — она. Дальше виденного сервер остаётся правдой в
+   * последней инстанции (см. startPause в обработчике).
    */
   async function refreshPauseProjection(lotId: string): Promise<void> {
     if (!pending || pending.slug !== lotId || limitHit || pauseLeft > 0) return;
@@ -328,9 +331,8 @@ const clapSound = s3Sound('clap.mp3');
       const uid = live.uid();
       if (!uid || !pending || pending.slug !== lotId) return;
       const history = await fetchSharedHistory(lotId);
-      for (let i = history.length - 1; i >= 0; i -= 1) {
-        const entry = history[i];
-        if (!entry || entry.buyer_uid !== uid) continue;
+      for (const entry of history) {
+        if (entry.buyer_uid !== uid) continue;
         const boughtAt = Date.parse(entry.created_at);
         if (!Number.isFinite(boughtAt)) return;
         const remaining = Math.ceil(PAUSE_SEC - (Date.now() - boughtAt) / 1000);

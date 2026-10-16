@@ -8,6 +8,11 @@ import { LOT_DETAIL_ASPECT } from '@/lib/lot-video';
 // Страница Лота — один маршрут `/lot/?id=<slug>`: каркас без данных, поля
 // заполняет клиент из БД (см. docs/adr/0002). Работает для лота, которого
 // не было на сборке. Старые адреса `/lots/<slug>/` не поддерживаются.
+//
+// Раскладка: на широком экране две колонки — медиа слева, информация, автор и
+// история справа; на узком — один столбец в том же порядке. Широкое (16:9)
+// видео вырывается на всю ширину над колонками; переключает раскладку CSS по
+// `data-media-orientation` кадра (его ставит lib/lot-view.ts) — global.css.
 const base = import.meta.env.BASE_URL;
 ---
 
@@ -20,53 +25,90 @@ const base = import.meta.env.BASE_URL;
     Загружаю лот…
   </p>
 
-  <!-- Скелетон до первого ответа БД: каркас как у data-lot-view — название →
-       кадр → кнопка (владелец и цена теперь в бейдже и кнопке, отдельных строк
-       нет). Кадр — «телефонной» ширины-плейсхолдера, как до загрузки постера. -->
-  <article data-lot-skeleton class="card-pixel mt-4 p-5 sm:p-8" aria-hidden="true">
-    <div class="skeleton-block mt-4 h-8 w-2/3"></div>
-    <div class="skeleton-block mt-4 aspect-square w-full max-w-md"></div>
-    <div class="skeleton-block mt-5 h-11 w-32"></div>
-  </article>
-
-  <article class="card-pixel mt-4 hidden p-5 sm:p-8" data-lot-view>
-    <h1 class="mt-4 text-2xl font-black sm:text-3xl" data-lot-title></h1>
-    <div class="mt-4 w-full">
-      <LotVideo videoUrl={null} title="" aspect={LOT_DETAIL_ASPECT}>
-        <LotBadges />
-      </LotVideo>
+  <!-- Скелетон до первого ответа БД: та же раскладка, что у карточки
+       (data-lot-detail), поэтому загрузка не прыгает. Владелец и цена теперь в
+       бейдже и кнопке, отдельных строк нет. -->
+  <div data-lot-skeleton class="mt-4" aria-hidden="true">
+    <div data-lot-detail class="grid items-start gap-6">
+      <div data-lot-cell="media" class="card-pixel p-4">
+        <div class="skeleton-block aspect-square w-full"></div>
+      </div>
+      <div data-lot-cell="info" class="card-pixel flex flex-col gap-4 p-5 sm:p-8">
+        <div class="skeleton-block h-8 w-2/3"></div>
+        <div class="skeleton-block h-11 w-full"></div>
+        <div class="skeleton-block h-11 w-full"></div>
+      </div>
+      <div data-lot-cell="history" class="card-pixel p-5 sm:p-8">
+        <div class="skeleton-block h-4 w-40"></div>
+        <div class="skeleton-block mt-3 h-12 w-full"></div>
+        <div class="skeleton-block mt-2 h-12 w-full"></div>
+        <div class="skeleton-block mt-2 h-12 w-full"></div>
+      </div>
     </div>
-    <p data-lot-suggested class="mt-2 hidden text-sm text-mist">
-      Привет добавил:{' '}
-      <b data-lot-suggested-login class="text-mist">
-        {' '}
-        —{' '}
-      </b>
-    </p>
+  </div>
 
-    <div class="mt-5">
-      <button
-        type="button"
-        class="btn-arcade btn-arcade-primary px-6 py-3"
-        data-buy-intent
-        disabled
+  <article data-lot-view class="mt-4 hidden">
+    <div data-lot-detail class="grid items-start gap-6">
+      <div data-lot-cell="media" class="card-pixel p-4">
+        <LotVideo videoUrl={null} title="" aspect={LOT_DETAIL_ASPECT}>
+          <LotBadges />
+        </LotVideo>
+      </div>
+
+      <div data-lot-cell="info" class="card-pixel flex flex-col gap-4 p-5 sm:p-8">
+        <h1 class="text-2xl font-black sm:text-3xl" data-lot-title></h1>
+        <!-- Автор привета — плашка геометрии кнопок: ник чернилами и бейдж
+             «автор» (тот же знак, что в строках истории). У лота без автора
+             (сид, лот админа) плашки нет. -->
+        <p data-lot-author class="chip-arcade hidden w-full px-6 py-3">
+          <b data-lot-author-login class="font-black break-all text-milk"></b>
+          <span class="badge-pixel bg-legend text-cream">автор</span>
+        </p>
+        <button
+          type="button"
+          class="btn-arcade btn-arcade-primary w-full px-6 py-3"
+          data-buy-intent
+          disabled
+        >
+          Забрать
+        </button>
+      </div>
+
+      <section
+        data-lot-cell="history"
+        data-lot-history
+        aria-label="История перепродаж"
+        class="card-pixel hidden p-5 sm:p-8"
       >
-        Забрать
-      </button>
+        <h2 class="font-display text-xs uppercase">История перепродаж</h2>
+        <p data-history-status class="sr-only" role="status"></p>
+        <div data-history-skeleton class="mt-3">
+          <div class="flex flex-col gap-2" aria-hidden="true">
+            <div class="skeleton-block h-12 w-full"></div>
+            <div class="skeleton-block h-12 w-full"></div>
+            <div class="skeleton-block h-12 w-full"></div>
+          </div>
+        </div>
+        <p data-history-empty class="mt-3 hidden text-sm font-bold text-mist">
+          Пока никто не забирал — стань первым
+        </p>
+        <div data-history-list-wrap class="mt-3 hidden">
+          <ul data-history-list class="flex flex-col gap-2 text-sm font-bold"></ul>
+        </div>
+        <div data-history-more class="mt-4 hidden">
+          <div class="flex justify-center">
+            <button
+              type="button"
+              class="btn-arcade btn-arcade-ghost px-5 py-2 text-sm"
+              data-history-more-btn
+            >
+              Показать ещё
+            </button>
+          </div>
+        </div>
+      </section>
     </div>
   </article>
-
-  <section
-    aria-label="История перепродаж"
-    class="card-pixel mt-6 hidden p-5 sm:p-8"
-    data-lot-history
-  >
-    <h2 class="font-display text-xs uppercase">История перепродаж</h2>
-    <p data-history-empty class="mt-3 text-sm font-bold text-mist">
-      Пока никто не забирал — стань первым
-    </p>
-    <ul data-history-list class="mt-3 flex flex-col gap-2 text-sm font-bold"></ul>
-  </section>
 
   <p data-lot-missing class="card-pixel mt-4 hidden p-5 text-sm font-bold text-mist sm:p-8">
     Такого лота нет — возможно, привет уже увёл другой чатерс. Вернись на биржу.
@@ -81,28 +123,49 @@ const base = import.meta.env.BASE_URL;
 
 <script>
   // Страница лота: slug — из query (`?id=`), состояние — снапшот живых данных
-  // (lib/live.ts), хвост перепродаж — из БД (lib/supabase.ts). Перерисовка —
-  // от событий снапшота: тик, фокус/возврат и смена сессии — его триггеры.
+  // (lib/live.ts), история — страницами из БД (lib/supabase.ts), а вся её
+  // механика (курсор, слияние, относительное время) — чистое ядро
+  // (lib/trade-history.ts). Здесь только разметка и перерисовка.
   import { fetchSharedHistory } from '@/lib/supabase';
-  import type { HistoryEntry } from '@/lib/trade-history';
+  import {
+    HISTORY_PAGE_SIZE,
+    appendHistory,
+    formatRelativeTime,
+    historyCursor,
+    mergeHistory,
+    type HistoryEntry,
+  } from '@/lib/trade-history';
   import { live, type LotState } from '@/lib/live';
   import { fillLot } from '@/lib/lot-view';
 
   const slug = (new URLSearchParams(window.location.search).get('id') ?? '').trim();
 
+  const skeleton = document.querySelector('[data-lot-skeleton]');
   const view = document.querySelector('[data-lot-view]');
+  const viewRoot = view?.querySelector('[data-lot-detail]') ?? null;
   const missing = document.querySelector('[data-lot-missing]');
   const errorNote = document.querySelector('[data-lot-error]');
   const history = document.querySelector('[data-lot-history]');
-  const suggestedEl = document.querySelector('[data-lot-suggested]');
-  const suggestedLoginEl = document.querySelector('[data-lot-suggested-login]');
-  const skeleton = document.querySelector('[data-lot-skeleton]');
+  const authorEl = document.querySelector('[data-lot-author]');
+  const authorLoginEl = document.querySelector('[data-lot-author-login]');
   const statusEl = document.querySelector('[data-lot-status]');
+  const historyStatusEl = document.querySelector('[data-history-status]');
+  const historySkeleton = document.querySelector('[data-history-skeleton]');
   const list = document.querySelector('[data-history-list]');
+  const listWrap = document.querySelector('[data-history-list-wrap]');
   const emptyNote = document.querySelector('[data-history-empty]');
-  /** `lastState` — для перекраски по балансу; `lastEntries` — перерисовка по uid. */
+  const moreWrap = document.querySelector('[data-history-more]');
+  const moreBtn = document.querySelector('[data-history-more-btn]');
+
+  /** `lastState` — для автора, «Твой» и перекраски по балансу. */
   let lastState: LotState | null = null;
-  let lastEntries: HistoryEntry[] = [];
+  /** Показанные записи истории: новые сверху; слияние и курсор — ядро. */
+  let shown: HistoryEntry[] = [];
+  /** Была ли страница в последней порции — без счётчиков: полная страница = есть ещё. */
+  let more = false;
+  let historyLoaded = false;
+  let refreshing = false;
+  let loadingMore = false;
 
   function toggle(el: Element | null, show: boolean): void {
     if (el instanceof HTMLElement) el.classList.toggle('hidden', !show);
@@ -120,6 +183,7 @@ const base = import.meta.env.BASE_URL;
     toggle(history, false);
     toggle(missing, true);
     toggle(errorNote, false);
+    resetHistory();
     hideSkeleton();
     document.title = 'Лот не найден — AlysQueZone';
   }
@@ -130,8 +194,15 @@ const base = import.meta.env.BASE_URL;
     toggle(history, false);
     toggle(missing, false);
     toggle(errorNote, true);
+    resetHistory();
     hideSkeleton();
     document.title = 'Лот не загрузился — AlysQueZone';
+  }
+
+  function resetHistory(): void {
+    shown = [];
+    more = false;
+    historyLoaded = false;
   }
 
   function fillDetail(st: LotState): void {
@@ -142,40 +213,111 @@ const base = import.meta.env.BASE_URL;
     hideSkeleton();
     document.title = `${st.title} — AlysQueZone`;
     // Слоты Лота (заголовок с эмоутами, видео с раскладкой кадра, бейджи,
-    // кнопка) — общий lib/lot-view.ts; раскладку кадра страницы лота
-    // (широкое — во всю ширину, портрет/квадрат — «телефонная») читает
-    // global.css по data-media-orientation.
-    fillLot(view, st, { balance: live.balance() });
+    // кнопка) — общий lib/lot-view.ts; раскладку страницы (колонки, широкая
+    // полоса) читает global.css по data-media-orientation.
+    fillLot(viewRoot, st, { balance: live.balance() });
     // Автор привета — только в подробностях лота, в списках подписи нет.
-    if (suggestedEl instanceof HTMLElement) {
-      suggestedEl.classList.toggle('hidden', !st.suggested_by_login);
-      if (suggestedLoginEl) suggestedLoginEl.textContent = st.suggested_by_login ?? '—';
-    }
+    const author = st.suggested_by_login;
+    toggle(authorEl, Boolean(author));
+    if (authorLoginEl) authorLoginEl.textContent = author ?? '';
     lastState = st;
   }
 
-  function renderSharedHistory(entries: HistoryEntry[], uid: string | null): void {
-    if (!list) return;
-    list.querySelectorAll('[data-shared-entry]').forEach((el) => el.remove());
-    const frag = document.createDocumentFragment();
-    for (const h of entries) {
-      const li = document.createElement('li');
-      li.setAttribute('data-shared-entry', 'true');
-      li.className =
-        'border-2 border-stream bg-void px-3 py-2 shadow-[3px_3px_0_var(--color-milk)]';
-      const mine = uid !== null && h.buyer_uid !== '' && h.buyer_uid === uid;
-      li.textContent = `${h.from} → ${h.to} · ${h.price} 🍺${mine ? ' · ТВОЙ' : ''}`;
-      frag.appendChild(li);
+  function announce(text: string): void {
+    if (historyStatusEl) historyStatusEl.textContent = text;
+  }
+
+  function textEl(tag: string, className: string, text: string): HTMLElement {
+    const el = document.createElement(tag);
+    el.className = className;
+    el.textContent = text;
+    return el;
+  }
+
+  function mark(text: string, bg: string): HTMLElement {
+    return textEl('span', `badge-pixel ml-1 ${bg} text-cream`, text);
+  }
+
+  /**
+   * Строка истории: `from → to · price` + пометки и относительное время.
+   * `uid` — своя покупка («ТВОЙ»), `author` — ник автора привета: его продажа
+   * получает знак «автор».
+   */
+  function entryRow(entry: HistoryEntry, uid: string | null, author: string | null): HTMLLIElement {
+    const li = document.createElement('li');
+    li.setAttribute('data-shared-entry', 'true');
+    li.className = 'border-2 border-stream bg-void px-3 py-2 shadow-[3px_3px_0_var(--color-milk)]';
+    const line = document.createElement('div');
+    line.className = 'flex flex-wrap items-baseline justify-between gap-x-3';
+    const who = document.createElement('span');
+    who.className = 'break-all';
+    who.append(
+      textEl('b', '', entry.from),
+      textEl('span', 'text-mist', ' → '),
+      textEl('b', '', entry.to)
+    );
+    if (uid !== null && entry.buyer_uid !== '' && entry.buyer_uid === uid) {
+      who.append(mark('ТВОЙ', 'bg-pivko'));
     }
-    list.appendChild(frag);
-    if (emptyNote instanceof HTMLElement) {
-      emptyNote.classList.toggle('hidden', list.children.length > 0);
+    if (author !== null && entry.from === author) {
+      who.append(mark('автор', 'bg-legend'));
+    }
+    const price = textEl('span', 'font-black whitespace-nowrap text-pivko', `${entry.price} 🍺`);
+    line.append(who, price);
+    const when = textEl(
+      'div',
+      'mt-0.5 text-xs font-bold text-mist',
+      formatRelativeTime(entry.created_at)
+    );
+    li.append(line, when);
+    return li;
+  }
+
+  function renderHistory(): void {
+    if (!list) return;
+    toggle(historySkeleton, false);
+    const uid = live.uid();
+    const author = lastState?.suggested_by_login ?? null;
+    list.replaceChildren(...shown.map((entry) => entryRow(entry, uid, author)));
+    toggle(listWrap, shown.length > 0);
+    toggle(emptyNote, shown.length === 0);
+    toggle(moreWrap, more && shown.length > 0);
+  }
+
+  /** Первая страница: на старте — с нуля, по событию каталога — поверх показанного. */
+  async function loadFirstPage(merge: boolean): Promise<void> {
+    const page = await fetchSharedHistory(slug, HISTORY_PAGE_SIZE);
+    more = page.length === HISTORY_PAGE_SIZE;
+    if (merge) {
+      const before = shown.length;
+      shown = mergeHistory(shown, page);
+      if (shown.length > before) announce('Новый перекуп в истории');
+    } else {
+      shown = page;
+    }
+    historyLoaded = true;
+    renderHistory();
+  }
+
+  /** Следующая страница — курсором по показанным, вниз (список не прыгает). */
+  async function loadMore(): Promise<void> {
+    if (loadingMore || !more || !historyLoaded) return;
+    loadingMore = true;
+    if (moreBtn instanceof HTMLButtonElement) moreBtn.disabled = true;
+    try {
+      const page = await fetchSharedHistory(slug, HISTORY_PAGE_SIZE, historyCursor(shown));
+      more = page.length === HISTORY_PAGE_SIZE;
+      shown = appendHistory(shown, page);
+      renderHistory();
+      if (page.length > 0) announce('История обновлена');
+    } finally {
+      loadingMore = false;
+      if (moreBtn instanceof HTMLButtonElement) moreBtn.disabled = false;
     }
   }
 
-  let refreshing = false;
-  /** Полная перерисовка деталей из снапшота + хвост перепродаж из БД. */
-  async function refreshDetail(): Promise<void> {
+  /** Полная перерисовка деталей из снапшота + история (первая или свежая). */
+  async function syncDetail(): Promise<void> {
     if (refreshing) return;
     refreshing = true;
     try {
@@ -195,22 +337,25 @@ const base = import.meta.env.BASE_URL;
         showMissing();
         return;
       }
+      const merge = historyLoaded;
       fillDetail(st);
-      lastEntries = await fetchSharedHistory(slug);
-      renderSharedHistory(lastEntries, live.uid());
+      await loadFirstPage(merge);
     } finally {
       refreshing = false;
     }
   }
 
+  moreBtn?.addEventListener('click', () => void loadMore());
+
   // Снапшот живых данных — единственный источник: лот, uid и баланс.
   live.subscribe((change) => {
     if (change.kind === 'catalog' && (change.changed.has(slug) || lastState === null)) {
-      void refreshDetail();
+      void syncDetail();
     }
-    if (change.kind === 'uid') renderSharedHistory(lastEntries, change.uid);
+    // Пометки «ТВОЙ» зависят от сессии; скелетон ещё не вопрос — молчим.
+    if (change.kind === 'uid' && historyLoaded) renderHistory();
     if (change.kind === 'balance' && lastState) {
-      fillLot(view, lastState, { balance: change.balance });
+      fillLot(viewRoot, lastState, { balance: change.balance });
     }
   });
 </script>
