@@ -14,6 +14,12 @@ price = 800
 video_url = "https://cdns.memealerts.com/p/69bcde52b57c1c9b432af084/0fcaba76-262b-4768-be63-9ae9daa7a390/alert_orig.webm"
 
 [[lots]]
+slug = "lot-meme-arhion24-real"
+title = "Привет настоящий arhion24"
+price = 800
+video_url = "https://cdns.memealerts.com/p/672ba6a81135f4340a61a4d0/47a5c7b8-853e-4d01-a87c-5f143b32c670/alert_orig.webm"
+
+[[lots]]
 slug = "lot-meme-assistant"
 title = "Виртуальный помощник"
 price = 800

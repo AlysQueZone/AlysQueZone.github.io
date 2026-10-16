@@ -3,6 +3,7 @@
 -- Локальный сид (supabase db reset); на проде не применяется.
 insert into public.lots (slug, title, price, video_url) values
   ('lot-meme-arhion24', 'o7 arhion24', 800, 'https://cdns.memealerts.com/p/69bcde52b57c1c9b432af084/0fcaba76-262b-4768-be63-9ae9daa7a390/alert_orig.webm'),
+  ('lot-meme-arhion24-real', 'Привет настоящий arhion24', 800, 'https://cdns.memealerts.com/p/672ba6a81135f4340a61a4d0/47a5c7b8-853e-4d01-a87c-5f143b32c670/alert_orig.webm'),
   ('lot-meme-assistant', 'Виртуальный помощник', 800, 'https://cdns.memealerts.com/p/64ceae64bde979e95d878442/30feb2e2-3eed-4878-8f80-895746b46d32/alert_orig.webm'),
   ('lot-meme-avrora', 'Привет avrora_666', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-meme-avrora.webm'),
   ('lot-meme-bradhi', 'Грубый привет от Bradhi', 800, 'https://cdns.memealerts.com/p/64ceae64bde979e95d878442/708a27b8-3213-4b8d-aead-2190c17ad493/alert_orig.webm'),
