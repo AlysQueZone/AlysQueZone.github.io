@@ -15,7 +15,8 @@
     2 «Чип, чернила»    — геометрия кнопки, ник чернилами (без цветного акцента).
     3 «Чип, маджента»   — то же, ник маджентой канала (--color-stream).
     4 «Тёмная плашка»   — инверсия: тёмная подложка, ник кремом.
-    5 «Полоса + автор»   — светлая плашка с толстой левой полосой и бейджем «автор».
+    5 «Ник + автор»     — плашка геометрии кнопки, внутри только ник (чернилами)
+                          и бейдж «автор» — тот же, что в истории перепродаж.
 
   Цвета ника по вариантам названы в описании явно: это главный предмет выбора.
 
@@ -275,6 +276,11 @@
         text-transform: uppercase;
       }
 
+      /* Плашки одной ширины: подпись автора и кнопка покупки — во всю колонку. */
+      .b-info .btn-arcade {
+        width: 100%;
+      }
+
       .mark {
         display: inline-block;
         font-family: var(--font-display);
@@ -360,8 +366,8 @@
       /* ================= Подпись автора: пять вариантов ================= */
 
       .al {
-        align-self: flex-start;
-        max-width: 100%;
+        align-self: stretch;
+        width: 100%;
       }
 
       .al-cap {
@@ -433,7 +439,7 @@
         color: var(--color-cream);
       }
 
-      /* 5 «Полоса + автор» — светлая плашка, толстая левая полоса, бейдж. */
+      /* 5 «Ник + автор» — плашка геометрии кнопки: только ник и бейдж. */
       .al-bar {
         display: inline-flex;
         align-items: center;
@@ -441,7 +447,6 @@
         flex-wrap: wrap;
         min-height: 2.75rem;
         border: 3px solid var(--color-milk);
-        border-left: 10px solid var(--color-legend);
         border-radius: 4px;
         box-shadow: 4px 4px 0 color-mix(in srgb, var(--color-milk) 30%, transparent);
         padding: 0.4rem 0.8rem;
@@ -1075,8 +1080,8 @@
         },
         {
           key: '5',
-          name: 'Полоса + автор',
-          desc: 'Светлая плашка с толстой левой полосой (--color-legend) и бейджем «автор» — тем же, что в истории перепродаж. Ник <b>чернилами</b>.',
+          name: 'Ник + автор',
+          desc: 'ВЫБРАНО (после правки): плашка геометрии кнопки, внутри — только ник <b>чернилами</b> (--color-milk) и бейдж «автор» (--color-legend), тот же, что в истории перепродаж. Подписи «Привет добавил» и толстой полосы слева нет.',
         },
       ];
 
@@ -1121,7 +1126,7 @@
           case '4':
             return `<span class="al al-dark">${cap}${nick}</span>`;
           case '5':
-            return `<span class="al al-bar">${cap}${nick}<span class="badge-pixel al-tag">автор</span></span>`;
+            return `<span class="al al-bar">${nick}<span class="badge-pixel al-tag">автор</span></span>`;
           default:
             return '';
         }

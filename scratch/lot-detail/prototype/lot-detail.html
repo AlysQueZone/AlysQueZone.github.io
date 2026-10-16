@@ -34,8 +34,10 @@
   Правки после просмотра (выбран B):
     - владелец лота — только бейджем на видео (как на витрине), без дубля
       чипом над кнопкой;
-    - автор привета — табличка геометрии кнопок (chip-arcade), подпись
-      приглушённая, ник тёплым акцентом; без «аватара» и розового фона;
+    - автор привета — плашка геометрии кнопок: ник чернилами и бейдж «автор»
+      (тот же, что в истории), без подписи «Привет добавил», без полосы,
+      без «аватара»;
+    - плашка автора и кнопка покупки — одной ширины (во всю колонку);
     - время — относительное по умолчанию.
 
   Оговорки throwaway (как у соседей в scratch/):
@@ -327,26 +329,21 @@
         line-height: 1.25;
       }
 
-      /* Автор привета — табличка геометрии кнопок: подпись приглушённая,
-         ник акцентом (тёплый, читаемый). Не яркий фон, не «аватар». */
+      /* Автор привета — плашка геометрии кнопок: ник чернилами и бейдж «автор»
+         (тот же, что в истории перепродаж). Ширина — как у кнопки покупки. */
       .author-plaque {
-        align-self: flex-start;
-        max-width: 100%;
-      }
-
-      .author-cap {
-        font-family: var(--font-display);
-        font-size: 8px;
-        line-height: 1.7;
-        text-transform: uppercase;
-        color: var(--color-mist);
+        align-self: stretch;
       }
 
       .author-nick {
         font-weight: 900;
         font-size: 1rem;
-        color: var(--color-ember-deep);
         word-break: break-all;
+      }
+
+      /* Кнопка покупки — той же ширины и высоты, что плашка автора. */
+      .buy-row .btn-arcade {
+        width: 100%;
       }
 
       /* Кадр видео (упрощённый lot-media-frame). */
@@ -1423,8 +1420,8 @@
       function authorPlaque(lot) {
         if (!lot.author) return '';
         return `<span class="chip-arcade author-plaque">
-          <span class="author-cap">Привет добавил</span>
           <span class="author-nick">${esc(lot.author)}</span>
+          <span class="mark mark-author">автор</span>
         </span>`;
       }
 
@@ -1520,7 +1517,7 @@
             <h1 class="lot-title">${esc(lot.title)}${lot.synthetic ? ' <span class="mark mark-author">демо</span>' : ''}</h1>
             ${authorPlaque(lot)}
             ${mediaBlock(lot)}
-            <div>${buyButton(lot)}</div>
+            <div class="buy-row">${buyButton(lot)}</div>
           </article>
           <section class="card-pixel" style="margin-top:1.5rem;padding:1.25rem">
             <h2 class="hist-head">История перепродаж</h2>
@@ -1537,7 +1534,7 @@
             <article class="card-pixel b-info" style="padding:1.25rem">
               <h1 class="lot-title">${esc(lot.title)}${lot.synthetic ? ' <span class="mark mark-author">демо</span>' : ''}</h1>
               ${authorPlaque(lot)}
-              <div>${buyButton(lot)}</div>
+              <div class="buy-row">${buyButton(lot)}</div>
             </article>
             <section class="card-pixel b-history">
               <h2 class="hist-head">История перепродаж</h2>
@@ -1555,7 +1552,7 @@
             <div class="c-head-main">
               <h1 class="lot-title">${esc(lot.title)}${lot.synthetic ? ' <span class="mark mark-author">демо</span>' : ''}</h1>
               ${authorPlaque(lot)}
-              <div>${buyButton(lot)}</div>
+              <div class="buy-row">${buyButton(lot)}</div>
             </div>
           </div>
           <section class="card-pixel" style="margin-top:1.5rem;padding:1.25rem">
