@@ -1,0 +1,1728 @@
+<!doctype html>
+<!--
+  ПРОТОТИП (throwaway) — страница открытой карточки лота (/lot/?id=…).
+
+  Вопрос: как выглядит рефактор «открытой карточки» под новые условия из
+  TODO (раздел «UI»):
+    1. История перекупов с датами и временем (в БД время UTC → локальная
+       зона браузера; без изменений в БД).
+    2. Подгрузка истории пагинацией («Показать ещё», новые сверху, курсорная
+       пагинация в проде — при открытом списке новая сделка дописывается
+       сверху, окно не прыгает).
+    3. Автор привета выделен явно и заметно (сейчас — бледная строка).
+
+  Три варианта (структурно разные, не по цвету), переключение ← → или
+  ?variant=A|B|C:
+    A «Сейчас+»        — один столбец, минимум изменений от текущей страницы.
+    B «Двухколоночный» — на десктопе медиа-колонка + колонка информации и
+                         истории; на мобильном схлопывается в один столбец.
+    C «Журнал»         — история-герой: таймлайн сделок, медиа компактное.
+
+  Пять демо-лотов (настоящий слепок из прод-БД, ники как есть), ?lot=<slug>:
+    1. lot-sub-melkij-strateg-2   — единственный лот с автором (автор ≠ владелец)
+    2. lot-privet-olyacaramel     — 50 перекупов (пагинация)
+    3. lot-privet-evilzerg57-double — единственное ШИРОКОЕ видео (16:9)
+    4. lot-privet-purpletie       — 1 перекуп (почти пусто)
+    5. DEMO                       — синтетика: автор ещё владеет, 0 перекупов
+                                    (у всех продовых лотов есть ≥1 перекуп)
+
+  Прочие переключатели (сверху): время — относительное / точное / оба;
+  кнопка «+ живой перекуп» — вставляет новую сделку сверху, как это сделает
+  Realtime в проде. В прототипе «ты» = spiritbanbanban (метка «ТВОЙ»).
+
+  Оговорки throwaway (как у соседей в scratch/):
+    - НЕ часть сборки, отдельный HTML вне Astro;
+    - токены/шрифты повторены вручную (Tailwind в файле нет);
+    - данные — статический слепок; покупка декоративная, ничего не покупает;
+    - постеры/видео — хотлинком с CDN канала.
+-->
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Прототип · Открытая карточка лота — AlysQueZone</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rubik:wght@400;700;800;900&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --color-void: #fff6bf;
+        --color-panel: #ffe6ac;
+        --color-bar: #ffe4a6;
+        --color-card: #f0c46c;
+        --color-milk: #422006;
+        --color-mist: #744210;
+        --color-stream: #c2187b;
+        --color-ctahover: #9e145f;
+        --color-ember: #ff9e2c;
+        --color-ember-deep: #a34400;
+        --color-melon: #c21d3b;
+        --color-blush: #ff00bc;
+        --color-legend: #b3127a;
+        --color-cream: #fffbea;
+        --color-pivko: #7a5f00;
+        --font-display: 'Press Start 2P', 'Rubik', system-ui, sans-serif;
+        --font-sans: 'Rubik', system-ui, -apple-system, sans-serif;
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background-color: var(--color-void);
+        color: var(--color-milk);
+        font-family: var(--font-sans);
+        min-height: 100vh;
+        padding-bottom: 8rem;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      h1,
+      h2,
+      h3,
+      p,
+      ul,
+      ol,
+      li {
+        margin: 0;
+        padding: 0;
+      }
+
+      ul,
+      ol {
+        list-style: none;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .display {
+        font-family: var(--font-display);
+      }
+
+      .muted {
+        color: var(--color-mist);
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      /* ---------------------------------------------------------------- *
+       * Шапка прототипа + нижний переключатель вариантов (не часть макета) *
+       * ---------------------------------------------------------------- */
+
+      .proto-top {
+        position: sticky;
+        top: 0;
+        z-index: 40;
+        background: var(--color-milk);
+        color: var(--color-cream);
+        padding: 0.5rem 0.9rem;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem 0.8rem;
+        border-bottom: 3px solid var(--color-milk);
+      }
+
+      .proto-top .brand {
+        font-family: var(--font-display);
+        font-size: 10px;
+        line-height: 1.7;
+        text-transform: uppercase;
+      }
+
+      .proto-top .note {
+        font-size: 12px;
+        font-weight: 700;
+        opacity: 0.85;
+      }
+
+      .tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+      }
+
+      .tab,
+      .proto-btn {
+        font: inherit;
+        font-size: 12px;
+        font-weight: 800;
+        cursor: pointer;
+        border: 2px solid var(--color-cream);
+        border-radius: 3px;
+        padding: 0.25rem 0.5rem;
+        background: transparent;
+        color: var(--color-cream);
+      }
+
+      .tab:hover,
+      .proto-btn:hover {
+        background: rgba(255, 251, 234, 0.18);
+      }
+
+      .tab[aria-current='true'] {
+        background: var(--color-cream);
+        color: var(--color-milk);
+      }
+
+      .proto-bottom {
+        position: fixed;
+        left: 50%;
+        bottom: 0.9rem;
+        transform: translateX(-50%);
+        z-index: 50;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: var(--color-milk);
+        color: var(--color-cream);
+        border: 3px solid var(--color-cream);
+        border-radius: 8px;
+        box-shadow: 4px 4px 0 rgba(66, 32, 6, 0.35);
+        padding: 0.35rem 0.5rem;
+      }
+
+      .proto-bottom button {
+        font: inherit;
+        font-weight: 900;
+        font-size: 16px;
+        line-height: 1;
+        width: 2rem;
+        height: 2rem;
+        border: 2px solid var(--color-cream);
+        border-radius: 5px;
+        background: transparent;
+        color: var(--color-cream);
+        cursor: pointer;
+      }
+
+      .proto-bottom button:hover {
+        background: rgba(255, 251, 234, 0.18);
+      }
+
+      .proto-bottom .label {
+        min-width: 12rem;
+        text-align: center;
+        font-size: 12px;
+      }
+
+      .proto-bottom .label b {
+        font-family: var(--font-display);
+        font-size: 10px;
+      }
+
+      /* ---------------------------------------------------------------- *
+       * Токены макета (повтор global.css)                                 *
+       * ---------------------------------------------------------------- */
+
+      .card-pixel {
+        background-color: var(--color-panel);
+        border: 3px solid var(--color-milk);
+        box-shadow: 6px 6px 0 var(--color-milk);
+        border-radius: 4px;
+      }
+
+      .badge-pixel {
+        display: inline-block;
+        font-family: var(--font-display);
+        font-size: 9px;
+        line-height: 1.7;
+        padding: 4px 8px;
+        border-radius: 2px;
+        text-transform: uppercase;
+      }
+
+      .btn-arcade {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.25rem;
+        min-height: 2.75rem;
+        border: 3px solid var(--color-milk);
+        box-shadow: 4px 4px 0 var(--color-milk);
+        border-radius: 4px;
+        font-weight: 900;
+        text-transform: uppercase;
+        cursor: pointer;
+        font-size: 1rem;
+        font-family: inherit;
+        padding: 0.5rem 1.2rem;
+      }
+
+      .btn-arcade-primary {
+        background-color: var(--color-stream);
+        color: var(--color-cream);
+      }
+
+      .btn-arcade-ghost {
+        background-color: transparent;
+        color: var(--color-milk);
+      }
+
+      .btn-arcade:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+
+      /* ---------------------------------------------------------------- *
+       * Общие блоки страницы лота                                          *
+       * ---------------------------------------------------------------- */
+
+      .wrap {
+        max-width: 60rem;
+        margin: 0 auto;
+        padding: 1rem;
+      }
+
+      .back {
+        font-size: 14px;
+        font-weight: 800;
+        color: var(--color-stream);
+      }
+
+      .back:hover {
+        text-decoration: underline;
+      }
+
+      .lot-title {
+        font-size: 1.5rem;
+        font-weight: 900;
+        line-height: 1.25;
+      }
+
+      /* Плашка автора привета — заметный акцент (легенда-маджента). */
+      .author-plaque {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        background: var(--color-cream);
+        border: 3px solid var(--color-legend);
+        box-shadow: 4px 4px 0 var(--color-legend);
+        border-radius: 4px;
+        padding: 0.5rem 0.7rem;
+      }
+
+      .author-plaque .ava {
+        flex: none;
+        width: 2rem;
+        height: 2rem;
+        display: grid;
+        place-items: center;
+        background: var(--color-legend);
+        color: var(--color-cream);
+        font-family: var(--font-display);
+        font-size: 12px;
+        border-radius: 3px;
+      }
+
+      .author-plaque .cap {
+        font-family: var(--font-display);
+        font-size: 8px;
+        line-height: 1.7;
+        text-transform: uppercase;
+        color: var(--color-mist);
+        display: block;
+      }
+
+      .author-plaque .nick {
+        font-weight: 900;
+        font-size: 1.05rem;
+        color: var(--color-legend);
+        word-break: break-all;
+      }
+
+      /* Кадр видео (упрощённый lot-media-frame). */
+      .frame {
+        position: relative;
+        width: 100%;
+        max-width: 28rem;
+        overflow: hidden;
+        border: 2px solid var(--color-milk);
+        background: #000;
+        aspect-ratio: 1 / 1;
+      }
+
+      .frame img,
+      .frame video {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        z-index: 1;
+      }
+
+      .frame .play {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.35);
+        border: 0;
+        cursor: pointer;
+        z-index: 2;
+      }
+
+      .frame .play span {
+        background: var(--color-stream);
+        color: var(--color-cream);
+        border: 3px solid var(--color-milk);
+        box-shadow: 3px 3px 0 var(--color-milk);
+        padding: 0.4rem 0.8rem;
+        font-weight: 900;
+        text-transform: uppercase;
+        font-size: 12px;
+      }
+
+      .frame .badge-pixel {
+        position: absolute;
+        z-index: 3;
+      }
+
+      .frame .owner-badge {
+        top: 0.5rem;
+        left: 0.5rem;
+        background: var(--color-milk);
+        color: var(--color-cream);
+        max-width: 85%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .frame .mine-badge {
+        top: 0.5rem;
+        right: 0.5rem;
+        background: var(--color-pivko);
+        color: var(--color-cream);
+      }
+
+      /* Широкое видео (16:9): кадр во всю ширину строки. Portrait/square —
+         «телефонная» ширина, как на текущей странице лота. */
+      .lot[data-orientation='wide'] .frame,
+      .lot[data-orientation='square'] .frame {
+        max-width: none;
+      }
+
+      .lot[data-orientation='portrait'] .frame {
+        max-width: 28rem;
+      }
+
+      .frame.pending {
+        max-width: 28rem;
+      }
+
+      /* Метки «ТВОЙ» и «автор» в истории. */
+      .mark {
+        display: inline-block;
+        font-family: var(--font-display);
+        font-size: 8px;
+        line-height: 1.7;
+        padding: 1px 5px;
+        border-radius: 2px;
+        text-transform: uppercase;
+        vertical-align: middle;
+      }
+
+      .mark-mine {
+        background: var(--color-pivko);
+        color: var(--color-cream);
+      }
+
+      .mark-author {
+        background: var(--color-legend);
+        color: var(--color-cream);
+      }
+
+      .who {
+        font-weight: 800;
+        word-break: break-all;
+      }
+
+      .arrow {
+        color: var(--color-mist);
+        margin: 0 0.3rem;
+      }
+
+      .price {
+        font-weight: 900;
+        color: var(--color-pivko);
+        white-space: nowrap;
+      }
+
+      .when {
+        display: inline-flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+        color: var(--color-mist);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      body[data-time='rel'] .exact,
+      body[data-time='exact'] .rel {
+        display: none;
+      }
+
+      .hist-head {
+        font-family: var(--font-display);
+        font-size: 10px;
+        line-height: 1.7;
+        text-transform: uppercase;
+      }
+
+      /* ---------------------------------------------------------------- *
+       * Вариант A «Сейчас+»                                               *
+       * ---------------------------------------------------------------- */
+
+      .a-col {
+        max-width: 34rem;
+        margin: 0 auto;
+      }
+
+      .a-card {
+        padding: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      .a-deal {
+        display: flex;
+        flex-direction: column;
+        gap: 0.15rem;
+        border: 2px solid var(--color-milk);
+        background: var(--color-void);
+        box-shadow: 3px 3px 0 var(--color-milk);
+        padding: 0.5rem 0.7rem;
+      }
+
+      .a-deal .row2 {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 0.6rem;
+        flex-wrap: wrap;
+      }
+
+      /* ---------------------------------------------------------------- *
+       * Вариант B «Двухколоночный»                                         *
+       * ---------------------------------------------------------------- */
+
+      .b-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1.25rem;
+        align-items: start;
+      }
+
+      .b-info {
+        display: flex;
+        flex-direction: column;
+        gap: 0.9rem;
+      }
+
+      .b-history {
+        padding: 1rem;
+      }
+
+      .b-deal {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 0.15rem 0.6rem;
+        align-items: baseline;
+        border: 2px solid var(--color-milk);
+        background: var(--color-void);
+        padding: 0.45rem 0.6rem;
+      }
+
+      .b-deal + .b-deal {
+        margin-top: 0.4rem;
+      }
+
+      .b-deal .line {
+        grid-column: 1;
+      }
+
+      .b-deal .price {
+        grid-column: 2;
+        text-align: right;
+      }
+
+      .b-deal .when {
+        grid-column: 1 / -1;
+      }
+
+      .b-owner-chip {
+        align-self: flex-start;
+        border: 3px solid var(--color-milk);
+        background: var(--color-panel);
+        box-shadow: 4px 4px 0 var(--color-milk);
+        padding: 0.35rem 0.6rem;
+        font-weight: 900;
+        font-size: 14px;
+      }
+
+      /* ---------------------------------------------------------------- *
+       * Вариант C «Журнал»                                                 *
+       * ---------------------------------------------------------------- */
+
+      .c-head {
+        display: grid;
+        grid-template-columns: minmax(0, 9rem) minmax(0, 1fr);
+        gap: 1rem;
+        align-items: start;
+      }
+
+      /* Широкое видео в «Журнале» тоже во всю ширину над текстом. */
+      .lot[data-variant='C'][data-orientation='wide'] .c-head {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .c-head-main {
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+      }
+
+      .c-timeline {
+        counter-reset: deal;
+      }
+
+      .tl-item {
+        position: relative;
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        grid-template-areas:
+          'dot what price'
+          'dot when when';
+        gap: 0.15rem 0.8rem;
+        padding: 0 0 1rem 1.6rem;
+      }
+
+      /* Вертикальная рельса таймлайна. */
+      .tl-item::before {
+        content: '';
+        position: absolute;
+        left: 0.4rem;
+        top: 1rem;
+        bottom: -0.2rem;
+        width: 3px;
+        background: var(--color-card);
+      }
+
+      .tl-item:last-child::before {
+        display: none;
+      }
+
+      .tl-dot {
+        grid-area: dot;
+        position: absolute;
+        left: 0;
+        top: 0.35rem;
+        width: 0.9rem;
+        height: 0.9rem;
+        background: var(--color-void);
+        border: 3px solid var(--color-milk);
+        border-radius: 50%;
+      }
+
+      .tl-item.newest .tl-dot {
+        background: var(--color-legend);
+        border-color: var(--color-legend);
+      }
+
+      .tl-what {
+        grid-area: what;
+        font-size: 14px;
+      }
+
+      .tl-price {
+        grid-area: price;
+        text-align: right;
+      }
+
+      .tl-when {
+        grid-area: when;
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        color: var(--color-mist);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      /* ---------------------------------------------------------------- *
+       * Десктоп                                                            *
+       * ---------------------------------------------------------------- */
+
+      @media (min-width: 900px) {
+        /* B: портрет/квадрат — медиа в левой колонке на обе строки; широкое
+           видео вырывается на всю ширину над колонками (Q7, вариант а). */
+        .lot[data-variant='B'] .b-grid {
+          grid-template-columns: minmax(0, 26rem) minmax(0, 1fr);
+        }
+
+        .lot[data-variant='B'] .b-media {
+          grid-area: media;
+        }
+
+        .lot[data-variant='B'] .b-info {
+          grid-area: info;
+        }
+
+        .lot[data-variant='B'] .b-history {
+          grid-area: history;
+        }
+
+        .lot[data-variant='B']:not([data-orientation='wide']) .b-grid {
+          grid-template-areas:
+            'media info'
+            'media history';
+        }
+
+        .lot[data-variant='B'][data-orientation='wide'] .b-grid {
+          grid-template-areas:
+            'media media'
+            'info history';
+        }
+
+        .c-head {
+          grid-template-columns: minmax(0, 16rem) minmax(0, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body data-time="both">
+    <header class="proto-top">
+      <span class="brand">AlysQueZone · прототип</span>
+      <span class="note">Открытая карточка лота</span>
+      <span class="tabs" data-lot-tabs></span>
+      <span class="tabs">
+        <button class="proto-btn" type="button" data-act="time"></button>
+        <button class="proto-btn" type="button" data-act="live">+ живой перекуп</button>
+      </span>
+    </header>
+
+    <main id="app" class="wrap"></main>
+
+    <nav class="proto-bottom" aria-label="Переключатель вариантов">
+      <button type="button" data-act="prev" aria-label="Предыдущий вариант">←</button>
+      <span class="label" data-variant-label></span>
+      <button type="button" data-act="next" aria-label="Следующий вариант">→</button>
+    </nav>
+
+    <script>
+      // Слепок прод-БД: { view: [лот…], history: { slug: [сделка…] } }.
+      const RAW = /*__DATA__*/ {
+        view: [
+          {
+            slug: 'lot-privet-olyacaramel',
+            title: 'Покупка olyacaramel',
+            video_url:
+              'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-olyacaramel.webm',
+            price: 3426,
+            next_price: 3427,
+            owner_login: 'dyadyapog',
+            owner_uid: '08019321-2ff9-4a51-8666-2902ea6cdc61',
+            suggested_by_login: null,
+          },
+          {
+            slug: 'lot-privet-evilzerg57-double',
+            title: 'Двойной привет evilzerg57',
+            video_url:
+              'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-evilzerg57-double.webm',
+            price: 3045,
+            next_price: 3350,
+            owner_login: 'feistyman333',
+            owner_uid: '13613931-3395-4c1b-8ba9-37146e9eb01b',
+            suggested_by_login: null,
+          },
+          {
+            slug: 'lot-privet-purpletie',
+            title: 'Привет PurpleTie',
+            video_url:
+              'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-purpletie.webm',
+            price: 880,
+            next_price: 968,
+            owner_login: 'foxindique',
+            owner_uid: '49b31e9c-f2c5-4117-9f75-7023f6b57427',
+            suggested_by_login: null,
+          },
+          {
+            slug: 'lot-sub-melkij-strateg-2',
+            title: 'Привет офлайн чатыку',
+            video_url:
+              'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-sub-melkij-strateg-2.webm',
+            price: 1419,
+            next_price: 1561,
+            owner_login: 'spiritbanbanban',
+            owner_uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+            suggested_by_login: 'melkij_strateg',
+          },
+        ],
+        history: {
+          'lot-sub-melkij-strateg-2': [
+            {
+              seller: 'melkij_strateg',
+              buyer: 'foxindique',
+              uid: '49b31e9c-f2c5-4117-9f75-7023f6b57427',
+              price: 880,
+              at: '2026-10-14T18:18:35.354531+00:00',
+            },
+            {
+              seller: 'foxindique',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 968,
+              at: '2026-10-15T02:02:29.195209+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'gedo0',
+              uid: 'eac22c2b-8888-45f1-aa74-8c58e77cbcc6',
+              price: 1065,
+              at: '2026-10-15T07:55:40.348537+00:00',
+            },
+            {
+              seller: 'gedo0',
+              buyer: '4deli',
+              uid: '38441380-8e28-458d-8785-375c54dd8edd',
+              price: 1172,
+              at: '2026-10-15T07:57:34.721645+00:00',
+            },
+            {
+              seller: '4deli',
+              buyer: 'gedo0',
+              uid: 'eac22c2b-8888-45f1-aa74-8c58e77cbcc6',
+              price: 1290,
+              at: '2026-10-15T07:58:03.769099+00:00',
+            },
+            {
+              seller: 'gedo0',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 1419,
+              at: '2026-10-16T01:47:04.622504+00:00',
+            },
+          ],
+          'lot-privet-olyacaramel': [
+            {
+              seller: null,
+              buyer: 'dyadyapog',
+              uid: '08019321-2ff9-4a51-8666-2902ea6cdc61',
+              price: 3377,
+              at: '2026-09-23T13:39:32.033785+00:00',
+            },
+            {
+              seller: 'dyadyapog',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3378,
+              at: '2026-09-24T01:03:07.93987+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: '4deli',
+              uid: '38441380-8e28-458d-8785-375c54dd8edd',
+              price: 3379,
+              at: '2026-09-24T03:36:51.367639+00:00',
+            },
+            {
+              seller: '4deli',
+              buyer: 'dyadyapog',
+              uid: '08019321-2ff9-4a51-8666-2902ea6cdc61',
+              price: 3380,
+              at: '2026-09-24T07:59:03.303131+00:00',
+            },
+            {
+              seller: 'dyadyapog',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3381,
+              at: '2026-09-24T14:32:50.477692+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'foxindique',
+              uid: '49b31e9c-f2c5-4117-9f75-7023f6b57427',
+              price: 3382,
+              at: '2026-09-24T15:32:07.067011+00:00',
+            },
+            {
+              seller: 'foxindique',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3383,
+              at: '2026-09-25T11:57:19.799832+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'foxindique',
+              uid: '49b31e9c-f2c5-4117-9f75-7023f6b57427',
+              price: 3384,
+              at: '2026-09-25T13:17:33.992303+00:00',
+            },
+            {
+              seller: 'foxindique',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3385,
+              at: '2026-09-25T13:34:58.681381+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'dyadyapog',
+              uid: '08019321-2ff9-4a51-8666-2902ea6cdc61',
+              price: 3386,
+              at: '2026-09-27T12:30:55.814628+00:00',
+            },
+            {
+              seller: 'dyadyapog',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3387,
+              at: '2026-09-27T13:45:44.980276+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'dyadyapog',
+              uid: '08019321-2ff9-4a51-8666-2902ea6cdc61',
+              price: 3388,
+              at: '2026-09-28T00:32:07.566485+00:00',
+            },
+            {
+              seller: 'dyadyapog',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3389,
+              at: '2026-09-28T01:20:28.870359+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'dyadyapog',
+              uid: '08019321-2ff9-4a51-8666-2902ea6cdc61',
+              price: 3390,
+              at: '2026-09-28T09:57:45.755466+00:00',
+            },
+            {
+              seller: 'dyadyapog',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3391,
+              at: '2026-09-29T03:14:34.925455+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'foxindique',
+              uid: '49b31e9c-f2c5-4117-9f75-7023f6b57427',
+              price: 3392,
+              at: '2026-09-29T05:48:45.763573+00:00',
+            },
+            {
+              seller: 'foxindique',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3393,
+              at: '2026-09-29T07:24:54.416822+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'gedo0',
+              uid: 'eac22c2b-8888-45f1-aa74-8c58e77cbcc6',
+              price: 3394,
+              at: '2026-09-29T08:14:34.64744+00:00',
+            },
+            {
+              seller: 'gedo0',
+              buyer: 'dyadyapog',
+              uid: '08019321-2ff9-4a51-8666-2902ea6cdc61',
+              price: 3395,
+              at: '2026-09-29T09:19:40.97952+00:00',
+            },
+            {
+              seller: 'dyadyapog',
+              buyer: 'foxindique',
+              uid: '49b31e9c-f2c5-4117-9f75-7023f6b57427',
+              price: 3396,
+              at: '2026-09-29T11:04:39.721404+00:00',
+            },
+            {
+              seller: 'foxindique',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3397,
+              at: '2026-09-29T16:40:44.735211+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'foxindique',
+              uid: '49b31e9c-f2c5-4117-9f75-7023f6b57427',
+              price: 3398,
+              at: '2026-09-29T16:49:24.209047+00:00',
+            },
+            {
+              seller: 'foxindique',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3399,
+              at: '2026-09-29T23:23:18.275556+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'foxindique',
+              uid: '49b31e9c-f2c5-4117-9f75-7023f6b57427',
+              price: 3400,
+              at: '2026-09-30T02:54:53.49621+00:00',
+            },
+            {
+              seller: 'foxindique',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3401,
+              at: '2026-09-30T03:30:04.564866+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'gedo0',
+              uid: 'eac22c2b-8888-45f1-aa74-8c58e77cbcc6',
+              price: 3402,
+              at: '2026-09-30T08:10:27.586072+00:00',
+            },
+            {
+              seller: 'gedo0',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3403,
+              at: '2026-09-30T21:28:55.644467+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'dyadyapog',
+              uid: '08019321-2ff9-4a51-8666-2902ea6cdc61',
+              price: 3404,
+              at: '2026-10-01T06:35:05.969391+00:00',
+            },
+            {
+              seller: 'dyadyapog',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3405,
+              at: '2026-10-01T20:13:32.618531+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'dyadyapog',
+              uid: '08019321-2ff9-4a51-8666-2902ea6cdc61',
+              price: 3406,
+              at: '2026-10-02T13:04:40.060804+00:00',
+            },
+            {
+              seller: 'dyadyapog',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3407,
+              at: '2026-10-03T00:29:00.767942+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'dyadyapog',
+              uid: '08019321-2ff9-4a51-8666-2902ea6cdc61',
+              price: 3408,
+              at: '2026-10-04T00:02:51.708393+00:00',
+            },
+            {
+              seller: 'dyadyapog',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3409,
+              at: '2026-10-04T03:38:59.734868+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'dyadyapog',
+              uid: '08019321-2ff9-4a51-8666-2902ea6cdc61',
+              price: 3410,
+              at: '2026-10-05T18:30:29.725031+00:00',
+            },
+            {
+              seller: 'dyadyapog',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3411,
+              at: '2026-10-06T00:30:25.549666+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'dyadyapog',
+              uid: '08019321-2ff9-4a51-8666-2902ea6cdc61',
+              price: 3412,
+              at: '2026-10-07T21:45:43.060411+00:00',
+            },
+            {
+              seller: 'dyadyapog',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3413,
+              at: '2026-10-08T07:47:23.753625+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'dyadyapog',
+              uid: '08019321-2ff9-4a51-8666-2902ea6cdc61',
+              price: 3414,
+              at: '2026-10-08T09:00:03.948269+00:00',
+            },
+            {
+              seller: 'dyadyapog',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3415,
+              at: '2026-10-08T18:33:22.9369+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'dyadyapog',
+              uid: '08019321-2ff9-4a51-8666-2902ea6cdc61',
+              price: 3416,
+              at: '2026-10-08T18:36:52.375975+00:00',
+            },
+            {
+              seller: 'dyadyapog',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3417,
+              at: '2026-10-11T02:46:28.915639+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'dyadyapog',
+              uid: '08019321-2ff9-4a51-8666-2902ea6cdc61',
+              price: 3418,
+              at: '2026-10-12T14:07:08.070837+00:00',
+            },
+            {
+              seller: 'dyadyapog',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3419,
+              at: '2026-10-13T00:23:46.891647+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: '4deli',
+              uid: '38441380-8e28-458d-8785-375c54dd8edd',
+              price: 3420,
+              at: '2026-10-13T01:50:24.192295+00:00',
+            },
+            {
+              seller: '4deli',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3421,
+              at: '2026-10-14T08:07:24.584448+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'dyadyapog',
+              uid: '08019321-2ff9-4a51-8666-2902ea6cdc61',
+              price: 3422,
+              at: '2026-10-14T12:19:08.100771+00:00',
+            },
+            {
+              seller: 'dyadyapog',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3423,
+              at: '2026-10-14T23:40:50.383758+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: '4deli',
+              uid: '38441380-8e28-458d-8785-375c54dd8edd',
+              price: 3424,
+              at: '2026-10-15T07:56:22.955813+00:00',
+            },
+            {
+              seller: '4deli',
+              buyer: 'spiritbanbanban',
+              uid: '869d27b7-833e-4b66-9594-befdb5c5ea03',
+              price: 3425,
+              at: '2026-10-16T01:46:39.351159+00:00',
+            },
+            {
+              seller: 'spiritbanbanban',
+              buyer: 'dyadyapog',
+              uid: '08019321-2ff9-4a51-8666-2902ea6cdc61',
+              price: 3426,
+              at: '2026-10-16T02:59:52.950972+00:00',
+            },
+          ],
+          'lot-privet-evilzerg57-double': [
+            {
+              seller: null,
+              buyer: 'melkij_strateg',
+              uid: 'a7976846-8d9d-46f4-9d76-fd9f4675e0bb',
+              price: 880,
+              at: '2026-09-15T13:42:15.994067+00:00',
+            },
+            {
+              seller: 'melkij_strateg',
+              buyer: 'foxindique',
+              uid: '49b31e9c-f2c5-4117-9f75-7023f6b57427',
+              price: 968,
+              at: '2026-09-16T05:48:11.680287+00:00',
+            },
+            {
+              seller: 'foxindique',
+              buyer: 'gedo0',
+              uid: 'eac22c2b-8888-45f1-aa74-8c58e77cbcc6',
+              price: 1065,
+              at: '2026-09-16T06:11:37.961981+00:00',
+            },
+            {
+              seller: 'gedo0',
+              buyer: '4deli',
+              uid: '38441380-8e28-458d-8785-375c54dd8edd',
+              price: 1172,
+              at: '2026-09-16T06:35:15.659129+00:00',
+            },
+            {
+              seller: '4deli',
+              buyer: 'gedo0',
+              uid: 'eac22c2b-8888-45f1-aa74-8c58e77cbcc6',
+              price: 1290,
+              at: '2026-09-16T13:58:36.17782+00:00',
+            },
+            {
+              seller: 'gedo0',
+              buyer: 'feistyman333',
+              uid: '13613931-3395-4c1b-8ba9-37146e9eb01b',
+              price: 1419,
+              at: '2026-09-16T17:11:03.258433+00:00',
+            },
+            {
+              seller: 'feistyman333',
+              buyer: 'gedo0',
+              uid: 'eac22c2b-8888-45f1-aa74-8c58e77cbcc6',
+              price: 1561,
+              at: '2026-09-17T12:05:27.302907+00:00',
+            },
+            {
+              seller: 'gedo0',
+              buyer: 'vandalque',
+              uid: '4e836bb6-9b14-4d9b-a93b-643f33785b83',
+              price: 1718,
+              at: '2026-09-17T12:11:55.386364+00:00',
+            },
+            {
+              seller: 'vandalque',
+              buyer: 'gedo0',
+              uid: 'eac22c2b-8888-45f1-aa74-8c58e77cbcc6',
+              price: 1890,
+              at: '2026-09-17T12:38:20.72902+00:00',
+            },
+            {
+              seller: 'gedo0',
+              buyer: 'feistyman333',
+              uid: '13613931-3395-4c1b-8ba9-37146e9eb01b',
+              price: 2079,
+              at: '2026-09-17T17:16:52.228438+00:00',
+            },
+            {
+              seller: 'feistyman333',
+              buyer: 'evilzerg57',
+              uid: 'be9fb817-1bcc-430d-92ea-4b62eaf18018',
+              price: 2287,
+              at: '2026-09-21T21:32:13.164603+00:00',
+            },
+            {
+              seller: 'evilzerg57',
+              buyer: 'feistyman333',
+              uid: '13613931-3395-4c1b-8ba9-37146e9eb01b',
+              price: 2516,
+              at: '2026-09-21T21:35:53.890025+00:00',
+            },
+            {
+              seller: 'feistyman333',
+              buyer: 'evilzerg57',
+              uid: 'be9fb817-1bcc-430d-92ea-4b62eaf18018',
+              price: 2768,
+              at: '2026-09-23T13:33:06.481531+00:00',
+            },
+            {
+              seller: 'evilzerg57',
+              buyer: 'feistyman333',
+              uid: '13613931-3395-4c1b-8ba9-37146e9eb01b',
+              price: 3045,
+              at: '2026-09-23T18:18:56.243284+00:00',
+            },
+          ],
+          'lot-privet-purpletie': [
+            {
+              seller: null,
+              buyer: 'foxindique',
+              uid: '49b31e9c-f2c5-4117-9f75-7023f6b57427',
+              price: 880,
+              at: '2026-10-16T14:45:16.238936+00:00',
+            },
+          ],
+        },
+      };
+
+      /** «Ты» в прототипе — spiritbanbanban (метка «ТВОЙ» и «Твой привет»). */
+      const ME = '869d27b7-833e-4b66-9594-befdb5c5ea03';
+      /** Размер страницы истории (в проде — курсорная пагинация по (created_at,id)). */
+      const PAGE = 10;
+
+      const VARIANTS = [
+        { key: 'A', name: 'Сейчас+' },
+        { key: 'B', name: 'Двухколоночный' },
+        { key: 'C', name: 'Журнал' },
+      ];
+
+      const NICK_POOL = [
+        'spiritbanbanban',
+        'foxindique',
+        'gedo0',
+        '4deli',
+        'evilzerg57',
+        'dyadyapog',
+        'feistyman333',
+        'vandalque',
+        'like_a_laika',
+      ];
+
+      function buildLots() {
+        const bySlug = {};
+        for (const v of RAW.view) {
+          const history = (RAW.history[v.slug] || []).map((h, i) => ({ ...h, id: i + 1 }));
+          bySlug[v.slug] = {
+            slug: v.slug,
+            title: v.title,
+            webm: v.video_url,
+            poster: (v.video_url || '').replace(/\.webm$/, '.webp'),
+            price: Number(v.price),
+            nextPrice: Number(v.next_price),
+            owner: v.owner_login,
+            ownerUid: v.owner_uid,
+            author: v.suggested_by_login,
+            history,
+            synthetic: false,
+          };
+        }
+        // Синтетика: у всех продовых лотов ≥1 перекуп, поэтому пустое состояние
+        // и «автор ещё владеет» показываем отдельным явно помеченным лотом.
+        const demo = JSON.parse(JSON.stringify(bySlug['lot-sub-melkij-strateg-2']));
+        demo.slug = 'DEMO';
+        demo.title = 'Демо: автор ещё владеет приветом';
+        demo.owner = demo.author;
+        demo.history = [];
+        demo.synthetic = true;
+        const order = [
+          'lot-sub-melkij-strateg-2',
+          'lot-privet-olyacaramel',
+          'lot-privet-evilzerg57-double',
+          'lot-privet-purpletie',
+        ];
+        return [...order.map((s) => bySlug[s]), demo];
+      }
+
+      const LOTS = buildLots();
+
+      const state = {
+        variant: 'A',
+        lot: LOTS[0].slug,
+        time: 'both',
+        pages: 1,
+        live: [],
+      };
+
+      // ------------------------------------------------------------------ //
+      // Форматирование времени (UTC из БД → локальная зона браузера)        //
+      // ------------------------------------------------------------------ //
+
+      const DATE_FMT = new Intl.DateTimeFormat('ru-RU', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      const SHORT_FMT = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short' });
+
+      function fmtExact(iso) {
+        const d = new Date(iso);
+        return Number.isNaN(d.getTime()) ? '' : DATE_FMT.format(d);
+      }
+
+      function fmtRel(iso) {
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) return '';
+        const sec = Math.max(0, (Date.now() - d.getTime()) / 1000);
+        if (sec < 60) return 'только что';
+        const min = Math.floor(sec / 60);
+        if (min < 60) return `${min} мин назад`;
+        const hr = Math.floor(min / 60);
+        if (hr < 24) return `${hr} ч назад`;
+        const day = Math.floor(hr / 24);
+        if (day === 1) return 'вчера';
+        if (day < 7) return `${day} дн назад`;
+        return SHORT_FMT.format(d);
+      }
+
+      function when(iso) {
+        return `<span class="when"><span class="rel">${fmtRel(iso)}</span><span class="exact">· ${fmtExact(iso)}</span></span>`;
+      }
+
+      function esc(s) {
+        return String(s ?? '').replace(
+          /[&<>"']/g,
+          (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
+        );
+      }
+
+      // ------------------------------------------------------------------ //
+      // Подготовка сущностей                                               //
+      // ------------------------------------------------------------------ //
+
+      function currentLot() {
+        return LOTS.find((l) => l.slug === state.lot) ?? LOTS[0];
+      }
+
+      /** Сделки: живые (сверху) + история новыми первыми. */
+      function dealsNewestFirst(lot) {
+        const hist = lot.history.slice().reverse();
+        const live = state.live.filter((x) => x.slug === lot.slug);
+        return [...live, ...hist];
+      }
+
+      function isMine(deal) {
+        return deal.uid === ME;
+      }
+
+      function isAuthor(deal, lot) {
+        return Boolean(lot.author) && deal.seller === lot.author;
+      }
+
+      function marks(deal, lot) {
+        let out = '';
+        if (isMine(deal)) out += '<span class="mark mark-mine">ТВОЙ</span>';
+        if (isAuthor(deal, lot)) out += '<span class="mark mark-author">автор</span>';
+        return out;
+      }
+
+      function authorPlaque(lot) {
+        if (!lot.author) return '';
+        const initial = esc(lot.author.slice(0, 1).toUpperCase());
+        return `<div class="author-plaque">
+          <span class="ava" aria-hidden="true">${initial}</span>
+          <span>
+            <span class="cap">Привет добавил</span>
+            <span class="nick">${esc(lot.author)}</span>
+          </span>
+        </div>`;
+      }
+
+      function mediaBlock(lot) {
+        const owner = lot.owner
+          ? `<span class="badge-pixel owner-badge">👑 ${esc(lot.owner)}</span>`
+          : '';
+        const mineBadge = isOwnedByMe(lot)
+          ? '<span class="badge-pixel mine-badge">Твой</span>'
+          : '';
+        return `<div class="frame pending" data-frame>
+          <img data-poster src="${esc(lot.poster)}" alt="${esc(lot.title)}" />
+          <button class="play" type="button" data-act="play" aria-label="Смотреть видео">
+            <span>▶ смотреть</span>
+          </button>
+          ${owner}${mineBadge}
+        </div>`;
+      }
+
+      function isOwnedByMe(lot) {
+        return lot.ownerUid === ME;
+      }
+
+      function buyButton(lot) {
+        if (isOwnedByMe(lot)) {
+          return '<button class="btn-arcade" type="button" disabled>Твой привет</button>';
+        }
+        return `<button class="btn-arcade btn-arcade-primary" type="button" data-act="buy">▶ Забрать за ${lot.nextPrice} 🍺</button>`;
+      }
+
+      // ------------------------------------------------------------------ //
+      // История: список + «Показать ещё»                                    //
+      // ------------------------------------------------------------------ //
+
+      const EMPTY =
+        '<p class="muted" style="font-weight:800">Пока никто не забирал — стань первым</p>';
+
+      function moreButton(lot) {
+        const total = dealsNewestFirst(lot).length;
+        if (state.pages * PAGE >= total) return '';
+        return '<div style="margin-top:.75rem;display:flex;justify-content:center"><button class="btn-arcade btn-arcade-ghost" type="button" data-act="more">Показать ещё</button></div>';
+      }
+
+      function historyBody(lot, variant) {
+        if (
+          lot.history.length === 0 &&
+          state.live.filter((x) => x.slug === lot.slug).length === 0
+        ) {
+          return EMPTY + moreButton(lot);
+        }
+        const deals = dealsNewestFirst(lot).slice(0, state.pages * PAGE);
+        const items = deals.map((d) => dealRow(d, lot, variant)).join('');
+        const tag = variant === 'C' ? 'ol' : 'ul';
+        return `<${tag}>${items}</${tag}>${moreButton(lot)}`;
+      }
+
+      function dealRow(d, lot, variant) {
+        const seller = esc(d.seller ?? 'Биржа');
+        const buyer = esc(d.buyer);
+        if (variant === 'C') {
+          const newest = state.live.some((x) => x.id === d.id && x.slug === lot.slug);
+          return `<li class="tl-item${newest ? ' newest' : ''}">
+            <span class="tl-dot" aria-hidden="true"></span>
+            <span class="tl-what"><span class="who">${seller}</span><span class="arrow">→</span><span class="who">${buyer}</span> ${marks(d, lot)}</span>
+            <span class="tl-price price">${d.price} 🍺</span>
+            <span class="tl-when">${when(d.at)}</span>
+          </li>`;
+        }
+        if (variant === 'B') {
+          return `<li class="b-deal">
+            <span class="line"><span class="who">${seller}</span><span class="arrow">→</span><span class="who">${buyer}</span> ${marks(d, lot)}</span>
+            <span class="price">${d.price} 🍺</span>
+            <span class="when">${when(d.at)}</span>
+          </li>`;
+        }
+        return `<li class="a-deal">
+          <span class="row2">
+            <span><span class="who">${seller}</span><span class="arrow">→</span><span class="who">${buyer}</span> ${marks(d, lot)}</span>
+            <span class="price">${d.price} 🍺</span>
+          </span>
+          <span class="row2">${when(d.at)}</span>
+        </li>`;
+      }
+
+      // ------------------------------------------------------------------ //
+      // Варианты                                                            //
+      // ------------------------------------------------------------------ //
+
+      function variantA(lot) {
+        return `<div class="lot a-col" data-variant="A">
+          <a class="back" href="#">← Назад на биржу</a>
+          <article class="card-pixel a-card" style="margin-top:1rem">
+            <h1 class="lot-title">${esc(lot.title)}${lot.synthetic ? ' <span class="mark mark-author">демо</span>' : ''}</h1>
+            ${authorPlaque(lot)}
+            ${mediaBlock(lot)}
+            <div>${buyButton(lot)}</div>
+          </article>
+          <section class="card-pixel" style="margin-top:1.5rem;padding:1.25rem">
+            <h2 class="hist-head">История перепродаж</h2>
+            <div data-history-body style="margin-top:.75rem">${historyBody(lot, 'A')}</div>
+          </section>
+        </div>`;
+      }
+
+      function variantB(lot) {
+        const ownerChip = lot.owner
+          ? `<span class="b-owner-chip">👑 Владелец: ${esc(lot.owner)}${isOwnedByMe(lot) ? ' (ты)' : ''}</span>`
+          : '<span class="b-owner-chip muted">Свободен</span>';
+        return `<div class="lot" data-variant="B">
+          <a class="back" href="#">← Назад на биржу</a>
+          <div class="b-grid" style="margin-top:1rem">
+            <div class="card-pixel b-media" style="padding:1rem">${mediaBlock(lot)}</div>
+            <article class="card-pixel b-info" style="padding:1.25rem">
+              <h1 class="lot-title">${esc(lot.title)}${lot.synthetic ? ' <span class="mark mark-author">демо</span>' : ''}</h1>
+              ${authorPlaque(lot)}
+              ${ownerChip}
+              <div>${buyButton(lot)}</div>
+            </article>
+            <section class="card-pixel b-history">
+              <h2 class="hist-head">История перепродаж</h2>
+              <div data-history-body style="margin-top:.75rem">${historyBody(lot, 'B')}</div>
+            </section>
+          </div>
+        </div>`;
+      }
+
+      function variantC(lot) {
+        const ownerChip = lot.owner
+          ? `<span class="b-owner-chip">👑 ${esc(lot.owner)}${isOwnedByMe(lot) ? ' (ты)' : ''}</span>`
+          : '<span class="b-owner-chip muted">Свободен</span>';
+        return `<div class="lot" data-variant="C">
+          <a class="back" href="#">← Назад на биржу</a>
+          <div class="c-head card-pixel" style="margin-top:1rem;padding:1rem">
+            <div class="c-media">${mediaBlock(lot)}</div>
+            <div class="c-head-main">
+              <h1 class="lot-title">${esc(lot.title)}${lot.synthetic ? ' <span class="mark mark-author">демо</span>' : ''}</h1>
+              ${authorPlaque(lot)}
+              <div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap">${ownerChip}</div>
+              <div>${buyButton(lot)}</div>
+            </div>
+          </div>
+          <section class="card-pixel" style="margin-top:1.5rem;padding:1.25rem">
+            <h2 class="hist-head">История перепродаж</h2>
+            <div data-history-body style="margin-top:1rem">${historyBody(lot, 'C')}</div>
+          </section>
+        </div>`;
+      }
+
+      const RENDER = { A: variantA, B: variantB, C: variantC };
+
+      // ------------------------------------------------------------------ //
+      // Рисование + привязки                                               //
+      // ------------------------------------------------------------------ //
+
+      const app = document.getElementById('app');
+
+      function renderTabs() {
+        document.querySelector('[data-lot-tabs]').innerHTML = LOTS.map(
+          (l) =>
+            `<button class="tab" type="button" data-act="lot" data-lot="${esc(l.slug)}" aria-current="${l.slug === state.lot}">${esc(l.title)}${l.synthetic ? ' (демо)' : ''}</button>`
+        ).join('');
+        const v = VARIANTS.find((x) => x.key === state.variant);
+        document.querySelector('[data-variant-label]').innerHTML = `<b>${v.key}</b> · ${v.name}`;
+        const timeLabel = { rel: 'время: относительно', exact: 'время: точно', both: 'время: оба' }[
+          state.time
+        ];
+        document.querySelector('[data-act="time"]').textContent = timeLabel;
+      }
+
+      function syncUrl() {
+        const url = new URL(location.href);
+        url.searchParams.set('variant', state.variant);
+        url.searchParams.set('lot', state.lot);
+        url.searchParams.set('time', state.time);
+        history.replaceState(null, '', url);
+      }
+
+      function render() {
+        const lot = currentLot();
+        app.innerHTML = RENDER[state.variant](lot);
+        document.body.dataset.time = state.time;
+        renderTabs();
+        bindPosters();
+      }
+
+      /** Ориентация кадра по фактической пропорции постера (как lib/lot-video.ts). */
+      function applyOrientation(img) {
+        const w = img.naturalWidth;
+        const h = img.naturalHeight;
+        if (!w || !h) return;
+        const ratio = w / h;
+        const o = ratio >= 1.2 ? 'wide' : ratio >= 0.9 ? 'square' : 'portrait';
+        const lotEl = img.closest('.lot');
+        const frame = img.closest('[data-frame]');
+        if (frame) {
+          frame.style.aspectRatio = `${w} / ${h}`;
+          frame.classList.remove('pending');
+        }
+        if (lotEl) lotEl.dataset.orientation = o;
+      }
+
+      function bindPosters() {
+        app.querySelectorAll('img[data-poster]').forEach((img) => {
+          if (img.complete && img.naturalWidth > 0) applyOrientation(img);
+          else img.addEventListener('load', () => applyOrientation(img), { once: true });
+        });
+      }
+
+      /** Обновить только тело истории (пагинация/живой перекуп — без прыжка). */
+      function refreshHistory() {
+        const lot = currentLot();
+        app.querySelectorAll('[data-history-body]').forEach((el) => {
+          el.innerHTML = historyBody(lot, state.variant);
+        });
+      }
+
+      document.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-act]');
+        if (!btn) return;
+        const act = btn.dataset.act;
+        if (act === 'prev' || act === 'next') {
+          const i = VARIANTS.findIndex((v) => v.key === state.variant);
+          const next = (i + (act === 'next' ? 1 : VARIANTS.length - 1)) % VARIANTS.length;
+          state.variant = VARIANTS[next].key;
+          syncUrl();
+          render();
+          return;
+        }
+        if (act === 'lot') {
+          state.lot = btn.dataset.lot;
+          state.pages = 1;
+          state.live = [];
+          syncUrl();
+          render();
+          return;
+        }
+        if (act === 'time') {
+          const order = ['both', 'rel', 'exact'];
+          state.time = order[(order.indexOf(state.time) + 1) % order.length];
+          syncUrl();
+          render();
+          return;
+        }
+        if (act === 'more') {
+          state.pages += 1;
+          refreshHistory();
+          return;
+        }
+        if (act === 'live') {
+          const lot = currentLot();
+          const maxId = Math.max(
+            0,
+            ...lot.history.map((h) => h.id),
+            ...state.live.map((x) => x.id)
+          );
+          const price = lot.nextPrice;
+          state.live.unshift({
+            slug: lot.slug,
+            id: maxId + 1,
+            seller: lot.owner ?? 'Биржа',
+            buyer: NICK_POOL[Math.floor(Math.random() * NICK_POOL.length)],
+            uid: 'live-' + Date.now(),
+            price,
+            at: new Date().toISOString(),
+          });
+          refreshHistory();
+          return;
+        }
+        if (act === 'play') {
+          const frame = btn.closest('[data-frame]');
+          const lot = currentLot();
+          if (frame && lot.webm) {
+            frame.innerHTML = `<video controls autoplay playsinline preload="metadata" poster="${esc(lot.poster)}" src="${esc(lot.webm)}"></video>`;
+          }
+          return;
+        }
+      });
+
+      // Стартовое состояние из адреса.
+      (function init() {
+        const q = new URLSearchParams(location.search);
+        const v = (q.get('variant') || 'A').toUpperCase();
+        if (VARIANTS.some((x) => x.key === v)) state.variant = v;
+        const l = q.get('lot');
+        if (l && LOTS.some((x) => x.slug === l)) state.lot = l;
+        const t = q.get('time');
+        if (['rel', 'exact', 'both'].includes(t)) state.time = t;
+        render();
+      })();
+    </script>
+  </body>
+</html>
