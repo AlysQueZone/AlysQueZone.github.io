@@ -26,9 +26,17 @@
     5. DEMO                       — синтетика: автор ещё владеет, 0 перекупов
                                     (у всех продовых лотов есть ≥1 перекуп)
 
-  Прочие переключатели (сверху): время — относительное / точное / оба;
-  кнопка «+ живой перекуп» — вставляет новую сделку сверху, как это сделает
-  Realtime в проде. В прототипе «ты» = spiritbanbanban (метка «ТВОЙ»).
+  Прочие переключатели (сверху): время — относительное (по умолчанию) /
+  точное / оба; кнопка «+ живой перекуп» — вставляет новую сделку сверху, как
+  это сделает Realtime в проде. В прототипе «ты» = spiritbanbanban (метка
+  «ТВОЙ»).
+
+  Правки после просмотра (выбран B):
+    - владелец лота — только бейджем на видео (как на витрине), без дубля
+      чипом над кнопкой;
+    - автор привета — табличка геометрии кнопок (chip-arcade), подпись
+      приглушённая, ник тёплым акцентом; без «аватара» и розового фона;
+    - время — относительное по умолчанию.
 
   Оговорки throwaway (как у соседей в scratch/):
     - НЕ часть сборки, отдельный HTML вне Astro;
@@ -277,6 +285,22 @@
         cursor: default;
       }
 
+      /* Статичная табличка: геометрия .btn-arcade (рамка, радиус, высота,
+         смещение тени 4px), но тень светлая, курсор обычный. */
+      .chip-arcade {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        min-height: 2.75rem;
+        border: 3px solid var(--color-milk);
+        border-radius: 4px;
+        box-shadow: 4px 4px 0 color-mix(in srgb, var(--color-milk) 30%, transparent);
+        font-weight: 900;
+        cursor: default;
+        padding: 0.4rem 0.8rem;
+        background: var(--color-void);
+      }
+
       /* ---------------------------------------------------------------- *
        * Общие блоки страницы лота                                          *
        * ---------------------------------------------------------------- */
@@ -303,44 +327,25 @@
         line-height: 1.25;
       }
 
-      /* Плашка автора привета — заметный акцент (легенда-маджента). */
+      /* Автор привета — табличка геометрии кнопок: подпись приглушённая,
+         ник акцентом (тёплый, читаемый). Не яркий фон, не «аватар». */
       .author-plaque {
-        display: flex;
-        align-items: center;
-        gap: 0.6rem;
-        background: var(--color-cream);
-        border: 3px solid var(--color-legend);
-        box-shadow: 4px 4px 0 var(--color-legend);
-        border-radius: 4px;
-        padding: 0.5rem 0.7rem;
+        align-self: flex-start;
+        max-width: 100%;
       }
 
-      .author-plaque .ava {
-        flex: none;
-        width: 2rem;
-        height: 2rem;
-        display: grid;
-        place-items: center;
-        background: var(--color-legend);
-        color: var(--color-cream);
-        font-family: var(--font-display);
-        font-size: 12px;
-        border-radius: 3px;
-      }
-
-      .author-plaque .cap {
+      .author-cap {
         font-family: var(--font-display);
         font-size: 8px;
         line-height: 1.7;
         text-transform: uppercase;
         color: var(--color-mist);
-        display: block;
       }
 
-      .author-plaque .nick {
+      .author-nick {
         font-weight: 900;
-        font-size: 1.05rem;
-        color: var(--color-legend);
+        font-size: 1rem;
+        color: var(--color-ember-deep);
         word-break: break-all;
       }
 
@@ -566,16 +571,6 @@
         grid-column: 1 / -1;
       }
 
-      .b-owner-chip {
-        align-self: flex-start;
-        border: 3px solid var(--color-milk);
-        background: var(--color-panel);
-        box-shadow: 4px 4px 0 var(--color-milk);
-        padding: 0.35rem 0.6rem;
-        font-weight: 900;
-        font-size: 14px;
-      }
-
       /* ---------------------------------------------------------------- *
        * Вариант C «Журнал»                                                 *
        * ---------------------------------------------------------------- */
@@ -706,7 +701,7 @@
       }
     </style>
   </head>
-  <body data-time="both">
+  <body data-time="rel">
     <header class="proto-top">
       <span class="brand">AlysQueZone · прототип</span>
       <span class="note">Открытая карточка лота</span>
@@ -1346,7 +1341,7 @@
       const state = {
         variant: 'A',
         lot: LOTS[0].slug,
-        time: 'both',
+        time: 'rel',
         pages: 1,
         live: [],
       };
@@ -1427,14 +1422,10 @@
 
       function authorPlaque(lot) {
         if (!lot.author) return '';
-        const initial = esc(lot.author.slice(0, 1).toUpperCase());
-        return `<div class="author-plaque">
-          <span class="ava" aria-hidden="true">${initial}</span>
-          <span>
-            <span class="cap">Привет добавил</span>
-            <span class="nick">${esc(lot.author)}</span>
-          </span>
-        </div>`;
+        return `<span class="chip-arcade author-plaque">
+          <span class="author-cap">Привет добавил</span>
+          <span class="author-nick">${esc(lot.author)}</span>
+        </span>`;
       }
 
       function mediaBlock(lot) {
@@ -1539,9 +1530,6 @@
       }
 
       function variantB(lot) {
-        const ownerChip = lot.owner
-          ? `<span class="b-owner-chip">👑 Владелец: ${esc(lot.owner)}${isOwnedByMe(lot) ? ' (ты)' : ''}</span>`
-          : '<span class="b-owner-chip muted">Свободен</span>';
         return `<div class="lot" data-variant="B">
           <a class="back" href="#">← Назад на биржу</a>
           <div class="b-grid" style="margin-top:1rem">
@@ -1549,7 +1537,6 @@
             <article class="card-pixel b-info" style="padding:1.25rem">
               <h1 class="lot-title">${esc(lot.title)}${lot.synthetic ? ' <span class="mark mark-author">демо</span>' : ''}</h1>
               ${authorPlaque(lot)}
-              ${ownerChip}
               <div>${buyButton(lot)}</div>
             </article>
             <section class="card-pixel b-history">
@@ -1561,9 +1548,6 @@
       }
 
       function variantC(lot) {
-        const ownerChip = lot.owner
-          ? `<span class="b-owner-chip">👑 ${esc(lot.owner)}${isOwnedByMe(lot) ? ' (ты)' : ''}</span>`
-          : '<span class="b-owner-chip muted">Свободен</span>';
         return `<div class="lot" data-variant="C">
           <a class="back" href="#">← Назад на биржу</a>
           <div class="c-head card-pixel" style="margin-top:1rem;padding:1rem">
@@ -1571,7 +1555,6 @@
             <div class="c-head-main">
               <h1 class="lot-title">${esc(lot.title)}${lot.synthetic ? ' <span class="mark mark-author">демо</span>' : ''}</h1>
               ${authorPlaque(lot)}
-              <div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap">${ownerChip}</div>
               <div>${buyButton(lot)}</div>
             </div>
           </div>
