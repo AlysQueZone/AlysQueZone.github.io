@@ -24,6 +24,7 @@ foo := "bar"
 alias lg := lazygit
 alias r := run
 alias db-rest := db-reset
+alias dev := run
 
 # -----------------------------------------------------------------------------
 # Recipes
@@ -41,8 +42,41 @@ _default:
 # Запуск проекта
 # -------------------------------------
 
+# Запуск тест сервера
 run:
     npm run dev
+
+# Запустить UI(при неообходимости запустить тест сервер)
+ui:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    url=http://localhost:4321/
+    alive() { curl -sf -o /dev/null --max-time 2 "$url"; }
+
+    if alive; then
+      xdg-open "$url"
+      exit 0
+    fi
+
+    echo "Dev-сервер не отвечает — запускаю just run" >&2
+    just run &
+    dev_pid=$!
+
+    for _ in $(seq 1 120); do
+      sleep 0.5
+      if alive; then break; fi
+    done
+    if ! alive; then
+      echo "Dev-сервер не ответил на $url за минуту" >&2
+      exit 1
+    fi
+
+    xdg-open "$url"
+    # astro dev отдаёт управление сразу (сервер живёт сам); если же dev всё-таки
+    # остался в этом окне — дождаться его, как обычный `just run`.
+    if kill -0 "$dev_pid" 2>/dev/null; then
+      wait "$dev_pid"
+    fi
 
 # -------------------------------------
 # Качество кода
@@ -80,34 +114,34 @@ lots-seed:
 # Рекомендуемый title карточки: ник из имени файла по реестру ников
 # Пример: just lots-title privets/Onghanntto.mp4
 lots-title *args:
-    python3 scripts/lots_title.py {{args}}
+    python3 scripts/lots_title.py {{ args }}
 
 # Синк ников чатерсов из чата VOD в content/chatters.toml
 # Пример: just chatters-sync --vod 2864275043
 chatters-sync *args:
-    python3 scripts/chatters_sync.py {{args}}
+    python3 scripts/chatters_sync.py {{ args }}
 
 # Найти автора привета по характерной фразе из чата VOD: печатает ник и канон.
 # Пример: just chatters-find --vod 2888034815 --until 1800 "надеюсь меня не переедут"
 chatters-find *args:
-    python3 scripts/chatters_find.py {{args}}
+    python3 scripts/chatters_find.py {{ args }}
 
 # Приём заявки на привет: id -> скачивание -> медиа -> карточка -> синк -> лот.
 # Безопасный первый заход: just submission 12 --check (скачает и покажет, стоп).
 # Полный проход: just submission 12; --force — осознанный обход дубль-гейта.
 submission *args:
-    python3 scripts/submission.py {{args}}
+    python3 scripts/submission.py {{ args }}
 
 # Отказ по заявке без выплаты: rejected (по умолчанию) или duplicate.
 # Пример: just submission-reject 12 --status duplicate
 submission-reject *args:
-    python3 scripts/submission.py reject {{args}}
+    python3 scripts/submission.py reject {{ args }}
 
 # Повторная выплата награды по уже принятой заявке: путь восстановления,
 # если выплата упала после приёма. Идемпотентно (сервер не платит дважды).
 # Пример: just submission-reward 12
 submission-reward *args:
-    python3 scripts/submission.py reward {{args}}
+    python3 scripts/submission.py reward {{ args }}
 
 # -------------------------------------
 # Локальная разработка (Supabase + фронт)

@@ -83,7 +83,8 @@ const base = import.meta.env.BASE_URL;
   // Страница лота: slug — из query (`?id=`), состояние — снапшот живых данных
   // (lib/live.ts), хвост перепродаж — из БД (lib/supabase.ts). Перерисовка —
   // от событий снапшота: тик, фокус/возврат и смена сессии — его триггеры.
-  import { fetchSharedHistory, type SharedHistoryEntry } from '@/lib/supabase';
+  import { fetchSharedHistory } from '@/lib/supabase';
+  import type { HistoryEntry } from '@/lib/trade-history';
   import { live, type LotState } from '@/lib/live';
   import { fillLot } from '@/lib/lot-view';
 
@@ -101,7 +102,7 @@ const base = import.meta.env.BASE_URL;
   const emptyNote = document.querySelector('[data-history-empty]');
   /** `lastState` — для перекраски по балансу; `lastEntries` — перерисовка по uid. */
   let lastState: LotState | null = null;
-  let lastEntries: SharedHistoryEntry[] = [];
+  let lastEntries: HistoryEntry[] = [];
 
   function toggle(el: Element | null, show: boolean): void {
     if (el instanceof HTMLElement) el.classList.toggle('hidden', !show);
@@ -153,7 +154,7 @@ const base = import.meta.env.BASE_URL;
     lastState = st;
   }
 
-  function renderSharedHistory(entries: SharedHistoryEntry[], uid: string | null): void {
+  function renderSharedHistory(entries: HistoryEntry[], uid: string | null): void {
     if (!list) return;
     list.querySelectorAll('[data-shared-entry]').forEach((el) => el.remove());
     const frag = document.createDocumentFragment();
@@ -195,7 +196,7 @@ const base = import.meta.env.BASE_URL;
         return;
       }
       fillDetail(st);
-      lastEntries = await fetchSharedHistory(slug, st.owner_login);
+      lastEntries = await fetchSharedHistory(slug);
       renderSharedHistory(lastEntries, live.uid());
     } finally {
       refreshing = false;
