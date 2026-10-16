@@ -80,7 +80,18 @@ const base = import.meta.env.BASE_URL;
         aria-label="История перепродаж"
         class="card-pixel hidden p-5 sm:p-8"
       >
-        <h2 class="font-display text-xs uppercase">История перепродаж</h2>
+        <!-- Направление истории неочевидно (раньше было наоборот): подпись
+             показывается только когда есть что листать — над пустой историей
+             она лишняя. -->
+        <h2 class="font-display text-xs uppercase">
+          История перепродаж
+          <span
+            data-history-order
+            class="ml-2 hidden font-sans text-xs font-bold normal-case text-mist"
+          >
+            новые сверху
+          </span>
+        </h2>
         <p data-history-status class="sr-only" role="status"></p>
         <div data-history-skeleton class="mt-3">
           <div class="flex flex-col gap-2" aria-hidden="true">
@@ -156,6 +167,7 @@ const base = import.meta.env.BASE_URL;
   const emptyNote = document.querySelector('[data-history-empty]');
   const moreWrap = document.querySelector('[data-history-more]');
   const moreBtn = document.querySelector('[data-history-more-btn]');
+  const orderHint = document.querySelector('[data-history-order]');
 
   /** `lastState` — для автора, «Твой» и перекраски по балансу. */
   let lastState: LotState | null = null;
@@ -278,6 +290,7 @@ const base = import.meta.env.BASE_URL;
     list.replaceChildren(...shown.map((entry) => entryRow(entry, uid, author)));
     toggle(listWrap, shown.length > 0);
     toggle(emptyNote, shown.length === 0);
+    toggle(orderHint, shown.length > 0);
     toggle(moreWrap, more && shown.length > 0);
   }
 
