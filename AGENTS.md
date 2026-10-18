@@ -18,6 +18,7 @@
 - Всплывающие уведомления — один модуль (`src/lib/notice.ts`): стек, таймеры, крестик и медиа; вызывающий говорит только «что показать» — `docs/adr/0005`.
 - Окна-диалоги — один цикл (`src/lib/modal.ts`): Escape, клик-вне, фокус-ловушка и стек окон; компонент объявляет разметку (`data-modal-close`) и состояние в `onOpen`/`onClose` — `docs/adr/0008`.
 - Карточка Лота — одно представление (`src/lib/lot-view.ts`): слоты и раскладка кадра; поверхность даёт корень и состояние, свои поля (title документа, автор, сортировка) правит сама — `docs/adr/0009`.
+- Звуки колеса — контент: список в `content/sounds.toml`, рантайм-проекция — `public.gamba_sounds` (`just sounds-sync`), фолбэк сборки — генерат (`just sounds-gen`); имена файлов в коде не живут — `docs/adr/0011`.
 - Цвет/визуальный стиль — один источник: палитра D1 в `design-system/alysquezone/MASTER.md`, токены — `@theme` в `src/styles/global.css`; hex в коде не хардкодим.
 - Контраст — часть стиля: muted-текст только `text-mist` (без `/60…80`), акцентный текст — `*-deep` или затемнённый токен (`melon`, `pivko`); проверка — `validate-tokens.cjs --dir src/` из скилла `design-system`.
 - UI/UX-скиллы (`.opencode/`) в гите нет: свежий клон — `npx uipro init --ai opencode`, обновление — `npx uipro update`.
@@ -44,6 +45,7 @@
 - Стиль / импорты / рендер / комментарии / тесты / SQL-гайд / `just` → `docs/agents/code-style.md`.
 - Цвета / токены / типографика / компоненты → `design-system/alysquezone/MASTER.md`.
 - Гамба-звуки / комиссия / рост цены / награда за привет / владение лотом → `docs/agents/economy.md`.
+- Новый звук колеса (`just sound-add`, манифест `content/sounds.toml`) → скилл `alysque-sound`.
 - Эмоуты / чат VOD / мемы / пасты / стата → `docs/agents/twitch-sources.md`.
 - Ники чатерсов / реестр / резолв написания → `docs/agents/chatters.md`.
 - Telegram-уведомление о заявке / Vault / триггер → `docs/agents/telegram-notify.md`.

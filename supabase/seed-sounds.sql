@@ -1,0 +1,34 @@
+-- Сгенерировано scripts/sounds_sync.py gen из content/sounds.toml.
+-- Руками не править: правь манифест и перегенерируй.
+-- Локальный сид (supabase db reset); на проде не применяется.
+insert into public.gamba_sounds (pool, file) values
+  ('spin', 'gamba-spin-sova.mp3'),
+  ('spin', 'gamba-spin-maknagens.mp3'),
+  ('spin', 'gamba-spin-toptop.mp3'),
+  ('spin', 'gamba-spin-sapogi.mp3'),
+  ('spin', 'gamba-spin-trtrtrtr.mp3'),
+  ('spin', 'gamba-spin-tutututu.mp3'),
+  ('spin', 'gamba-spin-kazu-tatata.mp3'),
+  ('spin', 'gamba-spin-tratatatata.mp3'),
+  ('spin', 'gamba-spin-maknaggetskue.mp3'),
+  ('spin', 'gamba-spin-otvinta.mp3'),
+  ('spin', 'gamba-spin-rgg-koleso.mp3'),
+  ('spin', 'gamba-spin-belaya-noch.mp3'),
+  ('spin', 'gamba-spin-tyapa-tyapa.mp3'),
+  ('spin', 'gamba-bg.mp3'),
+  ('spin', 'gamba-win-taktak.mp3'),
+  ('win', 'gamba-win1k.mp3'),
+  ('win', 'gamba-win-ideal.mp3'),
+  ('win', 'gamba-win-oooo.mp3'),
+  ('win', 'gamba-win-pivo.mp3'),
+  ('jackpot', 'gamba-win100k.mp3'),
+  ('jackpot', 'gamba-super-vanna.mp3'),
+  ('jackpot', 'gamba-super-snow.mp3'),
+  ('jackpot', 'gamba-super-ebaaaat.mp3'),
+  ('jackpot', 'gamba-super-vnimanie-ay.mp3'),
+  ('lose', 'm4-scum.mp3'),
+  ('lose', 'gamba-lose-higan.mp3'),
+  ('lose', 'gamba-lose-pivka.mp3'),
+  ('lose', 'gamba-lose-proigrala-zhopu.mp3'),
+  ('lose', 'gamba-lose-dengi-na-pivo.mp3')
+on conflict (pool, file) do nothing;

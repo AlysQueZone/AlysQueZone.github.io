@@ -10,29 +10,29 @@
 // крутка отменяется в onClose, показ — в onOpen.
 //
 // Звуки — публичный бакет media: абсолютные S3-URL без ${base}.
+// Пулы в разметку печёт сборка (фолбэк из манифеста content/sounds.toml), а
+// при открытии окна клиент подменяет их списком из БД — lib/gamba-sounds.ts.
 import { s3Sound } from '@/lib/media';
 import { GAMBA_EMOTE_URL } from '@/lib/emotes';
-import {
-  GAMBA_DAILY_LIMIT,
-  GAMBA_JACKPOT_SOUNDS,
-  GAMBA_LOSE_SOUNDS,
-  GAMBA_SPIN_SOUNDS,
-  GAMBA_WIN_SOUNDS,
-} from '@/lib/gamba';
-/** Звуковые пулы — из констант lib/gamba.ts (единый источник правды). */
-const SPIN_POOL = GAMBA_SPIN_SOUNDS.map((f) => s3Sound(f)).join(',');
-const WIN_POOL = GAMBA_WIN_SOUNDS.map((f) => s3Sound(f)).join(',');
-const JACKPOT_POOL = GAMBA_JACKPOT_SOUNDS.map((f) => s3Sound(f)).join(',');
-const LOSE_POOL = GAMBA_LOSE_SOUNDS.map((f) => s3Sound(f)).join(',');
+import { GAMBA_DAILY_LIMIT } from '@/lib/gamba';
+import { fallbackSoundPools, type SoundPool } from '@/lib/gamba-sounds';
+/** Фолбэк пулов на момент билда — играет, пока БД не ответила. */
+const FALLBACK_POOLS = fallbackSoundPools();
+const POOL_URLS: Record<SoundPool, string> = {
+  spin: FALLBACK_POOLS.spin.map((f) => s3Sound(f)).join(','),
+  win: FALLBACK_POOLS.win.map((f) => s3Sound(f)).join(','),
+  jackpot: FALLBACK_POOLS.jackpot.map((f) => s3Sound(f)).join(','),
+  lose: FALLBACK_POOLS.lose.map((f) => s3Sound(f)).join(','),
+};
 ---
 
 <div
   id="gamba-modal"
   data-limit={GAMBA_DAILY_LIMIT}
-  data-spin-pool={SPIN_POOL}
-  data-win-pool={WIN_POOL}
-  data-jackpot-pool={JACKPOT_POOL}
-  data-lose-pool={LOSE_POOL}
+  data-spin-pool={POOL_URLS.spin}
+  data-win-pool={POOL_URLS.win}
+  data-jackpot-pool={POOL_URLS.jackpot}
+  data-lose-pool={POOL_URLS.lose}
   class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4"
   role="dialog"
   aria-modal="true"
@@ -107,6 +107,7 @@ const LOSE_POOL = GAMBA_LOSE_SOUNDS.map((f) => s3Sound(f)).join(',');
 <script>
   import { getSupabase, signInWithTwitch } from '@/lib/supabase';
   import { live } from '@/lib/live';
+  import { s3Sound } from '@/lib/media';
   import {
     GAMBA_STAKE,
     mapGambaError,
@@ -114,6 +115,12 @@ const LOSE_POOL = GAMBA_LOSE_SOUNDS.map((f) => s3Sound(f)).join(',');
     spinGambaWithRetry,
     type GambaOutcome,
   } from '@/lib/gamba';
+  import {
+    SOUND_POOLS,
+    fetchSoundPools,
+    type SoundPool,
+    type SoundPools,
+  } from '@/lib/gamba-sounds';
   import { createModal } from '@/lib/modal';
 
   /** Токены палитры (design-system/alysquezone/MASTER.md) — canvas их не видит,
@@ -276,6 +283,14 @@ const LOSE_POOL = GAMBA_LOSE_SOUNDS.map((f) => s3Sound(f)).join(',');
     }
   }
 
+  /** Ключи dataset по пулам; единственный читатель пулов — pool(). */
+  const POOL_KEYS: Record<SoundPool, string> = {
+    spin: 'spinPool',
+    win: 'winPool',
+    jackpot: 'jackpotPool',
+    lose: 'losePool',
+  };
+
   /** Рандом-пулы звуков гамбы: равномерный выбор внутри категории. */
   function pool(key: string): string[] {
     if (!modal) return [];
@@ -293,7 +308,7 @@ const LOSE_POOL = GAMBA_LOSE_SOUNDS.map((f) => s3Sound(f)).join(',');
 
   function preloadPools(): void {
     try {
-      for (const key of ['spinPool', 'winPool', 'jackpotPool', 'losePool']) {
+      for (const key of SOUND_POOLS.map((p) => POOL_KEYS[p])) {
         for (const src of pool(key)) {
           const a = new Audio(src);
           a.preload = 'auto';
@@ -303,6 +318,27 @@ const LOSE_POOL = GAMBA_LOSE_SOUNDS.map((f) => s3Sound(f)).join(',');
     } catch {
       // предзагрузка — best effort
     }
+  }
+
+  /** Пулы из БД ложатся туда же, откуда их читает крутка, — в data-атрибуты. */
+  function setPools(pools: SoundPools): void {
+    if (!modal) return;
+    for (const pool of SOUND_POOLS) {
+      modal.dataset[POOL_KEYS[pool]] = pools[pool].map((f) => s3Sound(f)).join(',');
+    }
+  }
+
+  /**
+   * Догрузка пулов из БД при открытии окна. Крутку не блокирует: пока едет,
+   * звучит фолбэк сборки; приехало — подменяем и греем новые файлы. Список
+   * меняется синком, а не жизнью пользователя, поэтому каждый заход читает
+   * свежее (кэша нет) — релиз звука виден без перезагрузки страницы.
+   */
+  async function syncPools(): Promise<void> {
+    const pools = await fetchSoundPools();
+    if (!pools) return;
+    setPools(pools);
+    preloadPools();
   }
 
   /** Случайная фраза кручения — one-shot поверх щелчков (gamba-bg — один из вариантов пула, не луп). */
@@ -485,6 +521,7 @@ const LOSE_POOL = GAMBA_LOSE_SOUNDS.map((f) => s3Sound(f)).join(',');
       if (result) result.textContent = '';
       draw(0);
       preloadPools();
+      void syncPools();
       // Гейт заранее: при балансе меньше ставки — понятная подсказка,
       // а не ошибка после клика (свежесть — явная, это денежный гейт).
       void (async () => {

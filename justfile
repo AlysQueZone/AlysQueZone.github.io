@@ -98,6 +98,7 @@ check:
     npm run lint
     npm run test
     npm run format:check
+    python3 scripts/sounds_sync.py check
 
 # -------------------------------------
 # Контент лотов
@@ -115,6 +116,24 @@ lots-seed:
 # Пример: just lots-title privets/Onghanntto.mp4
 lots-title *args:
     python3 scripts/lots_title.py {{ args }}
+
+# -------------------------------------
+# Контент звуков гамбы
+# -------------------------------------
+
+# Синк content/sounds.toml в прод: манифест = таблица (лишнее сносится), без деплоя
+sounds-sync *args:
+    python3 scripts/sounds_sync.py sync {{ args }}
+
+# Пересобрать supabase/seed-sounds.sql и src/lib/gamba-sounds.gen.ts из манифеста
+sounds-gen:
+    python3 scripts/sounds_sync.py gen
+
+# Новый звук колеса: файл/URL -> mp3 -> Storage -> манифест -> синк (без деплоя)
+# Пример: just sound-add privets/ya_lublu_pivo.mp4 --pool win
+# Пример: just sound-add https://cdn.example/clip.webm --pool spin --name gamba-spin-rgg
+sound-add *args:
+    python3 scripts/sounds_sync.py add {{ args }}
 
 # Синк ников чатерсов из чата VOD в content/chatters.toml
 # Пример: just chatters-sync --vod 2864275043
@@ -156,11 +175,12 @@ db-up:
 db-stop:
     ./node_modules/.bin/supabase stop
 
-# Чистая локальная БД: миграции + сид из content/lots.toml (данные теряются).
+# Чистая локальная БД: миграции + сид из контент-манифестов (данные теряются).
 # --write-seed пишет только файл supabase/seed.sql; в локальную БД его заливает db reset.
 # Секреты Vault reset стирает — db-vault в конце их возвращает.
 db-reset: db-up
     python3 scripts/lots_sync.py --write-seed
+    python3 scripts/sounds_sync.py gen
     ./node_modules/.bin/supabase db reset
     just db-vault
 

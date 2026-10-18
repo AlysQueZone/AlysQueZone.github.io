@@ -24,56 +24,8 @@ export const GAMBA_STAKE = 100;
 /** Дневной лимит спинов — display-mirror, source of truth — DB (c_daily_limit в spin_gamba). */
 export const GAMBA_DAILY_LIMIT = 20;
 
-/**
- * Звуковые пулы гамбы — единый источник правды (имена файлов в бакете
- * media/sounds; URL собирает s3Sound() / GambaModal).
- *
- * Спин (кручение, случайный one-shot поверх щелчков) — свой пул ниже.
- * Нюансы имён: `gamba-win-taktak.mp3` исторически с префиксом win, по смыслу —
- * фраза кручения «тактактакуе»; `gamba-bg.mp3` — one-shot вариант спина, не луп.
- * Выигрыш small/big, джекпот, проигрыш — свои пулы; возврат церемониально
- * равен проигрышу (худший исход таблицы I, мимо нет) и звучит lose-пулом.
- */
-export const GAMBA_SPIN_SOUNDS = [
-  'gamba-spin-sova.mp3',
-  'gamba-spin-maknagens.mp3',
-  'gamba-spin-toptop.mp3',
-  'gamba-spin-sapogi.mp3',
-  'gamba-spin-trtrtrtr.mp3',
-  'gamba-spin-tutututu.mp3',
-  'gamba-spin-kazu-tatata.mp3',
-  'gamba-spin-tratatatata.mp3',
-  'gamba-spin-maknaggetskue.mp3',
-  'gamba-spin-otvinta.mp3',
-  'gamba-spin-rgg-koleso.mp3',
-  'gamba-spin-belaya-noch.mp3',
-  'gamba-spin-tyapa-tyapa.mp3',
-  'gamba-bg.mp3',
-  'gamba-win-taktak.mp3',
-] as const;
-
-export const GAMBA_WIN_SOUNDS = [
-  'gamba-win1k.mp3',
-  'gamba-win-ideal.mp3',
-  'gamba-win-oooo.mp3',
-  'gamba-win-pivo.mp3',
-] as const;
-
-export const GAMBA_JACKPOT_SOUNDS = [
-  'gamba-win100k.mp3',
-  'gamba-super-vanna.mp3',
-  'gamba-super-snow.mp3',
-  'gamba-super-ebaaaat.mp3',
-  'gamba-super-vnimanie-ay.mp3',
-] as const;
-
-export const GAMBA_LOSE_SOUNDS = [
-  'm4-scum.mp3',
-  'gamba-lose-higan.mp3',
-  'gamba-lose-pivka.mp3',
-  'gamba-lose-proigrala-zhopu.mp3',
-  'gamba-lose-dengi-na-pivo.mp3',
-] as const;
+// Звуковые пулы гамбы — в lib/gamba-sounds.ts: источник правды — манифест
+// content/sounds.toml, рантайм — public.gamba_sounds (docs/adr/0011).
 
 export type GambaOutcome = 'miss' | 'return' | 'small' | 'big' | 'jackpot';
 

@@ -1,0 +1,131 @@
+# Звуки гамбы — источник правды. Список пулов: spin | win | jackpot | lose.
+# Синк в прод: `just sounds-sync` (миграции не нужны). Локальный сид: `just sounds-seed`.
+# Добавить звук: `just sound-add <файл|URL> --pool <пул>` (конвертация, залив,
+# строка сюда, синк — одной командой).
+#
+# file — имя файла в публичном бакете media/sounds (без пути и без URL: его
+#   собирает s3Sound() по имени). Правишь список руками — правь только здесь:
+#   синк делает таблицу ровно такой, как этот файл, и сносит из неё лишнее.
+#   Имена исторические: префикс пула не всегда совпадает (`gamba-super-*` —
+#   джекпот, `m4-scum.mp3` — проигрыш). Новые звуки sound-add печёт как
+#   `gamba-<пул>-<слаг>`.
+
+[[sounds]]
+pool = "spin"
+file = "gamba-spin-sova.mp3"
+
+[[sounds]]
+pool = "spin"
+file = "gamba-spin-maknagens.mp3"
+
+[[sounds]]
+pool = "spin"
+file = "gamba-spin-toptop.mp3"
+
+[[sounds]]
+pool = "spin"
+file = "gamba-spin-sapogi.mp3"
+
+[[sounds]]
+pool = "spin"
+file = "gamba-spin-trtrtrtr.mp3"
+
+[[sounds]]
+pool = "spin"
+file = "gamba-spin-tutututu.mp3"
+
+[[sounds]]
+pool = "spin"
+file = "gamba-spin-kazu-tatata.mp3"
+
+[[sounds]]
+pool = "spin"
+file = "gamba-spin-tratatatata.mp3"
+
+[[sounds]]
+pool = "spin"
+file = "gamba-spin-maknaggetskue.mp3"
+
+[[sounds]]
+pool = "spin"
+file = "gamba-spin-otvinta.mp3"
+
+[[sounds]]
+pool = "spin"
+file = "gamba-spin-rgg-koleso.mp3"
+
+[[sounds]]
+pool = "spin"
+file = "gamba-spin-belaya-noch.mp3"
+
+[[sounds]]
+pool = "spin"
+file = "gamba-spin-tyapa-tyapa.mp3"
+
+# one-shot вариант спина, не луп
+[[sounds]]
+pool = "spin"
+file = "gamba-bg.mp3"
+
+# фраза кручения «тактактакуе» (имя исторически с префиксом win)
+[[sounds]]
+pool = "spin"
+file = "gamba-win-taktak.mp3"
+
+[[sounds]]
+pool = "win"
+file = "gamba-win1k.mp3"
+
+[[sounds]]
+pool = "win"
+file = "gamba-win-ideal.mp3"
+
+[[sounds]]
+pool = "win"
+file = "gamba-win-oooo.mp3"
+
+[[sounds]]
+pool = "win"
+file = "gamba-win-pivo.mp3"
+
+[[sounds]]
+pool = "jackpot"
+file = "gamba-win100k.mp3"
+
+[[sounds]]
+pool = "jackpot"
+file = "gamba-super-vanna.mp3"
+
+[[sounds]]
+pool = "jackpot"
+file = "gamba-super-snow.mp3"
+
+[[sounds]]
+pool = "jackpot"
+file = "gamba-super-ebaaaat.mp3"
+
+[[sounds]]
+pool = "jackpot"
+file = "gamba-super-vnimanie-ay.mp3"
+
+# возврат церемониально равен проигрышу и звучит этим пулом (худший исход
+# таблицы I, мимо нет)
+[[sounds]]
+pool = "lose"
+file = "m4-scum.mp3"
+
+[[sounds]]
+pool = "lose"
+file = "gamba-lose-higan.mp3"
+
+[[sounds]]
+pool = "lose"
+file = "gamba-lose-pivka.mp3"
+
+[[sounds]]
+pool = "lose"
+file = "gamba-lose-proigrala-zhopu.mp3"
+
+[[sounds]]
+pool = "lose"
+file = "gamba-lose-dengi-na-pivo.mp3"

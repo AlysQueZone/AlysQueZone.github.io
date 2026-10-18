@@ -2,11 +2,14 @@
 """Общие хелперы скриптов Supabase (stdlib, без зависимостей).
 
 Секреты НИКОГДА не печатаются: наружу отдаём только ключ/URL базой.
-Используется storage_upload.py и lots_sync.py.
+Используется storage_upload.py, lots_sync.py и sounds_sync.py.
 """
 
+import json
 import os
+import urllib.error
 import urllib.parse
+import urllib.request
 
 KEY_NAMES = ("SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEY", "SERVICE_ROLE_KEY")
 
@@ -60,3 +63,19 @@ def project_base(url):
     """https://<ref>.supabase.co из PUBLIC_SUPABASE_URL либо None."""
     ref = ref_from_url(url or "")
     return "https://%s.supabase.co" % ref if ref else None
+
+
+def request_json(key, method, url, payload=None, prefer=None):
+    """REST-запрос к PostgREST; возвращает (status, body). Тело ошибки урезано."""
+    data = json.dumps(payload).encode("utf-8") if payload is not None else None
+    headers = {"apikey": key, "Authorization": "Bearer " + key}
+    if data is not None:
+        headers["Content-Type"] = "application/json"
+    if prefer:
+        headers["Prefer"] = prefer
+    req = urllib.request.Request(url, data=data, method=method, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return resp.status, resp.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as exc:
+        return exc.code, exc.read().decode("utf-8", "replace")[:300]
