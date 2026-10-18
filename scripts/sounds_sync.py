@@ -323,7 +323,7 @@ def archive_source(root, local):
 
 def cmd_add(args):
     root = os.getcwd()
-    manifest = os.path.join(root, MANIFEST)
+    manifest = args.manifest
     entries = read_manifest(manifest)
     key, base = creds(args.env)
     if not key or not base:
@@ -408,6 +408,7 @@ def main():
         default=None,
         help="Имя файла в бакете (по умолчанию gamba-<пул>-<слаг>)",
     )
+    p_add.add_argument("--manifest", default=os.path.join(os.getcwd(), MANIFEST))
     p_add.add_argument("--env", default=os.path.join(os.getcwd(), ".env"))
 
     args = ap.parse_args()
