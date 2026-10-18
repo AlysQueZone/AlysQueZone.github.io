@@ -73,6 +73,10 @@ pool = "spin"
 file = "gamba-win-taktak.mp3"
 
 [[sounds]]
+pool = "spin"
+file = "gamba-spin-trrr-trrr.mp3"
+
+[[sounds]]
 pool = "win"
 file = "gamba-win1k.mp3"
 
@@ -87,6 +91,10 @@ file = "gamba-win-oooo.mp3"
 [[sounds]]
 pool = "win"
 file = "gamba-win-pivo.mp3"
+
+[[sounds]]
+pool = "win"
+file = "gamba-win-ya-lublu-pivo.mp3"
 
 [[sounds]]
 pool = "jackpot"
