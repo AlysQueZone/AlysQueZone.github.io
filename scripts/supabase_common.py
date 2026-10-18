@@ -65,8 +65,12 @@ def project_base(url):
     return "https://%s.supabase.co" % ref if ref else None
 
 
-def request_json(key, method, url, payload=None, prefer=None):
-    """REST-запрос к PostgREST; возвращает (status, body). Тело ошибки урезано."""
+def request_json(key, method, url, payload=None, prefer=None, timeout=30):
+    """REST-запрос к PostgREST; возвращает (status, body). Тело ошибки урезано.
+
+    Недоступный хост — тоже (status, текст): вызывающий покажет причину, а не
+    трассировку.
+    """
     data = json.dumps(payload).encode("utf-8") if payload is not None else None
     headers = {"apikey": key, "Authorization": "Bearer " + key}
     if data is not None:
@@ -75,7 +79,14 @@ def request_json(key, method, url, payload=None, prefer=None):
         headers["Prefer"] = prefer
     req = urllib.request.Request(url, data=data, method=method, headers=headers)
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
             return resp.status, resp.read().decode("utf-8", "replace")
     except urllib.error.HTTPError as exc:
         return exc.code, exc.read().decode("utf-8", "replace")[:300]
+    except urllib.error.URLError as exc:
+        return 0, str(exc.reason)
+
+
+def sql_str(value):
+    """Литерал для SQL-вставки (одинарные кавычки удваиваются)."""
+    return "'" + str(value).replace("'", "''") + "'"

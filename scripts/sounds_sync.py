@@ -38,11 +38,24 @@ from supabase_common import (
     request_json,
     resolve,
     resolve_service_key,
+    sql_str,
 )
 
 POOLS = ("spin", "win", "jackpot", "lose")
 PRINT_WIDTH = 100
 BUCKET = "media"
+MEDIA_SUFFIXES = (
+    ".mp3",
+    ".mp4",
+    ".webm",
+    ".mov",
+    ".mkv",
+    ".m4v",
+    ".m4a",
+    ".aac",
+    ".ogg",
+    ".wav",
+)
 SOUNDS_DEST = "sounds/"
 MANIFEST = os.path.join("content", "sounds.toml")
 SEED = os.path.join("supabase", "seed-sounds.sql")
@@ -75,11 +88,12 @@ def read_manifest(path):
             raise SystemExit("Дубль %s/%s" % (pool, name))
         seen.add((pool, name))
         entries.append({"pool": pool, "file": name})
+    for pool in POOLS:
+        if not any(e["pool"] == pool for e in entries):
+            raise SystemExit(
+                "Пул без звуков: %s — пустой пул молчит на своей стадии" % pool
+            )
     return entries
-
-
-def sql_str(value):
-    return "'" + str(value).replace("'", "''") + "'"
 
 
 def seed_sql(entries):
@@ -238,17 +252,71 @@ def default_name(pool, path):
     return "gamba-%s-%s.mp3" % (pool, slug or "sound")
 
 
-def download(url, out):
-    req = urllib.request.Request(url, headers={"User-Agent": "alysquezone-sounds/1"})
+def download(url, workdir):
+    """Клип или прямая ссылка -> локальный файл.
+
+    yt-dlp берёт и страницы клипов (`twitch.tv/.../clip/...`), и прямые ссылки;
+    urllib остаётся запасным путём для прямой ссылки, если yt-dlp не стоит.
+    """
+    os.makedirs(workdir, exist_ok=True)
+    out_tmpl = os.path.join(workdir, "source.%(ext)s")
+    ytdlp = None
     try:
-        with urllib.request.urlopen(req, timeout=120) as resp, open(out, "wb") as fh:
+        ytdlp = subprocess.run(
+            [
+                "yt-dlp",
+                "--no-playlist",
+                "--no-progress",
+                "-f",
+                "bestaudio/best",
+                "-o",
+                out_tmpl,
+                url,
+            ],
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        pass
+    if ytdlp is not None and ytdlp.returncode == 0:
+        found = find_download(workdir)
+        if found:
+            print("скачано (yt-dlp): %s" % os.path.basename(found))
+            return found
+    path = urllib.parse.urlsplit(url).path.lower()
+    if path.endswith(MEDIA_SUFFIXES):
+        target = os.path.join(workdir, "source" + os.path.splitext(path)[1])
+        direct_download(url, target)
+        print("скачано (прямая ссылка): %s" % os.path.basename(target))
+        return target
+    if ytdlp is None:
+        raise SystemExit("Нет yt-dlp — поставь его или дай прямую ссылку на медиафайл")
+    tail = (ytdlp.stderr or "").strip().splitlines()
+    raise SystemExit(
+        "Ссылка не скачалась: %s" % (tail[-1] if tail else "yt-dlp не справился")
+    )
+
+
+def direct_download(url, target):
+    req = urllib.request.Request(url, headers={"User-Agent": "AlysQueZone/1.0"})
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp, open(target, "wb") as fh:
             shutil.copyfileobj(resp, fh)
     except urllib.error.HTTPError as exc:
         raise SystemExit("Не скачалось (%s): %s" % (exc.code, url))
     except urllib.error.URLError as exc:
         raise SystemExit("Не скачалось (%s): %s" % (exc.reason, url))
-    if not os.path.getsize(out):
+    if not os.path.getsize(target):
         raise SystemExit("Пустой файл: %s" % url)
+
+
+def find_download(workdir):
+    for name in sorted(os.listdir(workdir)):
+        if name.startswith("source.") and not name.endswith(".part"):
+            full = os.path.join(workdir, name)
+            if os.path.isfile(full) and os.path.getsize(full) > 0:
+                return full
+    return None
 
 
 def to_mp3(src, out):
@@ -281,9 +349,13 @@ def to_mp3(src, out):
 def append_manifest(path, pool, name):
     """Дописывает блок в конец своей группы пула (файл читают глазами)."""
     with open(path, "r", encoding="utf-8") as fh:
-        lines = fh.read().splitlines()
-    if any(line.strip() == 'file = "%s"' % name for line in lines):
-        raise SystemExit("Уже в манифесте: %s" % name)
+        text = fh.read()
+    # Ключ — пара (пул, файл): одна фраза вправе стоять в двух пулах.
+    if (pool, name) in {
+        (e["pool"], e["file"]) for e in tomllib.loads(text).get("sounds", [])
+    }:
+        raise SystemExit("Уже в манифесте: %s/%s" % (pool, name))
+    lines = text.splitlines()
     block = ["", "[[sounds]]", 'pool = "%s"' % pool, 'file = "%s"' % name]
     insert_at = None
     starts = [i for i, line in enumerate(lines) if line.strip() == "[[sounds]]"]
@@ -334,19 +406,20 @@ def cmd_add(args):
 
     tmp = tempfile.mkdtemp(prefix="sound-")
     if re.match(r"^https?://", args.source):
-        local = os.path.join(
-            tmp,
-            os.path.basename(urllib.parse.urlparse(args.source).path) or "clip.webm",
+        # Имя по умолчанию — из ссылки: yt-dlp кладёт всё в source.<ext>.
+        name_hint = (
+            os.path.basename(urllib.parse.urlsplit(args.source).path) or args.source
         )
-        download(args.source, local)
+        local = download(args.source, tmp)
         keep_source = None
     else:
         local = args.source
         if not os.path.isfile(local):
             raise SystemExit("Нет файла: %s" % local)
+        name_hint = local
         keep_source = local
 
-    name = args.name or default_name(args.pool, local)
+    name = args.name or default_name(args.pool, name_hint)
     if not name.endswith(".mp3"):
         name += ".mp3"
     if (args.pool, name) in {(e["pool"], e["file"]) for e in entries}:
@@ -428,6 +501,10 @@ def main():
             "в окружении или в %s" % args.env
         )
         return 1
+    # Синк — единственный путь правки прод-таблицы, поэтому и генераты
+    # (сид + фолбэк сборки) обновляются здесь же: разойтись с манифестом нечем.
+    if not args.dry_run:
+        cmd_gen(entries)
     return sync_to_db(entries, key, base, dry_run=args.dry_run)
 
 

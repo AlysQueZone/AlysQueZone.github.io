@@ -24,11 +24,16 @@ import json
 import os
 import sys
 import tomllib
-import urllib.error
 import urllib.parse
-import urllib.request
 
-from supabase_common import load_dotenv, project_base, resolve, resolve_service_key
+from supabase_common import (
+    load_dotenv,
+    project_base,
+    request_json,
+    resolve,
+    resolve_service_key,
+    sql_str,
+)
 
 FIELDS = ("slug", "title", "price", "video_url")
 
@@ -58,10 +63,6 @@ def read_manifest(path):
     return lots
 
 
-def sql_str(value):
-    return "'" + str(value).replace("'", "''") + "'"
-
-
 def write_seed(lots, path):
     """Пересобирает supabase/seed.sql из манифеста (локальный db reset)."""
     lines = [
@@ -86,24 +87,8 @@ def write_seed(lots, path):
         fh.write("\n".join(lines) + "\n")
 
 
-def request(key, method, url, payload=None, prefer=None):
-    data = json.dumps(payload).encode("utf-8") if payload is not None else None
-    headers = {"apikey": key, "Authorization": "Bearer " + key}
-    if data is not None:
-        headers["Content-Type"] = "application/json"
-    if prefer:
-        headers["Prefer"] = prefer
-    req = urllib.request.Request(url, data=data, method=method, headers=headers)
-    try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            return resp.status, resp.read().decode("utf-8", "replace")
-    except urllib.error.HTTPError as exc:
-        body = exc.read().decode("utf-8", "replace")[:300]
-        return exc.code, body
-
-
 def fetch_existing(key, base):
-    status, body = request(
+    status, body = request_json(
         key, "GET", "%s/rest/v1/lots?select=slug,title,video_url" % base
     )
     if status != 200:
@@ -175,7 +160,7 @@ def main():
             created += 1
             print("+ %s" % lot["slug"])
             if not args.dry_run:
-                status, body = request(
+                status, body = request_json(
                     key,
                     "POST",
                     "%s/rest/v1/lots" % base,
@@ -192,7 +177,7 @@ def main():
                     base,
                     urllib.parse.quote(lot["slug"], safe=""),
                 )
-                status, body = request(
+                status, body = request_json(
                     key, "PATCH", url, payload, prefer="return=minimal"
                 )
                 if status not in (200, 204):
