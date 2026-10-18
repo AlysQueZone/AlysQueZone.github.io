@@ -1,0 +1,1 @@
+function e(e){return`https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/sounds/${e}`}export{e as t};
