@@ -12,17 +12,16 @@
 // Звуки — публичный бакет media: абсолютные S3-URL без ${base}.
 // Пулы в разметку печёт сборка (фолбэк из манифеста content/sounds.toml), а
 // при открытии окна клиент подменяет их списком из БД — lib/gamba-sounds.ts.
-import { s3Sound } from '@/lib/media';
 import { GAMBA_EMOTE_URL } from '@/lib/emotes';
 import { GAMBA_DAILY_LIMIT } from '@/lib/gamba';
-import { fallbackSoundPools, type SoundPool } from '@/lib/gamba-sounds';
+import { fallbackSoundPools, poolAttribute, type SoundPool } from '@/lib/gamba-sounds';
 /** Фолбэк пулов на момент билда — играет, пока БД не ответила. */
 const FALLBACK_POOLS = fallbackSoundPools();
 const POOL_URLS: Record<SoundPool, string> = {
-  spin: FALLBACK_POOLS.spin.map((f) => s3Sound(f)).join(','),
-  win: FALLBACK_POOLS.win.map((f) => s3Sound(f)).join(','),
-  jackpot: FALLBACK_POOLS.jackpot.map((f) => s3Sound(f)).join(','),
-  lose: FALLBACK_POOLS.lose.map((f) => s3Sound(f)).join(','),
+  spin: poolAttribute(FALLBACK_POOLS.spin),
+  win: poolAttribute(FALLBACK_POOLS.win),
+  jackpot: poolAttribute(FALLBACK_POOLS.jackpot),
+  lose: poolAttribute(FALLBACK_POOLS.lose),
 };
 ---
 
@@ -107,7 +106,6 @@ const POOL_URLS: Record<SoundPool, string> = {
 <script>
   import { getSupabase, signInWithTwitch } from '@/lib/supabase';
   import { live } from '@/lib/live';
-  import { s3Sound } from '@/lib/media';
   import {
     GAMBA_STAKE,
     mapGambaError,
@@ -116,8 +114,9 @@ const POOL_URLS: Record<SoundPool, string> = {
     type GambaOutcome,
   } from '@/lib/gamba';
   import {
-    SOUND_POOLS,
+    POOL_NAMES,
     fetchSoundPools,
+    poolAttribute,
     type SoundPool,
     type SoundPools,
   } from '@/lib/gamba-sounds';
@@ -308,7 +307,7 @@ const POOL_URLS: Record<SoundPool, string> = {
 
   function preloadPools(): void {
     try {
-      for (const key of SOUND_POOLS.map((p) => POOL_KEYS[p])) {
+      for (const key of POOL_NAMES.map((p) => POOL_KEYS[p])) {
         for (const src of pool(key)) {
           const a = new Audio(src);
           a.preload = 'auto';
@@ -323,8 +322,8 @@ const POOL_URLS: Record<SoundPool, string> = {
   /** Пулы из БД ложатся туда же, откуда их читает крутка, — в data-атрибуты. */
   function setPools(pools: SoundPools): void {
     if (!modal) return;
-    for (const pool of SOUND_POOLS) {
-      modal.dataset[POOL_KEYS[pool]] = pools[pool].map((f) => s3Sound(f)).join(',');
+    for (const pool of POOL_NAMES) {
+      modal.dataset[POOL_KEYS[pool]] = poolAttribute(pools[pool]);
     }
   }
 
