@@ -117,6 +117,12 @@ lots-seed:
 lots-title *args:
     python3 scripts/lots_title.py {{ args }}
 
+# Пример: just lot-add privets/Onghanntto.mp4 --title "Привет Onghanntto"
+# Хотлинк: just lot-add --link https://cdn.example/clip.webm --slug lot-meme-x --title "…"
+# Новый лот: тройка -> Storage -> карточка -> сид -> синк одной командой
+lot-add *args:
+    python3 scripts/lot_add.py {{ args }}
+
 # -------------------------------------
 # Контент звуков гамбы
 # -------------------------------------

@@ -2,7 +2,7 @@
 """Общие хелперы скриптов Supabase (stdlib, без зависимостей).
 
 Секреты НИКОГДА не печатаются: наружу отдаём только ключ/URL базой.
-Используется storage_upload.py, lots_sync.py и sounds_sync.py.
+Используется storage_upload.py, lots_sync.py, lot_add.py и sounds_sync.py.
 """
 
 import json

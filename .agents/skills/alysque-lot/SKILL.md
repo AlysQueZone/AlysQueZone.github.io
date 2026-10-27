@@ -1,32 +1,28 @@
 ---
 name: alysque-lot
-description: 'Новый лот AlysQueZone: медиа-тройка (`ffmpeg`), залив в Storage, `[[lots]]` в `content/lots.toml`, `just lots-sync`, перенос исходника. Use when просят залить привет / добавить лот / пополнить витрину.'
+description: 'Новый лот AlysQueZone: `just lot-add` — медиа-тройка, Storage, `[[lots]]` в `content/lots.toml`, сид и синк одной командой. Use when просят залить привет / добавить лот / пополнить витрину.'
 ---
 
-# Новый лот (медиа-пайплайн)
+# Новый лот
 
-Исходники от человека лежат в `privets/` (gitignored). Работать в `/tmp`, бинарники в репо не класть.
+Лот — это карточка в `content/lots.toml` и медиа в бакете `media`; публикуются синком без деплоя (`docs/adr/0002`). Исходники от человека лежат в `privets/` (gitignored): после успеха `lot-add` сам переносит их в `privets/already added/`, бинарники в репо не остаются.
 
-Раскладка бакета `media`: `sounds/*.mp3`, `videos/<slug>.webm|mp4|webp` (тройка на 1 привет; mp4/webp выводятся заменой расширения).
+## Title
 
-## Медиа-тройка
+`just lots-title privets/<файл>.mp4` — ник из имени файла по реестру `content/chatters.toml`. Правило (`docs/agents/chatters.md`): писать канон, встреченный вариант дописать в `aliases`; кандидатов несколько — не гадать, спросить человека. Имя из загрузчика клипов Twitch (`<дата>_<слаг>-<id>_portrait.mp4`) — слаг клипа, не ник: ник ищи `just chatters-find --vod latest "<часть фразы>"` (только написанный чат) или спрашивай человека.
 
-Из `privets/<name>.mp4` (проверено 2026-09-08):
+## Команда
 
-- `ffmpeg -i in.mp4 -c:v libvpx-vp9 -b:v 0 -crf 32 -c:a libopus out.webm`
-- `ffmpeg -i in.mp4 -c:v libx264 -crf 23 -preset veryfast -c:a aac -movflags +faststart out.mp4`
-- `ffmpeg -i in.mp4 -vframes 1 -q:v 80 out.webp`
+`just lot-add <файл|URL клипа> --title "…"` — весь механический путь: скачивание по ссылке, `ffmpeg` собирает тройку `videos/<slug>.webm|mp4|webp`, залив в Storage с проверкой публичных URL, карточка в `content/lots.toml`, свежий `supabase/seed.sql`, синк в прод.
 
-Звук из чужого webm: `ffmpeg -i in.webm -vn -codec:a libmp3lame -q:a 5 out.mp3` → в `sounds/`.
+`just lot-add --link <URL> --slug <slug> --title "…"` — хотлинк-мем: карточка на готовый чужой URL, без скачивания и залива.
 
-Заливка байтов — только скриптом `scripts/storage_upload.py` из корня (MCP/SQL байты не несут; ключ `SUPABASE_SERVICE_ROLE_KEY` в `.env`, ключ держится в окружении): `python3 scripts/storage_upload.py --bucket media --dest sounds/ a.mp3 b.mp3` или `--dir /tmp/out/ --pattern "*.mp3"`; URL `https://<ref>.supabase.co/storage/v1/object/public/media/<path>`.
+- `--slug` по умолчанию `lot-privet-<имя файла>`; у ссылки и хотлинка слаг не выводится — задай вручную (`lot-meme-*` — мемы).
+- `--price` — стартовая цена, по умолчанию 800.
 
-## Шаги
+**Готово, когда:** `just lot-add` напечатал `живой: .../media/videos/<slug>.webm` (или URL хотлинка) и `сверка: все N лотов совпадают с манифестом`, а лот виден на витрине.
 
-1. Своё видео → тройка выше → `storage_upload.py --dest videos/` (URL `.../media/videos/<slug>.webm`); хотлинк-мем → просто готовый URL.
-2. Добавить `[[lots]]` в манифест: `slug`, `title`, `price` (стартовая), `video_url`. Рекомендуемый `title` — `just lots-title privets/<файл>.mp4`: скрипт берёт ник из имени файла и сверяет с реестром ников (`content/chatters.toml`), отдавая канон. Имя из загрузчика клипов Twitch (`<дата>_<слаг>-<id>_portrait.mp4`) — это слаг клипа, не ник: скрипт так и скажет. Дальше правило реестра (`docs/agents/chatters.md`): писать канон, при резолве дописать алиас; кандидатов несколько — не гадать, спросить человека. Ник из чата — `just chatters-find --vod latest "<часть фразы>"`, но фраза ищется только в **написанном** чате: привет из клипа/озвучки так не найти, спроси человека.
-3. `just lots-seed` — пересобрать локальный `supabase/seed.sql`; `just lots-sync` — upsert в прод (существующим лотам `price`/владелец не трогаются, это runtime-состояние триггеров).
-4. `lots-sync` уже опубликовал лот — сайт читает каталог из БД в рантайме, лот виден без деплоя. Деплой нужен только для изменений кода.
-5. Перенести исходник из `privets/<файл>` в `privets/already added/` (имя сохраняем): там лежат уже залитые приветы, чтобы в следующий раз файл не обрабатывался повторно.
+## Когда что-то не так
 
-**Готово, когда:** `[[lots]]` в `content/lots.toml`, `just lots-sync` прошёл, лот виден на витрине, исходник перенесён в `privets/already added/`.
+- Синк упал после карточки — повтори `just lots-sync`: карточка уже в манифесте, `lot-add` второй раз не нужен.
+- `lot-add` остановился до карточки (слаг занят, битый файл, нет ffmpeg/yt-dlp) — манифест не тронут, исправь причину и повтори.

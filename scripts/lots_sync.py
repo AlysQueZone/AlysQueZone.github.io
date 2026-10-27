@@ -63,6 +63,20 @@ def read_manifest(path):
     return lots
 
 
+def manifest_lots(path):
+    """Сырые лоты манифеста без валидации; нет файла — пусто.
+
+    Нужен проверкам «слаг/URL уже есть» и слиянию с БД: read_manifest здесь
+    упал бы на пустом или недописанном манифесте раньше самой проверки.
+    """
+    try:
+        with open(path, "rb") as fh:
+            data = tomllib.load(fh)
+    except FileNotFoundError:
+        return []
+    return [lot for lot in data.get("lots", []) if isinstance(lot, dict)]
+
+
 def write_seed(lots, path):
     """Пересобирает supabase/seed.sql из манифеста (локальный db reset)."""
     lines = [
@@ -118,6 +132,66 @@ def plan(lot, existing):
     return ("update", patch) if patch else None
 
 
+def sync_lots(lots, key, base, dry_run=False):
+    """Манифест -> таблица: insert новых, PATCH title/video_url, сверка в конце.
+
+    Возвращает код выхода. Зовётся и из CLI, и из пайплайна нового лота
+    (`scripts/lot_add.py`), чтобы у синка была одна реализация.
+    """
+    existing = fetch_existing(key, base)
+    created = updated = 0
+    for lot in lots:
+        action = plan(lot, existing)
+        if not action:
+            continue
+        kind, payload = action
+        if kind == "insert":
+            created += 1
+            print("+ %s" % lot["slug"])
+            if not dry_run:
+                status, body = request_json(
+                    key,
+                    "POST",
+                    "%s/rest/v1/lots" % base,
+                    payload,
+                    prefer="return=minimal",
+                )
+                if status not in (200, 201):
+                    raise SystemExit("INSERT %s: %s %s" % (lot["slug"], status, body))
+        else:
+            updated += 1
+            print("~ %s (%s)" % (lot["slug"], ", ".join(sorted(payload))))
+            if not dry_run:
+                url = "%s/rest/v1/lots?slug=eq.%s" % (
+                    base,
+                    urllib.parse.quote(lot["slug"], safe=""),
+                )
+                status, body = request_json(
+                    key, "PATCH", url, payload, prefer="return=minimal"
+                )
+                if status not in (200, 204):
+                    raise SystemExit("PATCH %s: %s %s" % (lot["slug"], status, body))
+
+    if dry_run:
+        print("план: +%d новых, ~%d обновлений" % (created, updated))
+        return 0
+
+    print("записано: +%d новых, ~%d обновлений" % (created, updated))
+    after = fetch_existing(key, base)
+    drift = [
+        lot["slug"]
+        for lot in lots
+        if lot["slug"] not in after
+        or after[lot["slug"]].get("title") != lot["title"]
+        or after[lot["slug"]].get("video_url") != lot["video_url"]
+    ]
+    if drift:
+        print("РАСХОЖДЕНИЕ: %s" % ", ".join(drift))
+        return 1
+    print("сверка: все %d лотов совпадают с манифестом" % len(lots))
+    return 0
+
+
 def main():
     root = os.getcwd()
     ap = argparse.ArgumentParser(description="Sync content/lots.toml to public.lots.")
@@ -149,58 +223,7 @@ def main():
         )
         return 1
 
-    existing = fetch_existing(key, base)
-    created = updated = 0
-    for lot in lots:
-        action = plan(lot, existing)
-        if not action:
-            continue
-        kind, payload = action
-        if kind == "insert":
-            created += 1
-            print("+ %s" % lot["slug"])
-            if not args.dry_run:
-                status, body = request_json(
-                    key,
-                    "POST",
-                    "%s/rest/v1/lots" % base,
-                    payload,
-                    prefer="return=minimal",
-                )
-                if status not in (200, 201):
-                    raise SystemExit("INSERT %s: %s %s" % (lot["slug"], status, body))
-        else:
-            updated += 1
-            print("~ %s (%s)" % (lot["slug"], ", ".join(sorted(payload))))
-            if not args.dry_run:
-                url = "%s/rest/v1/lots?slug=eq.%s" % (
-                    base,
-                    urllib.parse.quote(lot["slug"], safe=""),
-                )
-                status, body = request_json(
-                    key, "PATCH", url, payload, prefer="return=minimal"
-                )
-                if status not in (200, 204):
-                    raise SystemExit("PATCH %s: %s %s" % (lot["slug"], status, body))
-
-    if args.dry_run:
-        print("план: +%d новых, ~%d обновлений" % (created, updated))
-        return 0
-
-    print("записано: +%d новых, ~%d обновлений" % (created, updated))
-    after = fetch_existing(key, base)
-    drift = [
-        lot["slug"]
-        for lot in lots
-        if lot["slug"] not in after
-        or after[lot["slug"]].get("title") != lot["title"]
-        or after[lot["slug"]].get("video_url") != lot["video_url"]
-    ]
-    if drift:
-        print("РАСХОЖДЕНИЕ: %s" % ", ".join(drift))
-        return 1
-    print("сверка: все %d лотов совпадают с манифестом" % len(lots))
-    return 0
+    return sync_lots(lots, key, base, args.dry_run)
 
 
 if __name__ == "__main__":

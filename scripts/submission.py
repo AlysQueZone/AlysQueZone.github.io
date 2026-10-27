@@ -16,9 +16,9 @@
   python3 scripts/submission.py reject 12 --status duplicate  # статус duplicate
   python3 scripts/submission.py reward 12          # выплатить награду по принятой (идемпотентно)
 
-Шаги accept: заявка -> yt-dlp во временную папку -> ffmpeg-тройка по
-скилл alysque-lot -> storage_upload.py в videos/<slug> -> [[lots]]
-в content/lots.toml -> lots_sync.py -> RPC accept_submission -> выплата награды
+Шаги accept: заявка -> yt-dlp + ffmpeg-тройка (`scripts/lot_add.py`) ->
+залив в videos/<slug>, карточка в content/lots.toml, сид и синк
+(`scripts/lot_add.py`) -> RPC accept_submission -> выплата награды
 (RPC pay_submission_reward). Заголовок и ник автора берутся из заявки с
 резолвом по реестру content/chatters.toml; слаг — новый уникальный, привязан
 к номеру заявки (повторный прогон переиспользует свой). Дубль-гейт —
@@ -33,22 +33,20 @@ import argparse
 import json
 import os
 import re
-import subprocess
 import sys
-import tomllib
 import urllib.error
 import urllib.parse
 import urllib.request
 
+import lot_add
+import lots_sync
 from lots_title import load_registry, squash, variants
-from supabase_common import load_dotenv, project_base, resolve, resolve_service_key
 
 # Код возврата «стоп, нужно решение человека» (мёртвая ссылка, дубликат,
 # неоднозначный ник). Отличаем от технической ошибки (3).
 EXIT_GATE = 2
 EXIT_FAIL = 3
 
-DEFAULT_PRICE = 800
 OPEN_STATUSES = ("new",)
 
 
@@ -94,9 +92,7 @@ class Config:
 
     def __init__(self, env_path):
         self.root = root_dir()
-        dotenv = load_dotenv(env_path)
-        self.key = resolve_service_key(dotenv)
-        self.base = project_base(resolve("PUBLIC_SUPABASE_URL", dotenv))
+        self.key, self.base = lot_add.creds(env_path)
         if not self.key or not self.base:
             raise SystemExit(
                 "Нет ключа/URL: задай SUPABASE_SERVICE_ROLE_KEY и "
@@ -291,25 +287,6 @@ def resolve_author(login, registry):
 # ---------------------------------------------------------------------------
 
 
-def slugify(value):
-    value = re.sub(r"[^a-z0-9]+", "-", (value or "").lower())
-    return value.strip("-")
-
-
-def manifest_info(path):
-    """{slug: title} из content/lots.toml (для уникальности и повторного запуска)."""
-    try:
-        with open(path, "rb") as fh:
-            data = tomllib.load(fh)
-    except FileNotFoundError:
-        return {}
-    out = {}
-    for lot in data.get("lots", []):
-        if lot.get("slug"):
-            out[str(lot["slug"])] = str(lot.get("title") or "")
-    return out
-
-
 def choose_slug(explicit, sub, taken):
     """Слаг привязан к заявке.
 
@@ -326,7 +303,8 @@ def choose_slug(explicit, sub, taken):
         return explicit
 
     # id заявки в слаге делает его нашим и разводит разные заявки.
-    return "lot-sub-%s-%d" % (slugify(sub.get("author_login")) or "author", sub["id"])
+    login = lot_add.slugify(sub.get("author_login")) or "author"
+    return "lot-sub-%s-%d" % (login, sub["id"])
 
 
 # ---------------------------------------------------------------------------
@@ -403,197 +381,9 @@ class GateStop(Exception):
     """Мягкая остановка: нужно решение человека (код 2)."""
 
 
-DIRECT_SUFFIXES = (".mp4", ".webm", ".mov", ".mkv", ".m4v")
-
-
-def download_video(url, workdir):
-    """yt-dlp во временную папку; прямая ссылка на файл — запасной urllib."""
-    os.makedirs(workdir, exist_ok=True)
-    existing = find_source(workdir)
-    if existing:
-        say("Видео уже скачано: %s" % existing)
-        return existing
-
-    out_tmpl = os.path.join(workdir, "source.%(ext)s")
-    try:
-        proc = subprocess.run(
-            [
-                "yt-dlp",
-                "--no-playlist",
-                "--no-progress",
-                "-f",
-                "bestvideo*+bestaudio/best",
-                "--merge-output-format",
-                "mp4",
-                "-o",
-                out_tmpl,
-                url,
-            ],
-            capture_output=True,
-            text=True,
-        )
-    except FileNotFoundError:
-        raise GateStop("не найден yt-dlp — установи его и повтори")
-    if proc.returncode == 0:
-        found = find_source(workdir)
-        if found:
-            say("Скачано (yt-dlp): %s" % found)
-            return found
-
-    # Прямая ссылка на медиафайл — качаем как есть (без разбора страницы).
-    path = urllib.parse.urlsplit(url).path.lower()
-    if path.endswith(DIRECT_SUFFIXES):
-        try:
-            return direct_download(url, workdir)
-        except Exception as exc:  # noqa: BLE001 — показываем причину агенту
-            raise GateStop("не удалось скачать прямую ссылку: %s" % exc)
-
-    tail = (proc.stderr or "").strip().splitlines()
-    reason = tail[-1] if tail else "yt-dlp не справился"
-    raise GateStop("ссылка мёртвая/приватная или не поддержана: %s" % reason)
-
-
-def direct_download(url, workdir):
-    req = urllib.request.Request(url, headers={"User-Agent": "AlysQueZone/1.0"})
-    with urllib.request.urlopen(req, timeout=120) as resp:
-        ext = os.path.splitext(urllib.parse.urlsplit(url).path)[1].lower() or ".mp4"
-        target = os.path.join(workdir, "source" + ext)
-        with open(target, "wb") as fh:
-            while True:
-                chunk = resp.read(1 << 20)
-                if not chunk:
-                    break
-                fh.write(chunk)
-    say("Скачано (прямая ссылка): %s" % target)
-    return target
-
-
-def find_source(workdir):
-    if not os.path.isdir(workdir):
-        return None
-    for name in sorted(os.listdir(workdir)):
-        if name.startswith("source.") and not name.endswith(".part"):
-            full = os.path.join(workdir, name)
-            if os.path.isfile(full) and os.path.getsize(full) > 0:
-                return full
-    return None
-
-
-def run_ffmpeg(args):
-    try:
-        proc = subprocess.run(
-            ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", *args],
-            capture_output=True,
-            text=True,
-        )
-    except FileNotFoundError:
-        raise GateStop("не найден ffmpeg — установи его и повтори")
-    if proc.returncode != 0:
-        tail = (proc.stderr or "").strip().splitlines()
-        raise GateStop("ffmpeg упал: %s" % (tail[-1] if tail else proc.returncode))
-    return True
-
-
-def build_triple(source, workdir, slug):
-    """Тройка webm/mp4/webp по скиллу alysque-lot (кэш по наличию)."""
-    webm = os.path.join(workdir, slug + ".webm")
-    mp4 = os.path.join(workdir, slug + ".mp4")
-    webp = os.path.join(workdir, slug + ".webp")
-    if not os.path.exists(webm):
-        say("Собираю %s…" % os.path.basename(webm))
-        run_ffmpeg(
-            [
-                "-i",
-                source,
-                "-c:v",
-                "libvpx-vp9",
-                "-b:v",
-                "0",
-                "-crf",
-                "32",
-                "-c:a",
-                "libopus",
-                webm,
-            ]
-        )
-    if not os.path.exists(mp4):
-        say("Собираю %s…" % os.path.basename(mp4))
-        run_ffmpeg(
-            [
-                "-i",
-                source,
-                "-c:v",
-                "libx264",
-                "-crf",
-                "23",
-                "-preset",
-                "veryfast",
-                "-c:a",
-                "aac",
-                "-movflags",
-                "+faststart",
-                mp4,
-            ]
-        )
-    if not os.path.exists(webp):
-        say("Собираю %s…" % os.path.basename(webp))
-        run_ffmpeg(["-i", source, "-vframes", "1", "-q:v", "80", webp])
-    return [webm, mp4, webp]
-
-
 # ---------------------------------------------------------------------------
 # Публикация
 # ---------------------------------------------------------------------------
-
-
-def upload_videos(cfg, files):
-    cmd = [
-        sys.executable,
-        os.path.join(cfg.root, "scripts", "storage_upload.py"),
-        "--bucket",
-        "media",
-        "--dest",
-        "videos/",
-        *files,
-    ]
-    say("Заливаю в Storage (videos/)…")
-    proc = subprocess.run(cmd, cwd=cfg.root)
-    if proc.returncode != 0:
-        raise SystemExit("storage_upload.py завершился с кодом %d" % proc.returncode)
-
-
-def toml_escape(value):
-    return str(value).replace("\\", "\\\\").replace('"', '\\"')
-
-
-def append_lot(cfg, slug, title, price, video_url):
-    path = os.path.join(cfg.root, "content", "lots.toml")
-    with open(path, "r", encoding="utf-8") as fh:
-        text = fh.read()
-    if slug in manifest_info(path):
-        say("Карточка уже в content/lots.toml (%s) — пропускаю" % slug)
-        return
-    if not text.endswith("\n"):
-        text += "\n"
-    block = '\n[[lots]]\nslug = "%s"\ntitle = "%s"\nprice = %d\nvideo_url = "%s"\n' % (
-        toml_escape(slug),
-        toml_escape(title),
-        price,
-        toml_escape(video_url),
-    )
-    with open(path, "a", encoding="utf-8") as fh:
-        fh.write(block)
-    say("Карточка добавлена: content/lots.toml (%s)" % slug)
-
-
-def run_lots_sync(cfg):
-    say("Синк контента (scripts/lots_sync.py)…")
-    proc = subprocess.run(
-        [sys.executable, os.path.join(cfg.root, "scripts", "lots_sync.py")],
-        cwd=cfg.root,
-    )
-    if proc.returncode != 0:
-        raise SystemExit("lots_sync.py завершился с кодом %d" % proc.returncode)
 
 
 def call_accept(cfg, sid, lot_id, author_login=None):
@@ -756,19 +546,25 @@ def prepare(cfg, sub, args):
         say("Автор в реестре не найден — оставляю снимок из заявки.")
 
     manifest_path = os.path.join(cfg.root, "content", "lots.toml")
-    manifest = manifest_info(manifest_path)
-    taken = {lot["slug"] for lot in existing} | set(manifest)
+    manifest = lots_sync.manifest_lots(manifest_path)
+    taken = {lot["slug"] for lot in existing} | {
+        str(lot["slug"]) for lot in manifest if lot.get("slug")
+    }
     slug = choose_slug(args.slug, sub, taken)
     say("Слаг: %s" % slug)
 
     workdir = args.workdir or os.path.join("/tmp", "alysque-submission-%d" % sub["id"])
-    source = download_video(sub["video_url"], workdir)
-    triple = build_triple(source, workdir, slug)
+    try:
+        source = lot_add.download_video(sub["video_url"], workdir)
+        triple = lot_add.build_triple(source, workdir, slug)
+    except lot_add.LotError as exc:
+        raise GateStop(str(exc))
     return {
         "title": title,
         "author": author,
         "slug": slug,
         "workdir": workdir,
+        "source": source,
         "triple": triple,
     }, None
 
@@ -776,7 +572,7 @@ def prepare(cfg, sub, args):
 def print_review(ctx):
     say()
     say("Готово к проверке (ничего не опубликовано):")
-    say("  исходник: %s" % find_source(ctx["workdir"]))
+    say("  исходник: %s" % ctx["source"])
     for path in ctx["triple"]:
         size = os.path.getsize(path) if os.path.exists(path) else 0
         say("  медиа:    %s (%.1f МБ)" % (path, size / (1 << 20)))
@@ -832,13 +628,18 @@ def cmd_accept(cfg, args):
         print_review(ctx)
         return 0
 
-    upload_videos(cfg, ctx["triple"])
-    video_url = "%s/storage/v1/object/public/media/videos/%s.webm" % (
-        cfg.base,
-        ctx["slug"],
-    )
-    append_lot(cfg, ctx["slug"], ctx["title"], args.price, video_url)
-    run_lots_sync(cfg)
+    try:
+        lot_add.publish_video(
+            cfg.root,
+            cfg.key,
+            cfg.base,
+            ctx["slug"],
+            ctx["title"],
+            args.price,
+            ctx["triple"],
+        )
+    except lot_add.LotError as exc:
+        return fail(str(exc))
     lot_id = fetch_lot_id(cfg, ctx["slug"])
     call_accept(cfg, sub["id"], lot_id, ctx.get("author"))
     try:
@@ -919,7 +720,7 @@ def build_parser():
     p_accept.add_argument("--env", default=os.path.join(root_dir(), ".env"))
     p_accept.add_argument("--workdir", default=None)
     p_accept.add_argument(
-        "--price", type=int, default=DEFAULT_PRICE, help="Стартовая цена"
+        "--price", type=int, default=lot_add.DEFAULT_PRICE, help="Стартовая цена"
     )
     p_accept.add_argument(
         "--slug", default=None, help="Слаг вручную (иначе уникальный новый)"
@@ -942,7 +743,7 @@ def build_parser():
 
     p_fetch = subs.add_parser("fetch", help="Скачать и собрать медиа, остановиться")
     add_common(p_fetch)
-    p_fetch.add_argument("--price", type=int, default=DEFAULT_PRICE)
+    p_fetch.add_argument("--price", type=int, default=lot_add.DEFAULT_PRICE)
     p_fetch.add_argument("--slug", default=None)
     p_fetch.add_argument("--title", default=None)
     p_fetch.add_argument("--author", default=None)
