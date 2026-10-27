@@ -4,6 +4,7 @@
 Использование (из корня репо):
   python3 scripts/chatters_sync.py --chat chat.json     # из готового дампа
   python3 scripts/chatters_sync.py --vod 2864275043     # скачать чат анонимным GQL
+  python3 scripts/chatters_sync.py --vod latest         # чат последнего архива
   python3 scripts/chatters_sync.py --chat a.json --chat b.json
   python3 scripts/chatters_sync.py --dry-run
 
@@ -36,6 +37,10 @@ EXCLUDE = {"alysque", "lysb0t", "bot_91"}
 GQL_URL = "https://gql.twitch.tv/gql"
 GQL_CLIENT_ID = "kimne78kx3ncx6brgo4mv6wki5h1ko"
 GQL_HASH = "b70a3591ff0f4e0313d126c6a1502d79a1c02baebb288227c582044aa76adf6a"
+GQL_LATEST = (
+    '{ user(login: "%s") { videos(first: 1, type: ARCHIVE) '
+    "{ edges { node { id createdAt } } } } }"
+)
 
 HEADER = """\
 # Реестр ников чатерсов alysque — источник правды для написания ников в карточках.
@@ -162,6 +167,36 @@ def gql_page(video_id, offset):
     return edges, has_next
 
 
+def latest_vod(login="alysque"):
+    """ID последнего архивного VOD канала — для `--vod latest`."""
+    body = json.dumps({"query": GQL_LATEST % login}).encode("utf-8")
+    req = urllib.request.Request(
+        GQL_URL,
+        data=body,
+        headers={"Client-Id": GQL_CLIENT_ID, "Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        raise SystemExit(
+            "GQL %s: %s" % (exc.code, exc.read().decode("utf-8", "replace")[:200])
+        )
+    except urllib.error.URLError as exc:
+        raise SystemExit("GQL недоступен: %s" % exc.reason)
+    if payload.get("errors"):
+        raise SystemExit(
+            "GQL ошибка: %s" % json.dumps(payload["errors"], ensure_ascii=False)[:300]
+        )
+    videos = ((payload.get("data") or {}).get("user") or {}).get("videos") or {}
+    edges = videos.get("edges") or []
+    node = (edges[0].get("node") or {}) if edges else {}
+    if not node.get("id"):
+        raise SystemExit("У канала %s нет архивных VOD" % login)
+    print("  VOD latest: %s (%s)" % (node["id"], node.get("createdAt", "?")))
+    return str(node["id"])
+
+
 def fetch_vod(video_id, max_pages=None):
     """Скачивает чат VOD, пагинируя по contentOffsetSeconds (курсор упирается в integrity-check)."""
     seen = {}
@@ -262,7 +297,10 @@ def main():
         help="Готовый chat.json (можно несколько)",
     )
     ap.add_argument(
-        "--vod", action="append", default=[], help="ID VOD; чат скачается анонимным GQL"
+        "--vod",
+        action="append",
+        default=[],
+        help="ID VOD или latest; чат скачается анонимным GQL",
     )
     ap.add_argument(
         "--exclude",
@@ -292,6 +330,7 @@ def main():
         from_dump(data, incoming)
         print("chat %s: +%d ников" % (path, len(incoming) - before))
     for vid in args.vod:
+        vid = latest_vod() if vid == "latest" else vid
         before = len(incoming)
         incoming.update(fetch_vod(vid, max_pages=args.max_pages))
         print("vod %s: +%d ников" % (vid, len(incoming) - before))

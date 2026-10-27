@@ -10,6 +10,8 @@ Deploy to production ВКЛ: мерж в `main` сам применяет миг
 
 `public.lots` — это контент: правится `content/lots.toml` + `scripts/lots_sync.py` (`just lots-sync`), не миграциями. Локальный сид — `supabase/seed.sql` (генерится `just lots-seed`).
 
+Колонки не угадывать: `select column_name from information_schema.columns where table_schema = 'public' and table_name = '<t>'` (в `lots` — `updated_at`, не `created_at`; в `profiles` — `user_id`/`balance`).
+
 ## Гранты (Supabase с 30.10.2026)
 
 С 30.10.2026 новые таблицы/вью/последовательности в `public` **не** получают гранты автоматически (default privileges отключены). Миграция, создающая объект, обязана выдать гранты в той же миграции — иначе Data API вернёт `42501 permission denied`, клиентские insert упадут на sequence, а скрипты на `service_role` не увидят таблицу.

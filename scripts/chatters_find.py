@@ -7,6 +7,7 @@
 
 Использование (из корня репо):
   python3 scripts/chatters_find.py --vod 2888034815 "надеюсь меня не переедут"
+  python3 scripts/chatters_find.py --vod latest "надеюсь меня не переедут"
   python3 scripts/chatters_find.py --vod 2888034815 --until 1800 "переедут"
   python3 scripts/chatters_find.py --chat chat.json "фраза"
 
@@ -138,7 +139,9 @@ def main():
         description="Найти автора привета по фразе из чата VOD."
     )
     ap.add_argument("phrase", help="Фраза или её часть (регистр/пунктуация не важны)")
-    ap.add_argument("--vod", action="append", default=[], help="ID VOD; чат скачается")
+    ap.add_argument(
+        "--vod", action="append", default=[], help="ID VOD или latest; чат скачается"
+    )
     ap.add_argument(
         "--chat",
         action="append",
@@ -174,6 +177,7 @@ def main():
         for msg in messages_from_dump(data):
             pool["%s:%s" % (path, msg["text"])] = msg
     for vid in args.vod:
+        vid = cs.latest_vod() if vid == "latest" else vid
         for msg in fetch_vod_messages(vid, max_pages=args.max_pages, until=args.until):
             pool["%s:%s:%s" % (vid, msg["at"], msg["login"])] = msg
 

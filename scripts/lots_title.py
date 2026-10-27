@@ -12,15 +12,22 @@
 показывает их; если совпадений нет — отдаёт имя файла с пометкой, что ник надо
 сверить руками. Печатает готовый title: `Привет <ник>`.
 
+Файл из загрузчика Twitch-клипов (`<дата>_<slug клипа>-<id>_portrait.mp4`)
+распознаётся отдельно: ника в нём нет, title не предлагается.
+
 Секретов не требует; только читает манифест реестра.
 """
 
 import argparse
 import os
+import re
 import sys
 import tomllib
 
 DEFAULT_REGISTRY = os.path.join("content", "chatters.toml")
+
+# Имя файла из загрузчика клипов Twitch: дата_слаг-клипа-ID_portrait.
+CLIP_STEM = re.compile(r"^\d{8}_.+-[A-Za-z0-9]{8,}_portrait$")
 
 
 def load_registry(path):
@@ -103,6 +110,15 @@ def main():
     stem = stem_of(args.file)
     if not stem:
         raise SystemExit("Пустое имя файла: %r" % args.file)
+
+    if CLIP_STEM.match(stem):
+        print("Имя файла: %s" % stem)
+        print(
+            "Это скачанный клип Twitch: в имени слаг клипа и его id, а не ник. "
+            'Ник автора — из чата (`just chatters-find --vod latest "<фраза>"`, '
+            "если привет написали) или спроси человека."
+        )
+        return 1
 
     registry = load_registry(args.registry)
     matches, kind = find_matches(stem, registry)
