@@ -31,6 +31,7 @@ insert into public.lots (slug, title, price, video_url) values
   ('lot-privet-hail-to-the-queen', 'Hail to the Queen', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-hail-to-the-queen.webm'),
   ('lot-privet-inexizi', 'Привет INexizI', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-inexizi.webm'),
   ('lot-privet-kuri-puri', 'Привет kuri_puri', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-kuri-puri.webm'),
+  ('lot-privet-libertarianetc', 'Привет Libertarianetc', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-libertarianetc.webm'),
   ('lot-privet-nxver-existd', 'Привет NXVER_EXISTD', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-nxver-existd.webm'),
   ('lot-privet-olyacaramel', 'Покупка olyacaramel', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-olyacaramel.webm'),
   ('lot-privet-onghanntto', 'Привет Onghanntto', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-onghanntto.webm'),

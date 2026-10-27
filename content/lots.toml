@@ -182,6 +182,12 @@ price = 800
 video_url = "https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-kuri-puri.webm"
 
 [[lots]]
+slug = "lot-privet-libertarianetc"
+title = "Привет Libertarianetc"
+price = 800
+video_url = "https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-libertarianetc.webm"
+
+[[lots]]
 slug = "lot-privet-nxver-existd"
 title = "Привет NXVER_EXISTD"
 price = 800
