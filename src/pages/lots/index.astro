@@ -117,6 +117,10 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
   const moreStatus = document.querySelector('[data-lots-more-status]');
   const endNote = document.querySelector('[data-lots-end]');
   const skeletonTpl = document.querySelector('[data-lot-skeleton-template]');
+  // Скелетон «Моих приветов» — тот же, что в серверной разметке; держим копию,
+  // чтобы при смене сессии вернуть его без второй копии разметки в скрипте.
+  const myPrivetySkeleton =
+    document.querySelector('[data-my-privety-skeleton]')?.cloneNode(true) ?? null;
 
   function toggle(el: Element | null, show: boolean): void {
     if (el instanceof HTMLElement) el.classList.toggle('hidden', !show);
@@ -140,14 +144,7 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
     const counter = document.querySelector('[data-my-privety-count]');
     if (counter) counter.textContent = '—';
     if (!slot) return;
-    slot.innerHTML = '';
-    const box = document.createElement('div');
-    box.className = 'border-2 border-milk bg-panel px-3 py-2';
-    box.setAttribute('aria-hidden', 'true');
-    const bar = document.createElement('div');
-    bar.className = 'skeleton-block h-4 w-1/2';
-    box.appendChild(bar);
-    slot.appendChild(box);
+    slot.replaceChildren(...(myPrivetySkeleton ? [myPrivetySkeleton.cloneNode(true)] : []));
   }
 
   function setGridNote(text: string | null): void {
@@ -231,6 +228,7 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
     }
 
     for (const st of states) {
+      if (!Number.isFinite(st.price)) continue;
       const card = rendered.get(st.slug);
       if (card) {
         fillCard(card, st);
@@ -268,6 +266,9 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
       const fresh = skeletonTpl.content.firstElementChild;
       if (!(fresh instanceof HTMLElement)) return;
       const clone = fresh.cloneNode(true) as HTMLElement;
+      // Маркер загрузки свой: живой тик зовёт clearSkeletons и не должен
+      // сносить скелетоны подгрузки до ответа страницы.
+      clone.removeAttribute('data-lot-skeleton');
       clone.dataset.lotsLoading = '1';
       grid.appendChild(clone);
     }
@@ -297,6 +298,12 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
     }
   }
 
+  /** Сентинел в зоне подгрузки: высокий вьюпорт/короткая страница — догружаем. */
+  function sentinelNear(): boolean {
+    if (!(moreWrap instanceof HTMLElement) || moreWrap.classList.contains('hidden')) return false;
+    return moreWrap.getBoundingClientRect().top <= window.innerHeight + 600;
+  }
+
   /** Догрузить страницу; `manual` — клик по кнопке, он же снимает блок ошибки. */
   async function loadMore(manual: boolean): Promise<void> {
     if (moreState === 'loading' || !live.catalogHasMore()) return;
@@ -312,6 +319,9 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
       updateMoreUi();
       render();
     }
+    // Пересечение уже было, нового колбэка не будет: если сентинел всё ещё
+    // в зоне загрузки (страница не заполнила экран) — тянем следующую.
+    if (moreState === 'idle' && live.catalogHasMore() && sentinelNear()) void loadMore(false);
   }
 
   /** Полная перерисовка окна: карточки, «мои приветы» и заметки. */
@@ -356,7 +366,7 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
 
   // Снапшот живых данных — единственный источник: окно каталога, uid и баланс.
   live.subscribe((change) => {
-    if (change.kind === 'catalog' || change.kind === 'uid' || change.kind === 'mine') render();
+    if (change.kind === 'catalog' || change.kind === 'uid' || change.kind === 'myLots') render();
     if (change.kind === 'balance') {
       myBalance = change.balance;
       repaintCards();

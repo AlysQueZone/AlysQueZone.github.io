@@ -97,9 +97,13 @@ function fakeReaders(): FakeReaders {
       const wait = gate;
       if (wait) await wait;
       calls.page += 1;
-      if (fail.catalog) return { ok: false, states: [] };
+      if (fail.catalog) return { ok: false, states: [], hasMore: false };
       const rows = ordered().filter((row) => (cursor ? after(row, cursor) : true));
-      return { ok: true, states: rows.slice(0, Math.max(1, limit)) };
+      return {
+        ok: true,
+        states: rows.slice(0, Math.max(1, limit)),
+        hasMore: rows.length > Math.max(1, limit),
+      };
     },
     async readCatalogBySlugs(_uid, slugs) {
       const wait = gate;
@@ -636,6 +640,23 @@ describe('createLiveStore', () => {
     expect(await store.loadCatalogPage()).toBe('end');
   });
 
+  it('ровно страница — конец известен сразу, без пустого запроса', async () => {
+    const f = fakeReaders();
+    for (let i = 0; i < 12; i++) {
+      const slug = `lot-${String(i).padStart(2, '0')}`;
+      f.state.catalog.set(slug, lot({ slug, price: 100 + i }));
+    }
+    const store = createLiveStore(f.readers);
+    store.useCatalogPages(12);
+    await store.start();
+
+    expect(store.catalogWindow()).toHaveLength(12);
+    expect(store.catalogHasMore()).toBe(false);
+    expect(f.calls.page).toBe(1);
+    expect(await store.loadCatalogPage()).toBe('end');
+    expect(f.calls.page).toBe(1);
+  });
+
   it('живой лот: в ценовом диапазоне окна — сразу, дороже границы — ждёт страницы', async () => {
     const f = fakeReaders();
     f.state.catalog.set('lot-a', lot({ slug: 'lot-a', price: 100 }));
@@ -723,7 +744,9 @@ describe('createLiveStore', () => {
     const f = fakeReaders();
     for (let i = 0; i < 5; i++) {
       const slug = `lot-${i}`;
-      f.state.catalog.set(slug, lot({ slug, price: 100 + i }));
+      const state = lot({ slug, price: 100 + i });
+      f.state.catalog.set(slug, state);
+      f.state.lots.set(slug, state);
     }
     const store = createLiveStore(f.readers);
     store.useCatalogPages(2);

@@ -295,11 +295,15 @@ export function initOutbidNotice(): void {
 
   /**
    * Добавить перекуп в колокол; `false` — тот же уже показан. Одно событие
-   * может прийти из двух диффов (окно витрины и «Мои приветы») — не дублируем.
+   * может прийти из двух диффов (окно витрины и «Мои приветы») почти
+   * одновременно; окно времени не блокирует настоящий повтор позже.
    */
   function pushHistory(ev: OutbidEvent): boolean {
     const key = eventKey(ev);
-    if (history.some((entry) => eventKey(entry) === key)) return false;
+    const duplicate = history.some(
+      (entry) => eventKey(entry) === key && Math.abs(entry.at - ev.at) < 5000
+    );
+    if (duplicate) return false;
     history.unshift(ev);
     while (history.length > MAX_HISTORY) history.pop();
     unread += 1;

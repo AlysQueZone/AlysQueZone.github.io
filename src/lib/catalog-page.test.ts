@@ -6,7 +6,6 @@ import { describe, expect, it } from 'vitest';
 import {
   appendCatalogPage,
   catalogCursor,
-  catalogPageHasMore,
   compareCatalog,
   fitsCatalogWindow,
   insertCatalogEntry,
@@ -26,12 +25,6 @@ describe('catalog-page', () => {
   it('курсор — последняя запись страницы; пустая страница курсора не даёт', () => {
     expect(catalogCursor([entry('a', 100), entry('b', 200)])).toEqual({ price: 200, slug: 'b' });
     expect(catalogCursor([])).toBeNull();
-  });
-
-  it('полная страница — есть ещё, короткая и пустая — конец', () => {
-    expect(catalogPageHasMore(12, 12)).toBe(true);
-    expect(catalogPageHasMore(11, 12)).toBe(false);
-    expect(catalogPageHasMore(0, 12)).toBe(false);
   });
 
   it('граница окна: до последней загруженной записи; загружено всё — любая', () => {
@@ -70,5 +63,12 @@ describe('catalog-page', () => {
       'b',
       'z',
     ]);
+  });
+
+  it('граница живой вставки — самый дорогой показанный лот, а не последний по загрузке', () => {
+    // Цена b выросла перекупом: b теперь дороже последней загруженной c.
+    const window = [entry('a', 100), entry('b', 600), entry('c', 200)];
+    expect(insertCatalogEntry(window, entry('d', 400), true)).not.toBeNull();
+    expect(insertCatalogEntry(window, entry('d', 700), true)).toBeNull();
   });
 });

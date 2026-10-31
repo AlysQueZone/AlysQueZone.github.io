@@ -27,8 +27,8 @@
 
 import {
   CATALOG_PAGE_SIZE,
+  appendCatalogPage,
   catalogCursor,
-  catalogPageHasMore,
   insertCatalogEntry,
   type CatalogCursor,
 } from './catalog-page';
@@ -58,6 +58,8 @@ export interface CatalogRead {
 export interface CatalogPageRead {
   ok: boolean;
   states: LotState[];
+  /** За последней строкой есть ещё (читатель берёт на одну строку больше). */
+  hasMore: boolean;
 }
 
 /** Итог подгрузки страницы витрины: ок — дописана, end — больше нет, error — БД/сеть. */
@@ -76,7 +78,10 @@ export interface LiveReaders {
   /** Свой баланс; null — не прочитался / строки нет / гость. */
   readBalance(uid: string): Promise<number | null>;
   readCatalog(uid: string | null): Promise<CatalogRead>;
-  /** Одна страница витрины после курсора (null — первая); порядок — цена, slug. */
+  /**
+   * Одна страница витрины после курсора (null — первая), порядок — цена, slug.
+   * `hasMore` считает читатель: строк запрашивается на одну больше.
+   */
   readCatalogPage(
     uid: string | null,
     cursor: CatalogCursor | null,
@@ -110,7 +115,7 @@ export type LiveChange =
   | { kind: 'uid'; uid: string | null }
   | { kind: 'balance'; balance: number | null; fresh: boolean }
   | { kind: 'catalog'; changed: ReadonlySet<string>; fresh: boolean }
-  | { kind: 'mine'; changed: ReadonlySet<string> }
+  | { kind: 'myLots'; changed: ReadonlySet<string> }
   | { kind: 'purchase'; purchase: LivePurchase }
   | { kind: 'outbid'; event: LiveOutbid }
   | { kind: 'deals' }
@@ -147,6 +152,7 @@ export interface LiveStore {
   myLots(): readonly LotState[];
   /** Был ли ответ по «Моим приветам» (для честного скелетона). */
   myLotsKnown(): boolean;
+  /** Лот из окна/карты или «Моих приветов» — для колокола и модалки. */
   lot(slug: string): LotState | null;
   /** Был ли ответ по каталогу (пустой каталог — тоже ответ). */
   catalogKnown(): boolean;
@@ -211,7 +217,7 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
   const catalogInsertSlugs = new Set<string>();
 
   /** «Мои приветы» полным списком владельца — включается поверхностью. */
-  let mineTracked = false;
+  let myLotsTracked = false;
   let myLotsValue = new Map<string, LotState>();
   let myLotsTried = false;
   /** Чей список сейчас в снапшоте: смена uid не подхватывает чужой ответ. */
@@ -318,7 +324,6 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
     return stable;
   }
 
-  /** Окно в порядке показа: slug из catalogWindowSlugs, значения — из карты. */
   function windowStatesOf(states: ReadonlyMap<string, LotState>): LotState[] {
     const window: LotState[] = [];
     for (const slug of catalogWindowSlugs) {
@@ -326,6 +331,18 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
       if (st) window.push(st);
     }
     return window;
+  }
+
+  /** Событие перекупа из свежей строки: один строитель на все диффы. */
+  function outbidFrom(st: LotState): LiveOutbid {
+    return {
+      slug: st.slug,
+      title: st.title,
+      by: st.owner_login ?? 'Чатерс',
+      price: st.price,
+      at: Date.now(),
+      video: st.video_url,
+    };
   }
 
   /**
@@ -347,14 +364,7 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
       if (old.owner_uid !== uidValue) continue;
       if (st.owner_uid === uidValue || st.owner_uid === null) continue;
       if (!Number.isFinite(st.price)) continue;
-      outbids.push({
-        slug,
-        title: st.title,
-        by: st.owner_login ?? 'Чатерс',
-        price: st.price,
-        at: Date.now(),
-        video: st.video_url,
-      });
+      outbids.push(outbidFrom(st));
     }
     return outbids;
   }
@@ -452,8 +462,8 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
     // Значение прежнего uid не раскроется под церемонией нового.
     heldBalance = null;
     // «Мои приветы» прежнего uid чужому не показываем; список перечитается.
-    if (mineTracked) {
-      if (myLotsValue.size > 0) emit({ kind: 'mine', changed: new Set(myLotsValue.keys()) });
+    if (myLotsTracked) {
+      if (myLotsValue.size > 0) emit({ kind: 'myLots', changed: new Set(myLotsValue.keys()) });
       myLotsValue = new Map();
       myLotsTried = false;
       myLotsUid = null;
@@ -499,27 +509,20 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
 
   /**
    * Применить страницу витрины: `start` — первая (окно с нуля), иначе дописать.
-   * Дубли по slug не задваиваются; курсор и «есть ещё» — по сырой странице.
+   * Дубли по slug не задваиваются; «есть ещё» считает читатель (строка сверху).
    */
-  function applyPage(states: readonly LotState[], start: boolean): void {
+  function applyPage(states: readonly LotState[], start: boolean, hasMore: boolean): void {
     const wasKnown = catalogKnown;
     const freshChanged = !catalogFresh;
     const prev = catalogValue;
     const next = new Map(prev);
     const changed = new Set<string>();
 
-    if (start) catalogWindowSlugs = [];
-    const seen = new Set(catalogWindowSlugs);
-    for (const raw of states) {
-      const stable = mergeState(next, raw, changed);
-      if (seen.has(stable.slug)) continue;
-      seen.add(stable.slug);
-      catalogWindowSlugs.push(stable.slug);
-    }
+    const pageStates = states.map((raw) => mergeState(next, raw, changed));
+    const base = start ? [] : windowStatesOf(prev);
+    catalogWindowSlugs = appendCatalogPage(base, pageStates).map((st) => st.slug);
     // Вставки, уже попавшие в страницу, больше не ждут границы окна.
-    for (const slug of catalogInsertSlugs) {
-      if (seen.has(slug)) catalogInsertSlugs.delete(slug);
-    }
+    for (const slug of catalogWindowSlugs) catalogInsertSlugs.delete(slug);
 
     catalogValue = next;
     catalogKnown = true;
@@ -527,7 +530,7 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
     const nextCursor = catalogCursor(states);
     if (nextCursor !== null) catalogNextCursor = nextCursor;
     else if (start) catalogNextCursor = null;
-    catalogHasMore = catalogPageHasMore(states.length, catalogPageSize);
+    catalogHasMore = hasMore;
 
     const outbids = collectOutbids(prev, next, changed);
     if (changed.size > 0 || freshChanged || !wasKnown) {
@@ -550,13 +553,13 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
           catalogPageSize
         );
       } catch {
-        read = { ok: false, states: [] };
+        read = { ok: false, states: [], hasMore: false };
       }
       if (!read.ok) {
         markCatalogUnavailable();
         return 'error';
       }
-      applyPage(read.states, start);
+      applyPage(read.states, start, read.hasMore);
       return read.states.length === 0 ? 'end' : 'ok';
     })();
     catalogPageInFlight = run;
@@ -634,7 +637,7 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
    * по одному — событию перекупа нужен новый владелец и цена.
    */
   function readMyLotsNow(uid: string, force = false): Promise<void> {
-    if (!mineTracked) return Promise.resolve();
+    if (!myLotsTracked) return Promise.resolve();
     if (!force && myLotsUid === uid) return myLotsInFlight ?? Promise.resolve();
     if (myLotsInFlight && myLotsInFlightUid === uid) return myLotsInFlight;
 
@@ -645,20 +648,14 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
       } catch {
         read = { ok: false, states: new Map() };
       }
-      if (uid !== uidValue || !mineTracked) return;
+      if (uid !== uidValue || !myLotsTracked) return;
       // Отказ не выдаём за «пусто»: скелетон честнее; синк/фокус повторят.
       if (!read.ok) return;
 
       const prev = myLotsValue;
       const next = new Map<string, LotState>();
       const changed = new Set<string>();
-      for (const [slug, raw] of read.states) {
-        const st = normalizeMine(raw);
-        const old = prev.get(slug);
-        const stable = old && sameLot(old, st) ? old : st;
-        next.set(slug, stable);
-        if (old !== stable) changed.add(slug);
-      }
+      for (const raw of read.states.values()) mergeState(next, raw, changed);
 
       const gone = [...prev.keys()].filter((slug) => !next.has(slug));
       const sold: LotState[] = [];
@@ -671,12 +668,12 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
           // best effort: колокол догонит сделку на фокусе/синке
         }
       }
-      if (uid !== uidValue || !mineTracked) return;
+      if (uid !== uidValue || !myLotsTracked) return;
 
       myLotsValue = next;
       myLotsTried = true;
       myLotsUid = uid;
-      emit({ kind: 'mine', changed });
+      emit({ kind: 'myLots', changed });
 
       if (sold.length > 0) {
         // Свежие строки — в карту, но не в окно: кнопке возврата нужна их N.
@@ -685,17 +682,7 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
         for (const st of sold) mergeState(merged, st, touched);
         catalogValue = merged;
         for (const st of sold) {
-          emit({
-            kind: 'outbid',
-            event: {
-              slug: st.slug,
-              title: st.title,
-              by: st.owner_login ?? 'Чатерс',
-              price: st.price,
-              at: Date.now(),
-              video: st.video_url,
-            },
-          });
+          emit({ kind: 'outbid', event: outbidFrom(st) });
         }
       }
     })();
@@ -716,6 +703,9 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
       catalogWindowSlugs.includes(slug) ? (catalogValue.get(slug) ?? null) : null;
     if (find()) return find();
     if (!catalogPaged) return refreshLotNow(slug);
+    // Лота может уже не быть (старый ?buy=): одно чтение дешевле, чем
+    // пролистать весь каталог впустую.
+    if (!(await refreshLotNow(slug))) return null;
     if (catalogWindowSlugs.length === 0) {
       const first = await loadCatalogPageNow();
       if (find()) return find();
@@ -781,7 +771,7 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
     // (без мигания «не хватает»), как было до переезда.
     if (u !== null) await readBalanceNow(u);
     await readCatalogNow();
-    if (mineTracked && u !== null) await readMyLotsNow(u, refreshMine);
+    if (myLotsTracked && u !== null) await readMyLotsNow(u, refreshMine);
   }
 
   /**
@@ -822,7 +812,7 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
     setUid(next);
     if (next !== before && next !== null) {
       void readBalanceNow(next);
-      if (mineTracked) void readMyLotsNow(next);
+      if (myLotsTracked) void readMyLotsNow(next);
     }
   }
 
@@ -860,8 +850,8 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
     },
 
     trackMyLots() {
-      if (mineTracked) return;
-      mineTracked = true;
+      if (myLotsTracked) return;
+      myLotsTracked = true;
       if (uidKnown && uidValue !== null) void readMyLotsNow(uidValue);
     },
 
@@ -887,7 +877,7 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
         prime({ kind: 'catalog', changed: new Set(catalogValue.keys()), fresh: catalogFresh });
       }
       if (myLotsTried) {
-        prime({ kind: 'mine', changed: new Set(myLotsValue.keys()) });
+        prime({ kind: 'myLots', changed: new Set(myLotsValue.keys()) });
       }
       let active = true;
       return () => {
@@ -954,7 +944,7 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
 
     reportDeal(payload) {
       emit({ kind: 'deals' });
-      if (!mineTracked || uidValue === null) return Promise.resolve();
+      if (!myLotsTracked || uidValue === null) return Promise.resolve();
       // Чужая сделка не трогает мои лоты: payload несёт продавца, лишний
       // запрос на каждую покупку в чате не нужен. Без payload — перечитываем.
       const seller = (payload?.new ?? {})['seller_uid'];

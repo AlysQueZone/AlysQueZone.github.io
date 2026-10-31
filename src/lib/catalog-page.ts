@@ -38,11 +38,6 @@ export function catalogCursor(entries: readonly CatalogKey[]): CatalogCursor | n
   return last ? { price: last.price, slug: last.slug } : null;
 }
 
-/** Полная страница — возможно, есть ещё; короткая (или пустая) — конец. */
-export function catalogPageHasMore(count: number, pageSize: number): boolean {
-  return count >= Math.max(1, Math.floor(pageSize));
-}
-
 /**
  * Помещается ли живой лот в загруженное окно: до последней загруженной
  * записи по порядку витрины. Окно пустое или загружено всё — помещается.
@@ -73,7 +68,9 @@ export function appendCatalogPage<T extends CatalogKey>(
 
 /**
  * Вставить живой лот в окно на место по цене; null — лот уже показан или
- * он дороже границы загруженного (придёт своей страницей).
+ * он дороже границы загруженного (придёт своей страницей). Граница — самый
+ * дорогой показанный лот: цены растут, и последняя по загрузке карточка
+ * может уже не быть верхней.
  */
 export function insertCatalogEntry<T extends CatalogKey>(
   window: readonly T[],
@@ -81,8 +78,11 @@ export function insertCatalogEntry<T extends CatalogKey>(
   hasMore: boolean
 ): T[] | null {
   if (window.some((item) => item.slug === entry.slug)) return null;
-  const last = window.at(-1) ?? null;
-  if (!fitsCatalogWindow(entry, last, hasMore)) return null;
+  let boundary: CatalogKey | null = null;
+  for (const item of window) {
+    if (boundary === null || compareCatalog(item, boundary) > 0) boundary = item;
+  }
+  if (!fitsCatalogWindow(entry, boundary, hasMore)) return null;
   const next = [...window];
   const at = next.findIndex((item) => compareCatalog(item, entry) > 0);
   next.splice(at < 0 ? next.length : at, 0, entry);

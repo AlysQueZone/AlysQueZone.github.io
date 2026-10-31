@@ -105,6 +105,29 @@ const TABLE_COLUMNS = 'slug,title,video_url,price,owner_login,owner_uid,suggeste
  */
 const SLUGS_CHUNK = 100;
 
+/**
+ * Прочитать список «вью, иначе таблица»: вью может отсутствовать, пока
+ * миграция не применена; таблица отдаёт тот же набор без next_price.
+ * `run` получает источник и колонки — порядок и фильтры задаёт вызывающий.
+ */
+async function readList(
+  run: (table: string, columns: string) => PromiseLike<{ data: unknown; error: unknown }>
+): Promise<{ ok: boolean; rows: unknown[] }> {
+  try {
+    const fromView = await withAuthRetry(() => run(VIEW, VIEW_COLUMNS));
+    if (!fromView.error && Array.isArray(fromView.data)) return { ok: true, rows: fromView.data };
+  } catch {
+    // вью нет — фолбэк ниже
+  }
+  try {
+    const fromTable = await withAuthRetry(() => run('lots', TABLE_COLUMNS));
+    if (fromTable.error || !Array.isArray(fromTable.data)) return { ok: false, rows: [] };
+    return { ok: true, rows: fromTable.data };
+  } catch {
+    return { ok: false, rows: [] };
+  }
+}
+
 /** Читатели живых данных поверх Supabase (ядро зовёт их, DOM/сети не знает). */
 function supabaseReaders(): LiveReaders {
   return {
@@ -140,31 +163,17 @@ function supabaseReaders(): LiveReaders {
      * «не загрузилось»). Секретов здесь нет: только publishable-ключ.
      */
     async readCatalog(uid: string | null): Promise<CatalogRead> {
-      const empty = new Map<string, LotState>();
       const sb = getSupabase();
-      if (!sb) return { ok: false, states: empty };
-      try {
-        const fromView = await withAuthRetry(() => sb.from(VIEW).select(VIEW_COLUMNS));
-        if (!fromView.error && Array.isArray(fromView.data)) {
-          return { ok: true, states: fillCatalog(fromView.data, uid) };
-        }
-      } catch {
-        // вью нет — фолбэк ниже
-      }
-      try {
-        const fromTable = await withAuthRetry(() => sb.from('lots').select(TABLE_COLUMNS));
-        if (fromTable.error || !Array.isArray(fromTable.data)) return { ok: false, states: empty };
-        return { ok: true, states: fillCatalog(fromTable.data, uid) };
-      } catch {
-        return { ok: false, states: empty };
-      }
+      if (!sb) return { ok: false, states: new Map() };
+      const read = await readList((table, columns) => sb.from(table).select(columns));
+      return { ok: read.ok, states: fillCatalog(read.rows, uid) };
     },
 
     /**
      * Одна страница витрины после курсора (null — первая). Keyset по паре
      * `(price, slug)`: цена меняется от перекупов, slug добивает ничью и
      * держит границу страниц на месте (offset бы сдвинулся живой вставкой).
-     * Вью отсутствует — фолбэк на таблицу, как у полного каталога.
+     * Строк берём на одну больше — по ней честно знаем «есть ещё».
      */
     async readCatalogPage(
       uid: string | null,
@@ -172,37 +181,25 @@ function supabaseReaders(): LiveReaders {
       limit: number
     ): Promise<CatalogPageRead> {
       const sb = getSupabase();
-      if (!sb) return { ok: false, states: [] };
+      if (!sb) return { ok: false, states: [], hasMore: false };
       const cap = Math.max(1, Math.floor(limit));
-      const read = (table: string, columns: string) => {
+      const read = await readList((table, columns) => {
         let query = sb
           .from(table)
           .select(columns)
           .order('price', { ascending: true })
           .order('slug', { ascending: true })
-          .limit(cap);
+          .limit(cap + 1);
         if (cursor) {
           query = query.or(
             `price.gt.${cursor.price},and(price.eq.${cursor.price},slug.gt.${cursor.slug})`
           );
         }
         return query;
-      };
-      try {
-        const fromView = await withAuthRetry(() => read(VIEW, VIEW_COLUMNS));
-        if (!fromView.error && Array.isArray(fromView.data)) {
-          return { ok: true, states: fillCatalogList(fromView.data, uid) };
-        }
-      } catch {
-        // вью нет — фолбэк ниже
-      }
-      try {
-        const fromTable = await withAuthRetry(() => read('lots', TABLE_COLUMNS));
-        if (fromTable.error || !Array.isArray(fromTable.data)) return { ok: false, states: [] };
-        return { ok: true, states: fillCatalogList(fromTable.data, uid) };
-      } catch {
-        return { ok: false, states: [] };
-      }
+      });
+      if (!read.ok) return { ok: false, states: [], hasMore: false };
+      const list = fillCatalogList(read.rows, uid);
+      return { ok: true, states: list.slice(0, cap), hasMore: list.length > cap };
     },
 
     /**
@@ -216,28 +213,11 @@ function supabaseReaders(): LiveReaders {
       const list = [...new Set(slugs)];
       for (let i = 0; i < list.length; i += SLUGS_CHUNK) {
         const chunk = list.slice(i, i + SLUGS_CHUNK);
-        try {
-          const fromView = await withAuthRetry(() =>
-            sb.from(VIEW).select(VIEW_COLUMNS).in('slug', chunk)
-          );
-          if (!fromView.error && Array.isArray(fromView.data)) {
-            for (const [slug, state] of fillCatalog(fromView.data, uid)) states.set(slug, state);
-            continue;
-          }
-        } catch {
-          // вью нет — фолбэк ниже
-        }
-        try {
-          const fromTable = await withAuthRetry(() =>
-            sb.from('lots').select(TABLE_COLUMNS).in('slug', chunk)
-          );
-          if (fromTable.error || !Array.isArray(fromTable.data)) {
-            return { ok: false, states: new Map() };
-          }
-          for (const [slug, state] of fillCatalog(fromTable.data, uid)) states.set(slug, state);
-        } catch {
-          return { ok: false, states: new Map() };
-        }
+        const read = await readList((table, columns) =>
+          sb.from(table).select(columns).in('slug', chunk)
+        );
+        if (!read.ok) return { ok: false, states: new Map() };
+        for (const [slug, state] of fillCatalog(read.rows, uid)) states.set(slug, state);
       }
       return { ok: true, states };
     },
@@ -247,38 +227,17 @@ function supabaseReaders(): LiveReaders {
      * полный запрос владельца (не фильтр загруженных страниц). Порядок — витрины.
      */
     async readMyLots(uid: string): Promise<CatalogRead> {
-      const empty = new Map<string, LotState>();
       const sb = getSupabase();
-      if (!sb) return { ok: false, states: empty };
-      try {
-        const fromView = await withAuthRetry(() =>
-          sb
-            .from(VIEW)
-            .select(VIEW_COLUMNS)
-            .eq('owner_uid', uid)
-            .order('price', { ascending: true })
-            .order('slug', { ascending: true })
-        );
-        if (!fromView.error && Array.isArray(fromView.data)) {
-          return { ok: true, states: fillCatalog(fromView.data, uid) };
-        }
-      } catch {
-        // вью нет — фолбэк ниже
-      }
-      try {
-        const fromTable = await withAuthRetry(() =>
-          sb
-            .from('lots')
-            .select(TABLE_COLUMNS)
-            .eq('owner_uid', uid)
-            .order('price', { ascending: true })
-            .order('slug', { ascending: true })
-        );
-        if (fromTable.error || !Array.isArray(fromTable.data)) return { ok: false, states: empty };
-        return { ok: true, states: fillCatalog(fromTable.data, uid) };
-      } catch {
-        return { ok: false, states: empty };
-      }
+      if (!sb) return { ok: false, states: new Map() };
+      const read = await readList((table, columns) =>
+        sb
+          .from(table)
+          .select(columns)
+          .eq('owner_uid', uid)
+          .order('price', { ascending: true })
+          .order('slug', { ascending: true })
+      );
+      return { ok: read.ok, states: fillCatalog(read.rows, uid) };
     },
 
     /**
