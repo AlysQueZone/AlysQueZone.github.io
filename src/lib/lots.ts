@@ -50,7 +50,6 @@ function parseCooldownSec(msg: string): number {
 }
 
 /**
- * Маппинг ошибок Postgres/триггера на честные виды.
  * Матчится по коду/сообщению триггера: cooldown / rate limit /
  * not authenticated (см. enforce_purchase_rules в миграциях).
  */

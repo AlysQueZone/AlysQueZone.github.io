@@ -2,11 +2,8 @@
  * Ошибки транспорта: один классификатор (решение —
  * docs/adr/0006).
  *
- * Текст ошибки и два частых вида — офлайн и «нет входа» — были скопированы
- * в lots.ts / gamba.ts / submissions.ts (и ещё раз инлайном в DailyLogin):
- * правка офлайн-гейта требовала четырёх заходов. Доменные виды (пауза,
- * лимит, не хватает Пивкойнов, сроки заявки) остаются у своих мапперов —
- * здесь только общее.
+ * Доменные виды (пауза, лимит, не хватает Пивкойнов, сроки заявки)
+ * остаются у своих мапперов — здесь только общее.
  *
  * Чистые функции без DOM и сети: тесты — src/lib/errors.test.ts.
  */
@@ -28,17 +25,15 @@ const OFFLINE_MARKERS = [
   'offline',
 ];
 
-/** Сеть не дошла: маркеры транспорта или TypeError от fetch. */
 export function isOfflineError(err: unknown): boolean {
   const low = errorText(err).toLowerCase();
   return OFFLINE_MARKERS.some((marker) => low.includes(marker)) || err instanceof TypeError;
 }
 
-// Набор — объединение прежних копий; 'no twitch identity' шлют покупочные RPC
+// 'no twitch identity' шлют покупочные RPC
 // (в JWT нет twitch-личности) — это тот же «нет входа», а не отдельная болезнь.
 const NO_AUTH_MARKERS = ['not authenticated', 'row-level security', 'jwt', 'no twitch identity'];
 
-/** Нет входа/сессия не прошла: JWT, RLS, «not authenticated», нет twitch-личности. */
 export function isNoAuthError(err: unknown): boolean {
   const low = errorText(err).toLowerCase();
   return NO_AUTH_MARKERS.some((marker) => low.includes(marker));

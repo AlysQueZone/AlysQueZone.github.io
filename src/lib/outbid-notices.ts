@@ -23,8 +23,7 @@ export function rebuyLabel(price: number | null): string {
   return `▶ Забрать за ${formatStaged(price)} 🍺`;
 }
 
-/** Кнопка перекупа в стиле сайта (как «Купить» на карточках: bg-stream).
- *  N — из снапшота живых данных; пока прайс не приехал или вью отсутствует —
+/** N — из снапшота живых данных; пока прайс не приехал или вью отсутствует —
  *  честный «…» (намерение несёт price: null), а не уплаченная цена как N
  *  (сервер при записи всё равно подтвердит настоящую). */
 export function makeRebuyButton(ev: OutbidEvent): HTMLButtonElement {
@@ -32,7 +31,6 @@ export function makeRebuyButton(ev: OutbidEvent): HTMLButtonElement {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.textContent = rebuyLabel(next);
-  // Аркадная кнопка стиля C (классы из global.css) + отступ от текста.
   btn.className = 'btn-arcade btn-arcade-primary';
   btn.style.marginTop = '8px';
   btn.style.padding = '8px 16px';
@@ -50,8 +48,7 @@ export function makeRebuyButton(ev: OutbidEvent): HTMLButtonElement {
   return btn;
 }
 
-/** Показать окошко перекупа: шапка + строка продавца + кнопка возврата.
- *  Ключ — slug: выкуп обратно гасит окошки этого лота (closeNotices). */
+/** Ключ — slug: выкуп обратно гасит окошки этого лота (closeNotices). */
 export function showOutbidNotice(ev: OutbidEvent): void {
   showCornerNotice({
     header: '▶ Твой лот перекупили!',

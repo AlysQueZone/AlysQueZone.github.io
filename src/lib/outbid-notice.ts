@@ -56,8 +56,7 @@ export function initOutbidNotice(): void {
     return uid === null ? null : `alysque:outbid-seen:${uid}`;
   }
 
-  /** Прочитанное — в localStorage per-uid: переживает перезагрузку.
-   *  Без сервера это лучший вариант для варианта А (без таблицы);
+  /** Прочитанное — в localStorage per-uid: переживает перезагрузку;
    *  между девайсами непрочитанное не синкается — осознанный лимит. */
   function loadSeenAt(): number {
     try {
@@ -206,7 +205,6 @@ export function initOutbidNotice(): void {
     btn.title = BELL_TITLE;
     btn.setAttribute('aria-expanded', 'false');
     btn.setAttribute('aria-controls', BELL_PANEL_ID);
-    // Колокол стиля C: аркадная кнопка-призрак + счётчик-пиксель.
     // Геометрию (высота 44px, паддинги) задаёт .btn-arcade — как у соседей
     // в шапке; здесь только кегль глифа (text-base) и якорь для счётчика.
     btn.className = 'btn-arcade btn-arcade-ghost px-3 text-base';

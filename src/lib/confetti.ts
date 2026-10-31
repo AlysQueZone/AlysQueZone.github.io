@@ -13,7 +13,6 @@ interface Particle {
   vr: number;
 }
 
-/** Взрыв confetti из центра экрана, само убирается через ~1.6с. */
 export function boom(count = 120): void {
   if (typeof document === 'undefined') return;
   const canvas = document.createElement('canvas');

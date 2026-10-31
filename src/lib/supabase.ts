@@ -98,7 +98,7 @@ export async function withAuthRetry<R extends { error: unknown }>(
   return run();
 }
 
-/** Ник Чатерса из метаданных Twitch (login — только снапшот, см. спеку). */
+/** Ник Чатерса из метаданных Twitch (login — только снапшот). */
 export function displayLogin(
   user: { user_metadata?: Record<string, unknown> } | null | undefined
 ): string {

@@ -37,7 +37,6 @@ import {
 } from './catalog-page';
 import type { LivePayload } from './live-core';
 
-/** Живое состояние Лота (было в lots.ts; чтения переехали в live.ts). */
 export interface LotState {
   slug: string;
   title: string;
@@ -828,7 +827,7 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
     const u = await readUidSafe();
     applyUid(u);
     // Баланс раньше каталога: поверхности рисуют каталог уже с балансом
-    // (без мигания «не хватает»), как было до переезда.
+    // (без мигания «не хватает»).
     if (u !== null) await readBalanceNow(u);
     await readCatalogNow();
     if (myLotsTracked && u !== null) await readMyLotsNow(u, refreshMine);

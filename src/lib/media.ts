@@ -7,7 +7,6 @@
 export const S3_MEDIA_BASE =
   'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media';
 
-/** Публичный URL UI-звука из бакета media. */
 export function s3Sound(file: string): string {
   return `${S3_MEDIA_BASE}/sounds/${file}`;
 }

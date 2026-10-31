@@ -1,6 +1,5 @@
 // Эмоуты канала: alysqueCLAP для звука покупки без видео (BuyModal) и гамбы,
 // alysqueWAUW — вывеска лота в hero.
-// Привязка «эмоут карточки лота» удалена: все лоты теперь видео-мемы.
 // Токены в заголовках лотов (напр. o7) рисуются 7TV-эмоутом канала.
 
 /** Нативные эмоуты Twitch канала: хотлинк с static-cdn.jtvnw.net (dark/3.0). */
@@ -56,7 +55,7 @@ function renderTitleEmotes(title: string): DocumentFragment {
       img.loading = 'lazy';
       // Крупнее текста, но -my-[0.2em] (по 0.2em сверху/снизу) держит margin-box
       // равным прежним 1.1em — строка не растёт, растёт только рисунок (симметрично,
-      // центр не смещается). См. c77eafb про тот же приём для GAMBA-эмоута.
+      // центр не смещается).
       img.className = 'inline-block h-[1.5em] w-auto -my-[0.2em] align-[-0.15em]';
       frag.appendChild(img);
     } else {

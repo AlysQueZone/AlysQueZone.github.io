@@ -89,7 +89,7 @@ export function mapGambaError(err: unknown): GambaErrorInfo {
 
 /**
  * Нормализация исхода из БД/RPC. Исход 'small' (мелкий выигрыш +50) —
- * штатный исход таблицы H; история эпохи F рисуется тем же текстом.
+ * штатный исход таблицы H.
  */
 function asOutcome(value: unknown): GambaOutcome | null {
   return value === 'miss' ||
