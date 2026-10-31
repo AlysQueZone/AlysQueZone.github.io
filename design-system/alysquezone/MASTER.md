@@ -151,8 +151,6 @@ Muted-текст: `text-mist` (без opacity-модификатора). `text-m
 
 ## Проверка
 
-```bash
-node .opencode/skills/design-system/scripts/validate-tokens.cjs --dir src/
-```
-
-Hex-срабатывания = must-fix. `px`/`rem` = шум, игнорировать.
+Палитру проверяет тест `src/lib/design-tokens.test.ts` (входит в `just test`):
+хекс разрешён только внутри `@theme` файла `global.css` и в декоративных
+наборах из раздела выше. Нарушение — падение с файлом и строкой.
