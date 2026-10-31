@@ -1,14 +1,18 @@
-// Палитра живёт в одном месте: хекс разрешён только внутри `@theme` в
-// `src/styles/global.css` и в декоративных наборах, которые объявляет
-// `DESIGN.md` («Декоративные наборы»). Тест читает исходники через
-// `import.meta.glob` (витевский `?raw`), поэтому видит и `.astro`, и
-// комментарии: линтер из скилла `uipro` их не видел, зато ругался на сами
-// токены.
+// Палитра живёт в одном месте: цветовые литералы (hex, rgb, hsl, oklch)
+// разрешены только внутри `@theme` в `src/styles/global.css` и в декоративных
+// наборах, которые объявляет `DESIGN.md` («Декоративные наборы»). Скан идёт по
+// сырому тексту, поэтому видит и `.astro`, и комментарии.
 import { describe, expect, it } from 'vitest';
 
 const TOKENS_FILE = '/src/styles/global.css';
 const DECORATIVE = new Set(['/src/lib/confetti.ts', '/src/components/GambaModal.astro']);
-const HEX = /#[0-9a-fA-F]{3,8}\b/g;
+const PATTERNS: ReadonlyArray<[kind: string, pattern: RegExp]> = [
+  ['hex', /#[0-9a-fA-F]{3,8}\b/g],
+  ['rgb', /\brgba?\s*\(/gi],
+  ['hsl', /\bhsla?\s*\(/gi],
+  ['oklch', /\boklch\s*\(/gi],
+  ['lab/lch', /\bl(?:ab|ch)\s*\(/gi],
+];
 
 const SOURCES = import.meta.glob(
   ['/src/**/*.css', '/src/**/*.astro', '/src/**/*.ts', '/src/**/*.js', '/src/**/*.mjs'],
@@ -56,8 +60,10 @@ describe('палитра', () => {
 
       content.split('\n').forEach((text, index) => {
         if (allowed.has(index + 1)) return;
-        for (const hex of text.match(HEX) ?? []) {
-          violations.push(`${file}:${index + 1} — ${hex}`);
+        for (const [kind, pattern] of PATTERNS) {
+          for (const found of text.match(pattern) ?? []) {
+            violations.push(`${file}:${index + 1} — ${kind}: ${found.trim()}`);
+          }
         }
       });
     }
