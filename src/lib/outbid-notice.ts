@@ -31,6 +31,8 @@ import { sellerLine, type OutbidEvent } from './outbid-event';
 import { playOutbidSound } from './outbid-sound';
 import { makeRebuyButton, rebuyLabel, showOutbidNotice } from './outbid-notices';
 import { closeNotices, MAX_NOTICES } from './notice';
+import { placePanel } from './popover';
+import { hasOpenModal } from './modal';
 
 const MAX_HISTORY = 10;
 const BELL_ID = 'outbid-bell';
@@ -80,6 +82,45 @@ export function initOutbidNotice(): void {
 
   let bellCount: HTMLElement | null = null;
   let bellPanel: HTMLElement | null = null;
+
+  function isOpen(): boolean {
+    return bellPanel !== null && bellPanel.style.display !== 'none';
+  }
+
+  /** Координаты панели от кнопки. Панель — `fixed` в body: шапка со sticky
+   *  и backdrop-blur не годится в родители (ломает fixed-потомков и режет
+   *  z-index, тот же подводный камень — DailyLogin.astro). Прямоугольник
+   *  читаем при каждом открытии: на узком экране шапка переносится. */
+  function anchorPanel(): void {
+    if (!bellPanel) return;
+    const btn = document.getElementById(BELL_ID);
+    if (!btn) return;
+    const placement = placePanel(
+      btn.getBoundingClientRect(),
+      { width: bellPanel.offsetWidth },
+      { width: window.innerWidth, height: window.innerHeight }
+    );
+    bellPanel.style.left = `${placement.left}px`;
+    bellPanel.style.top = `${placement.top}px`;
+    bellPanel.style.maxHeight = `${placement.maxHeight}px`;
+  }
+
+  /** Открытие/закрытие — одно место: видимость, aria и координаты вместе. */
+  function setOpen(open: boolean): void {
+    if (!bellPanel) return;
+    const btn = document.getElementById(BELL_ID);
+    btn?.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (!open) {
+      bellPanel.style.display = 'none';
+      return;
+    }
+    renderPanel();
+    bellPanel.style.display = 'block';
+    anchorPanel();
+    unread = 0;
+    markSeen();
+    renderBell();
+  }
 
   const unlock = (): void => {
     interacted = true;
@@ -140,6 +181,9 @@ export function initOutbidNotice(): void {
     btn.id = BELL_ID;
     btn.type = 'button';
     btn.title = 'Перекупы твоих лотов';
+    btn.setAttribute('aria-haspopup', 'dialog');
+    btn.setAttribute('aria-expanded', 'false');
+    btn.setAttribute('aria-controls', BELL_PANEL_ID);
     // Колокол стиля C: аркадная кнопка-призрак + счётчик-пиксель.
     // Геометрию (высота 44px, паддинги) задаёт .btn-arcade — как у соседей
     // в шапке; здесь только кегль глифа (text-base) и якорь для счётчика.
@@ -161,13 +205,15 @@ export function initOutbidNotice(): void {
     btn.appendChild(count);
     const panel = document.createElement('div');
     panel.id = BELL_PANEL_ID;
-    // Панель — карточка стиля C (фон/рамка/тень из .card-pixel),
-    // позиционирование прежнее.
+    // Панель — карточка стиля C (фон/рамка/тень из .card-pixel); координаты
+    // при открытии считает placePanel от кнопки, здесь только геометрия.
     panel.className = 'card-pixel';
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-label', 'Перекупы твоих лотов');
     panel.style.display = 'none';
     panel.style.position = 'fixed';
-    panel.style.top = '64px';
-    panel.style.right = '12px';
+    panel.style.top = '0';
+    panel.style.left = '0';
     panel.style.zIndex = '60';
     panel.style.width = '320px';
     panel.style.maxWidth = 'calc(100vw - 24px)';
@@ -177,20 +223,12 @@ export function initOutbidNotice(): void {
     document.body.appendChild(panel);
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      const open = panel.style.display !== 'none';
-      if (open) {
-        panel.style.display = 'none';
-        return;
-      }
-      renderPanel();
-      panel.style.display = 'block';
-      unread = 0;
-      markSeen();
-      renderBell();
+      setOpen(!isOpen());
     });
     document.addEventListener('click', (e) => {
       const t = e.target as HTMLElement | null;
-      if (t && !panel.contains(t)) panel.style.display = 'none';
+      if (!t || !isOpen() || bellPanel?.contains(t)) return;
+      setOpen(false);
     });
     actions.insertBefore(btn, actions.firstChild);
     bellCount = count;
@@ -266,7 +304,7 @@ export function initOutbidNotice(): void {
       if (added > 0) {
         unread += added;
         renderBell();
-        if (bellPanel && bellPanel.style.display !== 'none') renderPanel();
+        if (isOpen()) renderPanel();
       }
     } catch {
       // догон — best effort, лайв-канал работает и без него
@@ -290,6 +328,20 @@ export function initOutbidNotice(): void {
     for (const ev of fresh) showOutbidNotice(ev);
   });
 
+  // Escape — свой, как у всплывающих уведомлений (docs/adr/0005): окна-диалоги
+  // обслуживает стек modal.ts, и открытое окно забирает клавишу себе.
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || !isOpen() || hasOpenModal()) return;
+    const inside = bellPanel !== null && bellPanel.contains(document.activeElement);
+    setOpen(false);
+    if (inside) document.getElementById(BELL_ID)?.focus();
+  });
+
+  // Шапка переносится и меняет ширину — координаты пересчитываем, пока открыта.
+  window.addEventListener('resize', () => {
+    if (isOpen()) anchorPanel();
+  });
+
   // Снапшот живых данных — единственный источник событий колокола:
   // смена uid, перекуп, своя покупка, тик каталога и синк (догон).
   live.subscribe((change) => {
@@ -310,7 +362,7 @@ export function initOutbidNotice(): void {
     if (change.kind === 'catalog') {
       if (change.changed.size === 0) return;
       refreshRebuyButtons();
-      if (bellPanel && bellPanel.style.display !== 'none') renderPanel();
+      if (isOpen()) renderPanel();
       return;
     }
     if (change.kind === 'sync') {
@@ -328,7 +380,7 @@ export function initOutbidNotice(): void {
     }
     unread = Math.max(0, unread - (before - history.length));
     renderBell();
-    if (bellPanel && bellPanel.style.display !== 'none') renderPanel();
+    if (isOpen()) renderPanel();
     closeNotices(id);
   }
 }

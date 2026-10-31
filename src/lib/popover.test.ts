@@ -1,0 +1,56 @@
+import { describe, expect, it } from 'vitest';
+import { placePanel, POPOVER_GAP, POPOVER_MARGIN } from './popover';
+
+const viewport = { width: 1280, height: 800 };
+
+function anchor(
+  overrides: Partial<{ top: number; right: number; bottom: number; left: number }> = {}
+) {
+  return { top: 20, right: 1000, bottom: 64, left: 950, ...overrides };
+}
+
+describe('placePanel', () => {
+  it('раскрывает панель под кнопкой по её правому краю', () => {
+    const placement = placePanel(anchor(), { width: 320 }, viewport);
+    expect(placement.left).toBe(1000 - 320);
+    expect(placement.top).toBe(64 + POPOVER_GAP);
+    expect(placement.maxHeight).toBe(800 * 0.6);
+  });
+
+  it('держит поле у правого края, когда кнопка прижата к нему', () => {
+    const placement = placePanel(anchor({ right: 1280, left: 1230 }), { width: 320 }, viewport);
+    expect(placement.left).toBe(1280 - 320 - POPOVER_MARGIN);
+  });
+
+  it('на узком экране не вылезает за левое поле', () => {
+    const narrow = { width: 300, height: 800 };
+    // Ширину 276px (300 − поля) уже дал CSS max-width.
+    const placement = placePanel(
+      anchor({ right: 290, left: 240 }),
+      { width: 300 - POPOVER_MARGIN * 2 },
+      narrow
+    );
+    expect(placement.left).toBe(POPOVER_MARGIN);
+  });
+
+  it('страхует по левому полю, даже если ширина пришла неужатой', () => {
+    const placement = placePanel(
+      anchor({ right: 290, left: 240 }),
+      { width: 320 },
+      { width: 300, height: 800 }
+    );
+    expect(placement.left).toBe(POPOVER_MARGIN);
+  });
+
+  it('урезает высоту под свободное место, если экран низкий', () => {
+    const viewport = { width: 1280, height: 200 };
+    const placement = placePanel(anchor(), { width: 320 }, viewport);
+    expect(placement.top).toBe(64 + POPOVER_GAP);
+    expect(placement.maxHeight).toBe(200 - (64 + POPOVER_GAP) - POPOVER_MARGIN);
+  });
+
+  it('не отдаёт отрицательную высоту, когда места под кнопкой нет', () => {
+    const placement = placePanel(anchor(), { width: 320 }, { width: 1280, height: 80 });
+    expect(placement.maxHeight).toBe(0);
+  });
+});

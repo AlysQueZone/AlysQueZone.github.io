@@ -98,6 +98,11 @@ if (typeof document !== 'undefined') {
   });
 }
 
+/** Открыто ли хоть одно окно: поверхности со своим Escape (колокол) уступают клавишу. */
+export function hasOpenModal(): boolean {
+  return stack.length > 0;
+}
+
 /**
  * Завести цикл окна. null-корень (компонента нет на странице) — null:
  * вызывающий код работает через `?.`, как раньше с `if (!modal)`.
