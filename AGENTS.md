@@ -4,7 +4,8 @@
 
 - Коммить сам, когда изменение готово; новые решения — краткой строкой сюда.
 - Документы в `docs/` и `scratch/` — задача агента: поддерживать актуальность, устаревшие — править или удалять на своё усмотрение.
-- Гейт красный — деплоя нет: `npm run build` + покликать сборку в `preview`.
+- Гейт красный — деплоя нет: `pnpm build` + покликать сборку в `preview`.
+- Зависимости и скрипты — только pnpm (`pnpm install`, `pnpm dev`), `npm`/`npx` в проекте не используем; `agent-browser` — системная программа 0.41+, не пакет проекта.
 - Бэкенд — в Supabase: схема — только миграциями; контент лотов — `content/lots.toml` + `just lots-sync` (публикуется без деплоя, не миграциями), новый лот — `just lot-add <файл|URL>` (общий пайплайн со `submission.py`).
 - Новая таблица → в той же миграции гранты `anon`/`authenticated`/`service_role` и `usage` на sequence (с 30.10.2026 автоматом не выдаются); шаблон — `docs/agents/supabase.md`.
 - Витрина и страницы лотов — клиентская проекция БД (`docs/adr/0002`): билд без запроса к БД, но требует `PUBLIC_SUPABASE_*`.
@@ -22,7 +23,7 @@
 - Звуки колеса — контент: список в `content/sounds.toml`, рантайм-проекция — `public.gamba_sounds` (`just sounds-sync`), фолбэк сборки — генерат (`just sounds-gen`); имена файлов в коде не живут — `docs/adr/0011`.
 - Цвет/визуальный стиль — один источник: палитра D1 в `design-system/alysquezone/MASTER.md`, токены — `@theme` в `src/styles/global.css`; hex в коде не хардкодим.
 - Контраст — часть стиля: muted-текст только `text-mist` (без `/60…80`), акцентный текст — `*-deep` или затемнённый токен (`melon`, `pivko`); проверка — `validate-tokens.cjs --dir src/` из скилла `design-system`.
-- UI/UX-скиллы (`.opencode/`) в гите нет: свежий клон — `npx uipro init --ai opencode`, обновление — `npx uipro update`.
+- UI/UX-скиллы (`.opencode/`) в гите нет: свежий клон — `pnpm dlx uipro init --ai opencode`, обновление — `pnpm dlx uipro update`.
 - Свои скиллы (`.agents/skills/alysque-*`) — в гите и в зоне агента: поддерживать актуальность, править по своему усмотрению; при правке — по скиллу `writing-for-agents`. Чужие (`npx skills`, `uipro`) не в гите и не в зоне агента.
 
 ## TODO.md и NOTES.md

@@ -3,11 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "deploy": "npm run build && gh-pages -d dist --dotfiles",
+    "gh-deploy": "pnpm build && gh-pages -d dist --dotfiles",
     "astro": "astro",
     "prepare": "husky",
     "lint": "eslint .",
@@ -25,7 +28,6 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@tailwindcss/vite": "^4.3.3",
-    "agent-browser": "^0.37.1",
     "eslint": "^10.10.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-astro": "^3.1.0",

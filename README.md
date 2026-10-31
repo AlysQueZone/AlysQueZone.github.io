@@ -9,13 +9,13 @@
 
 ## Локальный запуск
 
-Нужны Node.js 18+ и npm.
+Нужны Node.js 22.12+ и pnpm (12+).
 
 Плюс `PUBLIC_SUPABASE_URL` и `PUBLIC_SUPABASE_PUBLISHABLE_KEY` в `.env` (шаблон — `.env.example`) — без них сайт не соберётся.
 
 ```bash
-npm install
-npm run dev
+pnpm install
+pnpm dev
 ```
 
 Открыть <http://localhost:4321>
@@ -40,8 +40,8 @@ just db-stop     # остановить БД
 ## Ещё команды
 
 ```bash
-npm run build    # сборка в dist/
-npm run preview  # предпросмотр сборки
+pnpm build    # сборка в dist/
+pnpm preview  # предпросмотр сборки
 ```
 
 ## AI Скиллы
@@ -105,7 +105,7 @@ npm run preview  # предпросмотр сборки
 
 Части скиллов нужен Python 3 — агент предупредит, если его нет.
 
-В гите этих скиллов нет: после клона — `npx uipro init --ai opencode`, обновление — `npx uipro update`.
+В гите этих скиллов нет: после клона — `pnpm dlx uipro init --ai opencode`, обновление — `pnpm dlx uipro update`.
 
 ### Пример
 

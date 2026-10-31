@@ -44,7 +44,7 @@ _default:
 
 # Запуск тест сервера
 run:
-    npm run dev
+    pnpm dev
 
 # Запустить UI(при неообходимости запустить тест сервер)
 ui:
@@ -83,21 +83,21 @@ ui:
 # -------------------------------------
 
 lint:
-    npm run lint
+    pnpm lint
 
 format:
-    npm run format
+    pnpm format
 
 # Тесты ядра (vitest, без DOM): реестр живых подписок и чистая логика
 test:
-    npm run test
+    pnpm test
 
 # Все гейты разом: типы, линт, тесты, формат (его же зовёт pre-commit)
 check:
-    npx tsc --noEmit
-    npm run lint
-    npm run test
-    npm run format:check
+    pnpm exec tsc --noEmit
+    pnpm lint
+    pnpm test
+    pnpm format:check
     python3 scripts/sounds_sync.py check
 
 # -------------------------------------
@@ -226,7 +226,7 @@ run-local: db-up db-vault
     : "${url:=http://127.0.0.1:54321}"
     [ -n "$key" ] || { echo 'Не нашёл publishable-ключ локального стека (supabase status -o env)' >&2; exit 1; }
     echo "Локальная БД: $url"
-    PUBLIC_SUPABASE_URL="$url" PUBLIC_SUPABASE_PUBLISHABLE_KEY="$key" npm run dev -- --force
+    PUBLIC_SUPABASE_URL="$url" PUBLIC_SUPABASE_PUBLISHABLE_KEY="$key" pnpm run dev --force
 
 # -------------------------------------
 # Релиз
@@ -243,7 +243,7 @@ release:
     trap 'gh auth switch --user "$prev" >/dev/null 2>&1 || true' EXIT
     gh auth switch --user AlysQueZone
     git push origin main
-    npm run deploy
+    pnpm gh-deploy
 
 # -------------------------------------
 # Другое
