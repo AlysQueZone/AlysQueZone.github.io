@@ -82,9 +82,31 @@ export function initOutbidNotice(): void {
 
   let bellCount: HTMLElement | null = null;
   let bellPanel: HTMLElement | null = null;
+  let layoutWatcher: ResizeObserver | null = null;
 
   function isOpen(): boolean {
     return bellPanel !== null && bellPanel.style.display !== 'none';
+  }
+
+  /** Пока панель открыта, следим за шапкой: кнопка входа меняет ширину
+   *  (гость ↔ ник), чип баланса может перенести строки — колокол едет,
+   *  а окно resize про это молчит. */
+  function watchLayout(active: boolean): void {
+    if (!active) {
+      layoutWatcher?.disconnect();
+      layoutWatcher = null;
+      return;
+    }
+    if (layoutWatcher || typeof ResizeObserver === 'undefined') return;
+    const btn = document.getElementById(BELL_ID);
+    const cluster = btn?.parentElement ?? null;
+    const header = btn?.closest('header') ?? null;
+    if (!cluster && !header) return;
+    layoutWatcher = new ResizeObserver(() => {
+      if (isOpen()) anchorPanel();
+    });
+    if (cluster) layoutWatcher.observe(cluster);
+    if (header) layoutWatcher.observe(header);
   }
 
   /** Координаты панели от кнопки. Панель — `fixed` в body: шапка со sticky
@@ -112,11 +134,13 @@ export function initOutbidNotice(): void {
     btn?.setAttribute('aria-expanded', open ? 'true' : 'false');
     if (!open) {
       bellPanel.style.display = 'none';
+      watchLayout(false);
       return;
     }
     renderPanel();
     bellPanel.style.display = 'block';
     anchorPanel();
+    watchLayout(true);
     unread = 0;
     markSeen();
     renderBell();
@@ -238,6 +262,7 @@ export function initOutbidNotice(): void {
 
   /** Колокол — только залогиненным: гостю кнопку и панель не показываем вообще. */
   function removeBell(): void {
+    watchLayout(false);
     document.getElementById(BELL_ID)?.remove();
     document.getElementById(BELL_PANEL_ID)?.remove();
     bellCount = null;

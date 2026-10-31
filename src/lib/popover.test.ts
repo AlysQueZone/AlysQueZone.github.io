@@ -6,19 +6,19 @@ const viewport = { width: 1280, height: 800 };
 function anchor(
   overrides: Partial<{ top: number; right: number; bottom: number; left: number }> = {}
 ) {
-  return { top: 20, right: 1000, bottom: 64, left: 950, ...overrides };
+  return { top: 20, right: 1000, bottom: 64, left: 900, ...overrides };
 }
 
 describe('placePanel', () => {
-  it('раскрывает панель под кнопкой по её правому краю', () => {
+  it('раскрывает панель под кнопкой от её левого края', () => {
     const placement = placePanel(anchor(), { width: 320 }, viewport);
-    expect(placement.left).toBe(1000 - 320);
+    expect(placement.left).toBe(900);
     expect(placement.top).toBe(64 + POPOVER_GAP);
     expect(placement.maxHeight).toBe(800 * 0.6);
   });
 
-  it('держит поле у правого края, когда кнопка прижата к нему', () => {
-    const placement = placePanel(anchor({ right: 1280, left: 1230 }), { width: 320 }, viewport);
+  it('сдвигает влево, когда панель не влезает справа', () => {
+    const placement = placePanel(anchor({ left: 1100, right: 1150 }), { width: 320 }, viewport);
     expect(placement.left).toBe(1280 - 320 - POPOVER_MARGIN);
   });
 

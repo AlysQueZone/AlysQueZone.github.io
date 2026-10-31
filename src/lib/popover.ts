@@ -2,8 +2,8 @@
  * Геометрия поповера, привязанного к кнопке-якорю.
  *
  * Чистая функция без DOM: якорь, ширина панели и вьюпорт на входе — координаты
- * `fixed`-панели и потолок высоты на выходе. Панель выровнена по правому краю
- * якоря (растёт влево) и раскрыта под ним; за края вьюпорта не выходит —
+ * `fixed`-панели и потолок высоты на выходе. Панель выровнена по левому краю
+ * якоря (растёт вправо) и раскрыта под ним; за края вьюпорта не выходит —
  * ширина ужимается в поля, высота — под свободное место.
  *
  * Владеет только числами: разметка, открытие и Escape — у поверхности
@@ -51,7 +51,7 @@ export function placePanel(
   viewport: ViewportSize
 ): PanelPlacement {
   const width = Math.min(panel.width, Math.max(0, viewport.width - POPOVER_MARGIN * 2));
-  const left = clamp(anchor.right - width, POPOVER_MARGIN, viewport.width - width - POPOVER_MARGIN);
+  const left = clamp(anchor.left, POPOVER_MARGIN, viewport.width - width - POPOVER_MARGIN);
   const top = anchor.bottom + POPOVER_GAP;
   const room = viewport.height - top - POPOVER_MARGIN;
   const maxHeight = Math.min(viewport.height * POPOVER_MAX_HEIGHT_RATIO, room);
