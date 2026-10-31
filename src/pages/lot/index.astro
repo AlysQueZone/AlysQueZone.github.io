@@ -133,10 +133,11 @@ const base = import.meta.env.BASE_URL;
 </BaseLayout>
 
 <script>
-  // Страница лота: slug — из query (`?id=`), состояние — снапшот живых данных
-  // (lib/live.ts), история — страницами из БД (lib/supabase.ts), а вся её
-  // механика (курсор, слияние, относительное время) — чистое ядро
-  // (lib/trade-history.ts). Здесь только разметка и перерисовка.
+  // Страница лота: slug — из query (`?id=`), состояние — срез снапшота живых
+  // данных на один этот лот (lib/live.ts), история — страницами из БД
+  // (lib/supabase.ts), а вся её механика (курсор, слияние, относительное
+  // время) — чистое ядро (lib/trade-history.ts). Здесь только разметка и
+  // перерисовка.
   import { fetchSharedHistory } from '@/lib/supabase';
   import {
     HISTORY_PAGE_SIZE,
@@ -150,6 +151,10 @@ const base = import.meta.env.BASE_URL;
   import { fillLot } from '@/lib/lot-view';
 
   const slug = (new URLSearchParams(window.location.search).get('id') ?? '').trim();
+
+  // Срез страницы — один этот лот, до первого чтения: полный каталог ей не
+  // нужен (docs/adr/0012). Пустой id — сразу «лота нет», без чтения.
+  if (slug.length > 0) live.useLot(slug);
 
   const skeleton = document.querySelector('[data-lot-skeleton]');
   const view = document.querySelector('[data-lot-view]');
@@ -368,4 +373,7 @@ const base = import.meta.env.BASE_URL;
       fillLot(viewRoot, lastState, { balance: change.balance });
     }
   });
+
+  // Пустой ?id= — читать нечего: «лота нет» сразу, не ждём события каталога.
+  if (slug.length === 0) showMissing();
 </script>

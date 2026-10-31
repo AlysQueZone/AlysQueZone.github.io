@@ -11,11 +11,13 @@
  * Поверхности читают снапшот синхронно (`live.uid()`, `live.balance()`,
  * `live.catalog()`, `live.lot(slug)`, …) и подписываются на изменения
  * (`live.subscribe`); денежные гейты (гамба, покупка) просят явную свежесть
- * (`live.refreshBalance()`, `live.refreshLot(slug)`). Витрина `/lots/`
- * включает страницы (`live.useCatalogPages`) и «Мои приветы»
- * (`live.trackMyLots`); остальные страницы читают каталог целиком
- * (docs/adr/0012). Модуль сам поднимается на первом subscribe / refresh /
- * report — отдельного «старта» у поверхностей нет.
+ * (`live.refreshBalance()`, `live.refreshLot(slug)`). Каталог читается срезом
+ * страницы: витрина `/lots/` включает страницы (`live.useCatalogPages`),
+ * главная — случайную выборку (`live.useRandomLots`), страница лота — один
+ * лот (`live.useLot`); «Мои приветы» — отдельный запрос владельца
+ * (`live.trackMyLots`). Полный каталог не читает никто (docs/adr/0012).
+ * Модуль сам поднимается на первом subscribe / refresh / report — отдельного
+ * «старта» у поверхностей нет.
  */
 import { getSupabase, withAuthRetry } from './supabase';
 import type { CatalogCursor } from './catalog-page';
@@ -23,6 +25,7 @@ import { createLiveRegistry, type LivePayload, type LiveTransport } from './live
 import {
   createLiveStore,
   normalizeNextPrice,
+  type CatalogListRead,
   type CatalogMoreResult,
   type CatalogPageRead,
   type CatalogRead,
@@ -95,6 +98,8 @@ function normalizeBalance(value: unknown): number | null {
 }
 
 const VIEW = 'lots_with_next_price';
+/** Случайная выборка главной: тот же состав колонок, порядок задаёт вью. */
+const RANDOM_VIEW = 'random_lots';
 const VIEW_COLUMNS =
   'slug,title,video_url,price,owner_login,owner_uid,suggested_by_login,next_price';
 const TABLE_COLUMNS = 'slug,title,video_url,price,owner_login,owner_uid,suggested_by_login';
@@ -157,16 +162,25 @@ function supabaseReaders(): LiveReaders {
     },
 
     /**
-     * Весь каталог одним запросом. Вью отсутствует (миграция ещё не применена) —
-     * фолбэк на таблицу `lots` с nextPrice null (клиентской формулы нет и не будет).
-     * Ошибка/ненастроенное хранилище → `ok: false` (витрина отличает «пусто» от
-     * «не загрузилось»). Секретов здесь нет: только publishable-ключ.
+     * Случайная выборка главной: вью `random_lots` отдаёт строки в случайном
+     * порядке, клиент берёт первые `limit`. Фолбэка на таблицу нет: он бы
+     * вернул произвольные строки без перемешивания, а полная выгрузка — ровно
+     * то, что этот путь убирает; миграция едет раньше фронта. Ошибка или
+     * ненастроенное хранилище → `ok: false` («не загрузилось» ≠ «пусто»).
      */
-    async readCatalog(uid: string | null): Promise<CatalogRead> {
+    async readRandomLots(uid: string | null, limit: number): Promise<CatalogListRead> {
       const sb = getSupabase();
-      if (!sb) return { ok: false, states: new Map() };
-      const read = await readList((table, columns) => sb.from(table).select(columns));
-      return { ok: read.ok, states: fillCatalog(read.rows, uid) };
+      if (!sb) return { ok: false, states: [] };
+      const cap = Math.max(1, Math.floor(limit));
+      try {
+        const { data, error } = await withAuthRetry(() =>
+          sb.from(RANDOM_VIEW).select(VIEW_COLUMNS).limit(cap)
+        );
+        if (error || !Array.isArray(data)) return { ok: false, states: [] };
+        return { ok: true, states: fillCatalogList(data, uid) };
+      } catch {
+        return { ok: false, states: [] };
+      }
     },
 
     /**
@@ -396,13 +410,22 @@ export const live = {
   myLots: (): readonly LotState[] => store.myLots(),
   myLotsKnown: (): boolean => store.myLotsKnown(),
 
-  /**
-   * Витрина листается страницами: до первого чтения. Вызывать на /lots/
-   * до подписки — главная и страница лота читают каталог целиком, как раньше.
-   */
+  /** Витрина листается страницами: до первого чтения, иначе no-op. */
   useCatalogPages(pageSize?: number): void {
-    // Режим — до ensureWired: иначе первое чтение может стартовать полным.
+    // Срез — до ensureWired: старт не должен увидеть режим по умолчанию.
     store.useCatalogPages(pageSize);
+    ensureWired();
+  },
+
+  /** Главная: случайная выборка N лотов; срез — до первого чтения. */
+  useRandomLots(count: number): void {
+    store.useRandomLots(count);
+    ensureWired();
+  },
+
+  /** Страница лота: один лот по slug; срез — до первого чтения. */
+  useLot(slug: string): void {
+    store.useLot(slug);
     ensureWired();
   },
 

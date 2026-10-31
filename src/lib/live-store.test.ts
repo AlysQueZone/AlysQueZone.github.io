@@ -45,7 +45,15 @@ function deferred(): Deferred {
 
 interface FakeReaders {
   readers: LiveReaders;
-  calls: { uid: number; balance: number; catalog: number; lot: number; page: number; mine: number };
+  calls: {
+    uid: number;
+    balance: number;
+    random: number;
+    bySlugs: number;
+    lot: number;
+    page: number;
+    mine: number;
+  };
   state: {
     uid: string | null;
     balance: number | null;
@@ -60,7 +68,7 @@ interface FakeReaders {
 }
 
 function fakeReaders(): FakeReaders {
-  const calls = { uid: 0, balance: 0, catalog: 0, lot: 0, page: 0, mine: 0 };
+  const calls = { uid: 0, balance: 0, random: 0, bySlugs: 0, lot: 0, page: 0, mine: 0 };
   const state = {
     uid: null as string | null,
     balance: null as number | null,
@@ -86,12 +94,12 @@ function fakeReaders(): FakeReaders {
       if (wait) await wait;
       return fail.balance ? null : state.balance;
     },
-    async readCatalog() {
+    async readRandomLots(_uid, limit) {
       const wait = gate;
       if (wait) await wait;
-      calls.catalog += 1;
-      if (fail.catalog) return { ok: false, states: new Map<string, LotState>() };
-      return { ok: true, states: new Map(state.catalog) };
+      calls.random += 1;
+      if (fail.catalog) return { ok: false, states: [] };
+      return { ok: true, states: ordered().slice(0, Math.max(1, limit)) };
     },
     async readCatalogPage(_uid, cursor, limit) {
       const wait = gate;
@@ -108,6 +116,7 @@ function fakeReaders(): FakeReaders {
     async readCatalogBySlugs(_uid, slugs) {
       const wait = gate;
       if (wait) await wait;
+      calls.bySlugs += 1;
       if (fail.catalog) return { ok: false, states: new Map<string, LotState>() };
       const states = new Map<string, LotState>();
       for (const slug of slugs) {
@@ -168,12 +177,13 @@ function kinds(events: LiveChange[]): string[] {
 }
 
 describe('createLiveStore', () => {
-  it('start читает снапшот: uid, баланс, каталог — и объявляет их', async () => {
+  it('start читает снапшот: uid, баланс, выборку — и объявляет их', async () => {
     const f = fakeReaders();
     f.state.uid = 'u1';
     f.state.balance = 1000;
     f.state.catalog.set('lot-a', lot({ mine: true }));
     const store = createLiveStore(f.readers);
+    store.useRandomLots(1);
     const events = collect(store);
 
     await store.start();
@@ -190,6 +200,7 @@ describe('createLiveStore', () => {
     const f = fakeReaders();
     f.state.catalog.set('lot-a', lot());
     const store = createLiveStore(f.readers);
+    store.useRandomLots(1);
     const events = collect(store);
 
     await store.start();
@@ -201,19 +212,20 @@ describe('createLiveStore', () => {
     expect(kinds(events)).toEqual(['catalog']);
   });
 
-  it('каталог: добавление, правка и удаление — changed ровно эти slug, стабильные ссылки целы', async () => {
+  it('выборка: правка и удаление — changed ровно эти slug; новый лот ждёт перезагрузки', async () => {
     const f = fakeReaders();
     const keep = lot({ slug: 'lot-keep' });
     f.state.catalog.set('lot-a', lot());
     f.state.catalog.set('lot-b', lot({ slug: 'lot-b' }));
     f.state.catalog.set('lot-keep', keep);
     const store = createLiveStore(f.readers);
+    store.useRandomLots(10);
     const events = collect(store);
     await store.start();
+    expect(store.catalogWindow()).toHaveLength(3);
 
-    const changedA = lot({ price: 150 });
     f.state.catalog = new Map([
-      ['lot-a', changedA],
+      ['lot-a', lot({ price: 150 })],
       ['lot-c', lot({ slug: 'lot-c' })],
       ['lot-keep', keep],
     ]);
@@ -222,17 +234,20 @@ describe('createLiveStore', () => {
     const last = events.at(-1);
     expect(last?.kind).toBe('catalog');
     if (last?.kind !== 'catalog') throw new Error('ожидалось событие каталога');
-    expect([...last.changed].sort()).toEqual(['lot-a', 'lot-b', 'lot-c']);
-    expect(store.catalog().size).toBe(3);
+    expect([...last.changed].sort()).toEqual(['lot-a', 'lot-b']);
+    expect(store.catalog().size).toBe(2);
     expect(store.catalog().get('lot-a')?.price).toBe(150);
     // Неизменившийся лот не пересобирался — ссылка та же.
     expect(store.catalog().get('lot-keep')).toBe(keep);
+    // Новый лот вне выборки: главная его не добирает (ADR 0012).
+    expect(store.catalog().has('lot-c')).toBe(false);
   });
 
   it('неудача перечитывания не затирает последнее хорошее, свежесть — false', async () => {
     const f = fakeReaders();
     f.state.catalog.set('lot-a', lot());
     const store = createLiveStore(f.readers);
+    store.useRandomLots(1);
     const events = collect(store);
     await store.start();
     const good = store.catalog().get('lot-a');
@@ -254,6 +269,7 @@ describe('createLiveStore', () => {
     const f = fakeReaders();
     f.fail.catalog = true;
     const store = createLiveStore(f.readers);
+    store.useRandomLots(1);
     const events = collect(store);
 
     await store.start();
@@ -266,8 +282,9 @@ describe('createLiveStore', () => {
     const f = fakeReaders();
     f.state.catalog.set('lot-a', lot());
     const store = createLiveStore(f.readers);
+    store.useRandomLots(1);
     await store.start();
-    expect(f.calls.catalog).toBe(1);
+    expect(f.calls.random).toBe(1);
 
     const release = f.holdCatalog();
     const first = store.refreshCatalog();
@@ -275,8 +292,8 @@ describe('createLiveStore', () => {
     release();
     await Promise.all([first, second]);
 
-    // Первый тик прочитал, второй не потерялся — догнал одним проходом.
-    expect(f.calls.catalog).toBe(3);
+    // Первый тик прочитал выборку, второй не потерялся — догнал одним проходом.
+    expect(f.calls.bySlugs).toBe(2);
   });
 
   it('смена uid: «мой» флаг пересчитан без чтения каталога, чужой баланс не показывается', async () => {
@@ -285,16 +302,17 @@ describe('createLiveStore', () => {
     f.state.balance = 1000;
     f.state.catalog.set('lot-a', lot({ owner_uid: 'u1', mine: true }));
     const store = createLiveStore(f.readers);
+    store.useRandomLots(1);
     const events = collect(store);
     await store.start();
-    const catalogCalls = f.calls.catalog;
+    const catalogCalls = f.calls.random + f.calls.bySlugs;
 
     f.state.uid = 'u2';
     f.state.balance = 2000;
     store.applyUid('u2');
     await store.refreshBalance();
 
-    expect(f.calls.catalog).toBe(catalogCalls);
+    expect(f.calls.random + f.calls.bySlugs).toBe(catalogCalls);
     expect(store.catalog().get('lot-a')?.mine).toBe(false);
     expect(store.balance()).toBe(2000);
     expect(kinds(events)).toEqual([
@@ -322,6 +340,7 @@ describe('createLiveStore', () => {
       lot({ slug: 'lot-other', owner_uid: 'u2', owner_login: 'bob' })
     );
     const store = createLiveStore(f.readers);
+    store.useRandomLots(10);
     const events = collect(store);
     await store.start();
 
@@ -363,6 +382,7 @@ describe('createLiveStore', () => {
     f.state.balance = 1000;
     f.state.catalog.set('lot-a', lot({ owner_uid: 'u2', owner_login: 'bob' }));
     const store = createLiveStore(f.readers);
+    store.useRandomLots(1);
     const events = collect(store);
     await store.start();
 
@@ -484,6 +504,7 @@ describe('createLiveStore', () => {
     const f = fakeReaders();
     f.state.catalog.set('lot-a', lot());
     const store = createLiveStore(f.readers);
+    store.useRandomLots(1);
     const events = collect(store);
     await store.start();
 
@@ -504,6 +525,7 @@ describe('createLiveStore', () => {
     const f = fakeReaders();
     f.state.catalog.set('lot-a', lot());
     const store = createLiveStore(f.readers);
+    store.useRandomLots(1);
     const events = collect(store);
     await store.start();
 
@@ -543,9 +565,10 @@ describe('createLiveStore', () => {
     f.state.uid = 'u1';
     f.state.catalog.set('lot-a', lot({ owner_uid: 'u1', mine: true }));
     const store = createLiveStore(f.readers);
+    store.useRandomLots(1);
     await store.start();
 
-    // Гонка: uid сменился, пока каталог был в полёте; ответ несёт флаг старого uid.
+    // Гонка: uid сменился, пока выборка была в полёте; ответ несёт флаг старого uid.
     store.applyUid('u2');
     await store.refreshCatalog();
 
@@ -558,6 +581,7 @@ describe('createLiveStore', () => {
     f.state.balance = 1000;
     f.state.catalog.set('lot-a', lot());
     const store = createLiveStore(f.readers);
+    store.useRandomLots(1);
     await store.start();
 
     const late = collect(store);
@@ -573,6 +597,7 @@ describe('createLiveStore', () => {
     f.state.uid = 'u1';
     f.state.balance = 500;
     const store = createLiveStore(f.readers);
+    store.useRandomLots(1);
     expect(store.catalogKnown()).toBe(false);
 
     // Авторизация сработала до первого чтения (между скриптами страницы).
@@ -590,15 +615,17 @@ describe('createLiveStore', () => {
 
   it('sync объявляет синк и перечитывает; reportDeal объявляет сделку', async () => {
     const f = fakeReaders();
+    f.state.catalog.set('lot-a', lot());
     const store = createLiveStore(f.readers);
+    store.useRandomLots(1);
     const events = collect(store);
     await store.start();
-    const catalogCalls = f.calls.catalog;
+    const catalogCalls = f.calls.bySlugs;
 
     await store.sync();
     store.reportDeal();
 
-    expect(f.calls.catalog).toBe(catalogCalls + 1);
+    expect(f.calls.bySlugs).toBe(catalogCalls + 1);
     expect(kinds(events).at(-2)).toBe('sync');
     expect(kinds(events).at(-1)).toBe('deals');
   });
@@ -607,6 +634,7 @@ describe('createLiveStore', () => {
     const f = fakeReaders();
     f.state.catalog.set('lot-a', lot());
     const store = createLiveStore(f.readers);
+    store.useRandomLots(1);
     const heard: LiveChange[] = [];
     store.subscribe(() => {
       throw new Error('сломанный подписчик');
@@ -616,6 +644,117 @@ describe('createLiveStore', () => {
     await store.start();
 
     expect(heard.length).toBeGreaterThan(0);
+  });
+
+  it('выборка главной: старт читает N, тик обновляет только её, новые лоты не вставляются', async () => {
+    const f = fakeReaders();
+    for (let i = 0; i < 5; i++) {
+      const slug = `lot-${i}`;
+      f.state.catalog.set(slug, lot({ slug, price: 100 + i }));
+    }
+    const store = createLiveStore(f.readers);
+    store.useRandomLots(2);
+    await store.start();
+
+    expect(f.calls.random).toBe(1);
+    expect(store.catalogWindow().map((st) => st.slug)).toEqual(['lot-0', 'lot-1']);
+    expect(store.catalog().size).toBe(2);
+    expect(store.catalogHasMore()).toBe(false);
+
+    const selected = store.catalogWindow()[0];
+    if (!selected) throw new Error('ожидалась выборка');
+    f.state.catalog.set(selected.slug, lot({ slug: selected.slug, price: 999, nextPrice: 1000 }));
+    await store.reportLotsTick({ eventType: 'UPDATE', new: { slug: selected.slug } });
+    expect(f.calls.bySlugs).toBe(1);
+    expect(store.catalog().get(selected.slug)?.price).toBe(999);
+    expect(store.catalog().size).toBe(2);
+
+    // Новый лот приходит только следующей загрузкой: выборка стабильна.
+    f.state.catalog.set('lot-new', lot({ slug: 'lot-new', price: 50 }));
+    await store.reportLotsTick({ eventType: 'INSERT', new: { slug: 'lot-new' } });
+    expect(store.catalogWindow().map((st) => st.slug)).toEqual(['lot-0', 'lot-1']);
+    expect(store.catalog().has('lot-new')).toBe(false);
+    // UPDATE и INSERT обновили только окно по slug — полного каталога нет.
+    expect(f.calls.bySlugs).toBe(2);
+  });
+
+  it('один лот: старт и тик читают только его, без полного каталога', async () => {
+    const f = fakeReaders();
+    f.state.catalog.set('lot-a', lot({ slug: 'lot-a', price: 100 }));
+    f.state.catalog.set('lot-b', lot({ slug: 'lot-b', price: 200 }));
+    const store = createLiveStore(f.readers);
+    store.useLot('lot-a');
+    await store.start();
+
+    expect(f.calls.random).toBe(0);
+    expect(f.calls.bySlugs).toBe(1);
+    expect(store.catalogWindow().map((st) => st.slug)).toEqual(['lot-a']);
+    expect(store.catalog().has('lot-b')).toBe(false);
+
+    f.state.catalog.set('lot-a', lot({ slug: 'lot-a', price: 150 }));
+    await store.reportLotsTick({ eventType: 'UPDATE', new: { slug: 'lot-a' } });
+    expect(store.lot('lot-a')?.price).toBe(150);
+    expect(f.calls.bySlugs).toBe(2);
+  });
+
+  it('один лот: нет строки — «лота нет», отказ БД — «не загрузилось»', async () => {
+    const missing = fakeReaders();
+    const missingStore = createLiveStore(missing.readers);
+    missingStore.useLot('lot-missing');
+    await missingStore.start();
+
+    expect(missingStore.catalogKnown()).toBe(true);
+    expect(missingStore.catalogOk()).toBe(true);
+    expect(missingStore.lot('lot-missing')).toBeNull();
+    expect(missingStore.catalogWindow()).toHaveLength(0);
+
+    const broken = fakeReaders();
+    broken.fail.catalog = true;
+    const brokenStore = createLiveStore(broken.readers);
+    brokenStore.useLot('lot-a');
+    await brokenStore.start();
+
+    expect(brokenStore.catalogKnown()).toBe(true);
+    expect(brokenStore.catalogOk()).toBe(false);
+    expect(brokenStore.lot('lot-a')).toBeNull();
+  });
+
+  it('колокол на выборке: «Мои приветы» дают перекуп вне окна', async () => {
+    const f = fakeReaders();
+    f.state.uid = 'u1';
+    f.state.balance = 1000;
+    f.state.catalog.set(
+      'lot-mine',
+      lot({ slug: 'lot-mine', price: 900, owner_uid: 'u1', owner_login: 'me', mine: true })
+    );
+    f.state.catalog.set('lot-other', lot({ slug: 'lot-other', price: 100, owner_uid: 'u2' }));
+    const store = createLiveStore(f.readers);
+    store.useRandomLots(1);
+    store.trackMyLots();
+    const events = collect(store);
+    await store.start();
+
+    // Выбрался дешёвый чужой лот; мой — вне окна, но в «Моих приветах».
+    expect(store.catalogWindow().map((st) => st.slug)).toEqual(['lot-other']);
+    expect(store.myLots().map((st) => st.slug)).toEqual(['lot-mine']);
+
+    f.state.catalog.set(
+      'lot-mine',
+      lot({ slug: 'lot-mine', title: 'Мой', price: 1200, owner_uid: 'u3', owner_login: 'carol' })
+    );
+    f.state.lots.set(
+      'lot-mine',
+      lot({ slug: 'lot-mine', title: 'Мой', price: 1200, owner_uid: 'u3', owner_login: 'carol' })
+    );
+    await store.reportDeal();
+
+    const outbids = events.filter((event) => event.kind === 'outbid');
+    expect(outbids).toHaveLength(1);
+    expect(outbids[0]).toMatchObject({
+      kind: 'outbid',
+      event: { slug: 'lot-mine', title: 'Мой', by: 'carol', price: 1200 },
+    });
+    expect(store.catalogWindow().map((st) => st.slug)).toEqual(['lot-other']);
   });
 
   it('витрина страницами: первая страница — окно, следующая дописывается, дальше конец', async () => {

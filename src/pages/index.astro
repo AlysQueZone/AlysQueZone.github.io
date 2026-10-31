@@ -8,9 +8,9 @@ import BrandHeadline from '@/components/BrandHeadline.astro';
 import { ALYSQUE_WAUW } from '@/lib/emotes';
 
 const base = import.meta.env.BASE_URL;
-// Случайные приветы — 4 лота наугад из живого каталога БД, выбор в браузере
-// (витрина не приедается, «топа» больше нет — дорогие лоты не
-// караулят вход). Не хардкод.
+// Случайные приветы — 4 лота из случайной выборки БД (вью `random_lots`,
+// docs/adr/0012): порядок и выбор — в БД, не на клиенте; полный каталог
+// главная не читает. Не хардкод.
 ---
 
 <BaseLayout title="AlysQueZone — БИРЖА ПРИВЕТОВ">
@@ -117,12 +117,12 @@ const base = import.meta.env.BASE_URL;
 </BaseLayout>
 
 <script>
-  // Случайные приветы — из живого каталога БД (снапшот lib/live.ts), выбор
-  // в браузере (не на билде). Карточки — каноничный LotCard (шаблон в разметке):
-  // слоты Лота и раскладку кадра заполняет lib/lot-view.ts, как на витрине;
-  // цена и покупка — в кнопке, модалка покупки на странице (BuyModal). Одно
-  // представление Лота на всех поверхностях (docs/adr/0009); тик, фокус и
-  // своя покупка — триггеры модуля живых данных.
+  // Случайные приветы — срез снапшота lib/live.ts: случайную выборку из вью
+  // `random_lots` читает БД (docs/adr/0012), свежие цены/владельцев тик
+  // обновляет по slug выбранных лотов. Карточки — каноничный LotCard (шаблон
+  // в разметке): слоты Лота и раскладку кадра заполняет lib/lot-view.ts, как
+  // на витрине; цена и покупка — в кнопке, модалка покупки на странице
+  // (BuyModal). Одно представление Лота на всех поверхностях (docs/adr/0009).
   import { live, type LotState } from '@/lib/live';
   import { fillLot } from '@/lib/lot-view';
 
@@ -131,6 +131,9 @@ const base = import.meta.env.BASE_URL;
   const note = document.querySelector('[data-random-state]');
   const status = document.querySelector('[data-random-status]');
   const PICK = 4;
+
+  // Срез главной — до первого чтения: иначе снапшот не увидит режим.
+  live.useRandomLots(PICK);
 
   /** Баланс — зеркало гейта: не хватает — кнопки карточек гаснут. */
   let myBalance: number | null = null;
@@ -169,17 +172,12 @@ const base = import.meta.env.BASE_URL;
     }
   }
 
-  /** Выбрать случайные лоты и нарисовать их карточками LotCard. */
-  function paintCards(states: ReadonlyMap<string, LotState>): void {
+  /** Нарисовать выборку карточками LotCard: порядок — как отдала БД. */
+  function paintCards(states: readonly LotState[]): void {
     if (!(slot instanceof HTMLElement) || !(tpl instanceof HTMLTemplateElement)) return;
-    const pool = [...states.values()];
-    for (let i = pool.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [pool[i], pool[j]] = [pool[j] as (typeof pool)[number], pool[i] as (typeof pool)[number]];
-    }
     const cards: HTMLElement[] = [];
     rendered = new Map();
-    for (const st of pool.slice(0, PICK)) {
+    for (const st of states.slice(0, PICK)) {
       const fresh = tpl.content.firstElementChild;
       if (!(fresh instanceof HTMLElement)) break;
       const card = fresh.cloneNode(true) as HTMLElement;
@@ -190,14 +188,14 @@ const base = import.meta.env.BASE_URL;
     slot.replaceChildren(...cards);
   }
 
-  /** Отрисовка из снапшота: первый непустой каталог — выбор, дальше перекраска. */
+  /** Отрисовка из снапшота: первая непустая выборка — карточки, дальше перекраска. */
   function render(): void {
     if (!(slot instanceof HTMLElement)) return;
     // Ответа БД ещё не было — скелетоны честнее «пусто/не загрузилось».
     if (!live.catalogKnown()) return;
-    const states = live.catalog();
+    const states = live.catalogWindow();
     myBalance = live.balance();
-    if (!painted && states.size > 0) {
+    if (!painted && states.length > 0) {
       paintCards(states);
       painted = true;
     } else if (painted) {

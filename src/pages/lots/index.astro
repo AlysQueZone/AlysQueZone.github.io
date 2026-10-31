@@ -103,7 +103,7 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
   /** Состояние подгрузки: ошибка блокирует авто-повтор до клика по кнопке. */
   let moreState: 'idle' | 'loading' | 'error' = 'idle';
 
-  // Режим страниц — до первого чтения: остальные страницы читают каталог целиком.
+  // Срез витрины — страницы; режим фиксируется до первого чтения.
   live.useCatalogPages(CATALOG_PAGE_SIZE);
   live.trackMyLots();
 

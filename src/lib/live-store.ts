@@ -4,13 +4,16 @@
  * Решение — docs/adr/0003: живой транспорт и читатели —
  * в src/lib/live.ts; здесь состояние и события:
  *
- * - синхронные чтения снапшота: uid, баланс, каталог, окно витрины, «мои
- *   приветы», один лот;
- * - витрина может листаться страницами (`useCatalogPages`): снапшот хранит
- *   загруженное окно, живой тик обновляет только его, а лот снаружи окна
- *   ждёт своей страницы (механика — src/lib/catalog-page.ts); «Мои приветы»
- *   в этом режиме — отдельный полный список владельца (`trackMyLots`), не
- *   фильтр окна;
+ * - синхронные чтения снапшота: uid, баланс, каталог, окно, «мои приветы»,
+ *   один лот;
+ * - каталог читается срезом страницы, а не целиком: витрина листается
+ *   страницами (`useCatalogPages`), главная просит случайную выборку
+ *   (`useRandomLots`), страница лота — один лот (`useLot`). Снапшот хранит
+ *   загруженное окно (страницы или выборку), живой тик обновляет только его,
+ *   а лот снаружи окна ждёт своей страницы (механика —
+ *   src/lib/catalog-page.ts); «Мои приветы» — отдельный полный список
+ *   владельца (`trackMyLots`), не фильтр окна: колоколу нужны все свои лоты,
+ *   даже вне среза;
  * - одна подписка на изменения (uid / баланс / каталог / мои приветы / покупка /
  *   перекуп / сделки / синк) — поверхности читают снапшот и слушают;
  * - коалесцинг триггеров: одновременные перечитывания схлопываются в одно,
@@ -62,6 +65,22 @@ export interface CatalogPageRead {
   hasMore: boolean;
 }
 
+/** Ответ случайной выборки: строки в том порядке, в каком их отдала БД. */
+export interface CatalogListRead {
+  ok: boolean;
+  states: LotState[];
+}
+
+/**
+ * Срез каталога: что именно читает поверхность. Полного каталога нет — каждая
+ * страница объявляет свой срез до первого чтения.
+ */
+type CatalogScope =
+  | { kind: 'none' }
+  | { kind: 'pages'; size: number }
+  | { kind: 'random'; limit: number }
+  | { kind: 'slugs'; slugs: readonly string[] };
+
 /** Итог подгрузки страницы витрины: ок — дописана, end — больше нет, error — БД/сеть. */
 export type CatalogMoreResult = 'ok' | 'end' | 'error';
 
@@ -77,7 +96,8 @@ export interface LiveReaders {
   readUid(): Promise<string | null>;
   /** Свой баланс; null — не прочитался / строки нет / гость. */
   readBalance(uid: string): Promise<number | null>;
-  readCatalog(uid: string | null): Promise<CatalogRead>;
+  /** Случайная выборка для главной: строки в порядке, в каком их отдала БД. */
+  readRandomLots(uid: string | null, limit: number): Promise<CatalogListRead>;
   /**
    * Одна страница витрины после курсора (null — первая), порядок — цена, slug.
    * `hasMore` считает читатель: строк запрашивается на одну больше.
@@ -137,12 +157,16 @@ export interface LiveStore {
   /** Был ли ответ по балансу для текущего uid (для честного прочерка без мигания). */
   balanceKnown(): boolean;
   catalog(): ReadonlyMap<string, LotState>;
-  /** Окно витрины в порядке показа: загруженные страницы (или весь каталог). */
+  /** Окно в порядке показа: загруженные страницы витрины или случайная выборка. */
   catalogWindow(): readonly LotState[];
-  /** Есть ли ещё страница витрины (в полном режиме — нет). */
+  /** Есть ли ещё страница витрины (только в режиме страниц). */
   catalogHasMore(): boolean;
   /** Включить страницы витрины; размер — до первого чтения, иначе no-op. */
   useCatalogPages(pageSize?: number): void;
+  /** Главная: случайная выборка N лотов; режим — до первого чтения, иначе no-op. */
+  useRandomLots(count: number): void;
+  /** Страница лота: один лот по slug; режим — до первого чтения, иначе no-op. */
+  useLot(slug: string): void;
   /** Догрузить следующую страницу витрины (общая дорожка на всех вызывающих). */
   loadCatalogPage(): Promise<CatalogMoreResult>;
   /** Дочитать страницы, пока лот не окажется в окне (возврат к покупке). */
@@ -204,10 +228,9 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
   let catalogKnown = false;
   let started = false;
 
-  /** Витрина страницами: режим включается поверхностью до первого чтения. */
-  let catalogPaged = false;
-  let catalogPageSize = CATALOG_PAGE_SIZE;
-  /** Окно — slug загруженных страниц в порядке показа (значения — в catalogValue). */
+  /** Срез каталога выбирает поверхность до первого чтения; по умолчанию — никакой. */
+  let catalogScope: CatalogScope = { kind: 'none' };
+  /** Окно — slug загруженных страниц/выборки в порядке показа (значения — в catalogValue). */
   let catalogWindowSlugs: string[] = [];
   let catalogNextCursor: CatalogCursor | null = null;
   let catalogHasMore = false;
@@ -370,32 +393,19 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
   }
 
   /**
-   * Применить прочитанный каталог: «мой» флаг — под текущий uid (ответ мог
-   * прийти уже после смены сессии), дифф владельца даёт событие перекупа
-   * (только при неизменном uid — смена сессии не сделка), свежесть — флаг.
-   * `updateHealth=false` — одиночное чтение (refreshLot): строку вливаем,
-   * но здоровье всего каталога им не подменяем.
+   * Влить одиночное чтение (refreshLot): «мой» флаг — под текущий uid (ответ
+   * мог прийти уже после смены сессии), дифф владельца даёт событие перекупа
+   * (только при неизменном uid — смена сессии не сделка). Здоровье каталога
+   * одиночным чтением не подменяем — его держит чтение среза.
    */
-  function applyCatalog(
-    next: ReadonlyMap<string, LotState>,
-    ok: boolean,
-    updateHealth = true
-  ): void {
+  function applyLotRead(next: ReadonlyMap<string, LotState>): void {
     const prev = catalogValue;
     const { merged, changed } = mergeCatalog(withMine(next, uidValue));
     const outbids = collectOutbids(prev, merged, changed);
 
     catalogValue = merged;
-    // В режиме страниц значения окна берутся из карты — порядок не трогаем.
-    if (updateHealth) {
-      const freshChanged = ok !== catalogFresh;
-      catalogFresh = ok;
-      const wasKnown = catalogKnown;
-      catalogKnown = true;
-      if (changed.size > 0 || freshChanged || !wasKnown) {
-        emit({ kind: 'catalog', changed, fresh: ok });
-      }
-    } else if (catalogKnown && changed.size > 0) {
+    // Порядок окна не трогаем: значения берутся из карты.
+    if (catalogKnown && changed.size > 0) {
       emit({ kind: 'catalog', changed, fresh: catalogFresh });
     }
     // Перекуп — после каталога: кнопкам возврата уже видна свежая N.
@@ -508,10 +518,11 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
   }
 
   /**
-   * Применить страницу витрины: `start` — первая (окно с нуля), иначе дописать.
-   * Дубли по slug не задваиваются; «есть ещё» считает читатель (строка сверху).
+   * Применить срез каталога: `start` — первый (окно с нуля), иначе дописать
+   * страницу. Дубли по slug не задваиваются; «есть ещё» считает читатель
+   * (строка сверху).
    */
-  function applyPage(states: readonly LotState[], start: boolean, hasMore: boolean): void {
+  function applySlice(states: readonly LotState[], start: boolean, hasMore: boolean): void {
     const wasKnown = catalogKnown;
     const freshChanged = !catalogFresh;
     const prev = catalogValue;
@@ -541,6 +552,8 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
 
   /** Одна страница витрины: общая дорожка для старта, скролла и ensureLot. */
   function loadCatalogPageNow(): Promise<CatalogMoreResult> {
+    const scope = catalogScope;
+    if (scope.kind !== 'pages') return Promise.resolve('end');
     if (catalogPageInFlight) return catalogPageInFlight;
     const start = catalogWindowSlugs.length === 0;
     if (!start && !catalogHasMore) return Promise.resolve('end');
@@ -550,7 +563,7 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
         read = await readers.readCatalogPage(
           uidValue,
           start ? null : catalogNextCursor,
-          catalogPageSize
+          scope.size
         );
       } catch {
         read = { ok: false, states: [], hasMore: false };
@@ -559,7 +572,7 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
         markCatalogUnavailable();
         return 'error';
       }
-      applyPage(read.states, start, read.hasMore);
+      applySlice(read.states, start, read.hasMore);
       return read.states.length === 0 ? 'end' : 'ok';
     })();
     catalogPageInFlight = run;
@@ -570,8 +583,50 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
   }
 
   /**
+   * Первый срез главной или страницы лота: случайная выборка N (порядок — как
+   * отдала БД) или один лот по slug. Пустая выборка/нет строки — честный
+   * «пусто», отказ БД — markCatalogUnavailable (страницы различают эти случаи).
+   */
+  async function loadSelectionNow(): Promise<void> {
+    const scope = catalogScope;
+    if (scope.kind === 'random') {
+      let read: CatalogListRead;
+      try {
+        read = await readers.readRandomLots(uidValue, scope.limit);
+      } catch {
+        read = { ok: false, states: [] };
+      }
+      if (!read.ok) {
+        markCatalogUnavailable();
+        return;
+      }
+      applySlice(read.states, true, false);
+      return;
+    }
+    if (scope.kind !== 'slugs') return;
+
+    let read: CatalogRead;
+    try {
+      read = await readers.readCatalogBySlugs(uidValue, scope.slugs);
+    } catch {
+      read = { ok: false, states: new Map() };
+    }
+    if (!read.ok) {
+      markCatalogUnavailable();
+      return;
+    }
+    const states: LotState[] = [];
+    for (const slug of scope.slugs) {
+      const st = read.states.get(slug);
+      if (st) states.push(st);
+    }
+    applySlice(states, true, false);
+  }
+
+  /**
    * Освежить загруженное окно одним запросом по slug: цена/владелец, удалённые
-   * уходят. Новые лоты из Realtime — только если по цене попадают в окно.
+   * уходят. В режиме страниц новый лот из Realtime вставляется, только если по
+   * цене попадает в окно; выборка главной новых лотов не добирает.
    */
   async function refreshWindowNow(): Promise<void> {
     const windowSlugs = [...catalogWindowSlugs];
@@ -702,7 +757,7 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
     const find = (): LotState | null =>
       catalogWindowSlugs.includes(slug) ? (catalogValue.get(slug) ?? null) : null;
     if (find()) return find();
-    if (!catalogPaged) return refreshLotNow(slug);
+    if (catalogScope.kind !== 'pages') return refreshLotNow(slug);
     // Лота может уже не быть (старый ?buy=): одно чтение дешевле, чем
     // пролистать весь каталог впустую.
     if (!(await refreshLotNow(slug))) return null;
@@ -722,18 +777,13 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
   }
 
   async function readCatalogNow(): Promise<void> {
-    if (!catalogPaged) {
-      let read: CatalogRead;
-      try {
-        read = await readers.readCatalog(uidValue);
-      } catch {
-        read = { ok: false, states: catalogValue };
-      }
-      applyCatalog(read.ok ? read.states : catalogValue, read.ok);
-      return;
-    }
+    const scope = catalogScope;
+    if (scope.kind === 'none') return;
+
+    // Окно пусто — первое чтение среза (или повтор после отказа БД).
     if (catalogWindowSlugs.length === 0) {
-      await loadCatalogPageNow();
+      if (scope.kind === 'pages') await loadCatalogPageNow();
+      else await loadSelectionNow();
       return;
     }
     if (catalogPageInFlight) {
@@ -757,10 +807,10 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
     if (read.state) next.set(slug, read.state);
     else {
       next.delete(slug);
-      if (catalogPaged) catalogWindowSlugs = catalogWindowSlugs.filter((s) => s !== slug);
+      catalogWindowSlugs = catalogWindowSlugs.filter((s) => s !== slug);
     }
-    // Одиночное чтение не выдаёт весь каталог за свежий (флаг здоровья — каталога).
-    applyCatalog(next, true, false);
+    // Одиночное чтение не выдаёт срез за свежий (флаг здоровья — у среза).
+    applyLotRead(next);
     return read.state;
   }
 
@@ -816,10 +866,15 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
     }
   }
 
-  /** Окно в порядке показа: в режиме страниц — загруженные, иначе весь каталог. */
+  /** Окно в порядке показа: загруженные страницы витрины или случайная выборка. */
   function catalogWindow(): readonly LotState[] {
-    if (!catalogPaged) return [...catalogValue.values()];
     return windowStatesOf(catalogValue);
+  }
+
+  /** Срез фиксируется до первого чтения: позже смена — no-op. */
+  function setScope(scope: CatalogScope): void {
+    if (started || catalogKnown) return;
+    catalogScope = scope;
   }
 
   return {
@@ -828,20 +883,27 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
     balanceKnown: () => balanceTried,
     catalog: () => catalogValue,
     catalogWindow,
-    catalogHasMore: () => catalogPaged && catalogHasMore,
+    catalogHasMore: () => catalogScope.kind === 'pages' && catalogHasMore,
     lot: (slug) => catalogValue.get(slug) ?? myLotsValue.get(slug) ?? null,
     catalogKnown: () => catalogKnown,
     catalogOk: () => catalogFresh,
 
     useCatalogPages(pageSize = CATALOG_PAGE_SIZE) {
-      // Режим выбирается до первого чтения: окно и полный каталог — разные снапшоты.
-      if (started || catalogKnown) return;
-      catalogPaged = true;
-      catalogPageSize = Math.max(1, Math.floor(pageSize));
+      setScope({ kind: 'pages', size: Math.max(1, Math.floor(pageSize)) });
+    },
+
+    useRandomLots(count) {
+      setScope({ kind: 'random', limit: Math.max(1, Math.floor(count)) });
+    },
+
+    useLot(slug) {
+      const clean = slug.trim();
+      if (clean.length === 0) return;
+      setScope({ kind: 'slugs', slugs: [clean] });
     },
 
     loadCatalogPage() {
-      if (!catalogPaged) return Promise.resolve('end');
+      if (catalogScope.kind !== 'pages') return Promise.resolve('end');
       return loadCatalogPageNow();
     },
 
@@ -904,8 +966,9 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
     },
 
     reportLotsTick(payload) {
-      // Вставка в окно: запоминаем slug, границу окна решим при обновлении.
-      if (catalogPaged && payload.eventType === 'INSERT') {
+      // Вставка в окно витрины: запоминаем slug, границу окна решим при
+      // обновлении. Выборка главной новых лотов не добирает (ADR 0012).
+      if (catalogScope.kind === 'pages' && payload.eventType === 'INSERT') {
         const slug = (payload.new ?? {})['slug'];
         if (typeof slug === 'string' && slug.length > 0) catalogInsertSlugs.add(slug);
       }
