@@ -719,6 +719,67 @@ describe('createLiveStore', () => {
     expect(brokenStore.lot('lot-a')).toBeNull();
   });
 
+  it('выборка не перевыбирается, когда все выбранные лоты удалили', async () => {
+    const f = fakeReaders();
+    f.state.catalog.set('lot-a', lot({ slug: 'lot-a', price: 100 }));
+    f.state.catalog.set('lot-b', lot({ slug: 'lot-b', price: 200 }));
+    const store = createLiveStore(f.readers);
+    store.useRandomLots(2);
+    await store.start();
+    expect(f.calls.random).toBe(1);
+
+    f.state.catalog.clear();
+    await store.reportLotsTick({ eventType: 'DELETE', new: {} });
+    expect(store.catalogWindow()).toHaveLength(0);
+    expect(store.catalog().size).toBe(0);
+    expect(store.catalogKnown()).toBe(true);
+    expect(store.catalogOk()).toBe(true);
+
+    // Выбор один раз за загрузку: ни синк, ни новый лот не запускают перевыбор.
+    await store.sync();
+    await store.reportLotsTick({ eventType: 'INSERT', new: { slug: 'lot-new' } });
+    expect(f.calls.random).toBe(1);
+    expect(store.catalogWindow()).toHaveLength(0);
+    expect(store.catalog().has('lot-new')).toBe(false);
+  });
+
+  it('удалённый лот страницы не перечитывается на каждом тике', async () => {
+    const f = fakeReaders();
+    f.state.catalog.set('lot-a', lot({ slug: 'lot-a' }));
+    const store = createLiveStore(f.readers);
+    store.useLot('lot-a');
+    await store.start();
+    expect(f.calls.bySlugs).toBe(1);
+
+    f.state.catalog.clear();
+    await store.reportLotsTick({ eventType: 'DELETE', new: {} });
+    expect(store.lot('lot-a')).toBeNull();
+    expect(store.catalogKnown()).toBe(true);
+    expect(store.catalogOk()).toBe(true);
+    expect(f.calls.bySlugs).toBe(2);
+
+    await store.reportLotsTick({ eventType: 'UPDATE', new: { slug: 'lot-a' } });
+    await store.sync();
+    expect(f.calls.bySlugs).toBe(2);
+  });
+
+  it('отказ первого чтения лота повторяется следующим синком', async () => {
+    const f = fakeReaders();
+    f.state.catalog.set('lot-a', lot({ slug: 'lot-a' }));
+    f.fail.catalog = true;
+    const store = createLiveStore(f.readers);
+    store.useLot('lot-a');
+    await store.start();
+    expect(store.catalogOk()).toBe(false);
+    expect(f.calls.bySlugs).toBe(1);
+
+    f.fail.catalog = false;
+    await store.sync();
+    expect(store.lot('lot-a')).not.toBeNull();
+    expect(store.catalogOk()).toBe(true);
+    expect(f.calls.bySlugs).toBe(2);
+  });
+
   it('колокол на выборке: «Мои приветы» дают перекуп вне окна', async () => {
     const f = fakeReaders();
     f.state.uid = 'u1';

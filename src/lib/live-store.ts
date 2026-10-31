@@ -79,7 +79,7 @@ type CatalogScope =
   | { kind: 'none' }
   | { kind: 'pages'; size: number }
   | { kind: 'random'; limit: number }
-  | { kind: 'slugs'; slugs: readonly string[] };
+  | { kind: 'lot'; slug: string };
 
 /** Итог подгрузки страницы витрины: ок — дописана, end — больше нет, error — БД/сеть. */
 export type CatalogMoreResult = 'ok' | 'end' | 'error';
@@ -230,6 +230,8 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
 
   /** Срез каталога выбирает поверхность до первого чтения; по умолчанию — никакой. */
   let catalogScope: CatalogScope = { kind: 'none' };
+  /** Случайная выборка/лот прочитаны: пустое окно — удаление, не первый старт. */
+  let catalogSelectionLoaded = false;
   /** Окно — slug загруженных страниц/выборки в порядке показа (значения — в catalogValue). */
   let catalogWindowSlugs: string[] = [];
   let catalogNextCursor: CatalogCursor | null = null;
@@ -601,13 +603,14 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
         return;
       }
       applySlice(read.states, true, false);
+      catalogSelectionLoaded = true;
       return;
     }
-    if (scope.kind !== 'slugs') return;
+    if (scope.kind !== 'lot') return;
 
     let read: CatalogRead;
     try {
-      read = await readers.readCatalogBySlugs(uidValue, scope.slugs);
+      read = await readers.readCatalogBySlugs(uidValue, [scope.slug]);
     } catch {
       read = { ok: false, states: new Map() };
     }
@@ -615,12 +618,9 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
       markCatalogUnavailable();
       return;
     }
-    const states: LotState[] = [];
-    for (const slug of scope.slugs) {
-      const st = read.states.get(slug);
-      if (st) states.push(st);
-    }
-    applySlice(states, true, false);
+    const st = read.states.get(scope.slug);
+    applySlice(st ? [st] : [], true, false);
+    catalogSelectionLoaded = true;
   }
 
   /**
@@ -780,15 +780,25 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
     const scope = catalogScope;
     if (scope.kind === 'none') return;
 
-    // Окно пусто — первое чтение среза (или повтор после отказа БД).
-    if (catalogWindowSlugs.length === 0) {
-      if (scope.kind === 'pages') await loadCatalogPageNow();
-      else await loadSelectionNow();
+    if (scope.kind === 'pages') {
+      // Пустое окно витрины — первая страница (или повтор после отказа БД).
+      if (catalogWindowSlugs.length === 0) {
+        await loadCatalogPageNow();
+        return;
+      }
+      if (catalogPageInFlight) {
+        await catalogPageInFlight;
+        await refreshWindowNow();
+        return;
+      }
+      await refreshWindowNow();
       return;
     }
-    if (catalogPageInFlight) {
-      await catalogPageInFlight;
-      await refreshWindowNow();
+
+    // Выборка/лот: пустое окно после первого чтения — это удалённые лоты, а не
+    // повод перевыбрать (ADR 0012: выбор один раз за загрузку).
+    if (!catalogSelectionLoaded) {
+      await loadSelectionNow();
       return;
     }
     await refreshWindowNow();
@@ -875,6 +885,7 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
   function setScope(scope: CatalogScope): void {
     if (started || catalogKnown) return;
     catalogScope = scope;
+    catalogSelectionLoaded = false;
   }
 
   return {
@@ -899,7 +910,7 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
     useLot(slug) {
       const clean = slug.trim();
       if (clean.length === 0) return;
-      setScope({ kind: 'slugs', slugs: [clean] });
+      setScope({ kind: 'lot', slug: clean });
     },
 
     loadCatalogPage() {

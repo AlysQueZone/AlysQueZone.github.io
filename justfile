@@ -235,7 +235,21 @@ run-local: db-up db-vault
 # Push/deploy идут от аккаунта-владельца AlysQueZone (у активного может не
 # быть прав); прежний активный аккаунт возвращается в конце даже при ошибке.
 
-# Релиз: push main (миграции Supabase) + deploy gh-pages
+# Дождаться применения всех локальных миграций Supabase после push в main
+wait-migrations:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for _ in $(seq 1 60); do
+      if pending=$(./node_modules/.bin/supabase migration list --linked 2>/dev/null \
+        | python3 -c 'import json,sys; print(sum(1 for m in json.load(sys.stdin)["migrations"] if m["local"] and not m["remote"]))'); then
+        [ "$pending" = "0" ] && exit 0
+      fi
+      sleep 2
+    done
+    echo 'Supabase не применил миграции за 120 с — проверь очередь миграций' >&2
+    exit 1
+
+# Релиз: push main, дождаться миграций Supabase, затем deploy gh-pages
 release:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -243,6 +257,7 @@ release:
     trap 'gh auth switch --user "$prev" >/dev/null 2>&1 || true' EXIT
     gh auth switch --user AlysQueZone
     git push origin main
+    just wait-migrations
     pnpm gh-deploy
 
 # -------------------------------------
