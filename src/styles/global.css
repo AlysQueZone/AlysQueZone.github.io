@@ -6,7 +6,7 @@
      мем-тексты) пикселем не набираем — нечитаемо. */
   --font-display: 'Press Start 2P', 'Rubik', system-ui, sans-serif;
   --font-sans: 'Rubik', system-ui, -apple-system, sans-serif;
-  /* D1 «Маджента CTA»: палитра — design-system/alysquezone/MASTER.md. */
+  /* D1 «Маджента CTA»: палитра — DESIGN.md. */
   --color-void: #fff6bf;
   --color-panel: #ffe6ac;
   --color-bar: #ffe4a6;

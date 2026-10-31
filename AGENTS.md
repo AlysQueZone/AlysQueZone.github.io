@@ -23,7 +23,7 @@
 - Поповер у кнопки — чистая геометрия (`src/lib/popover.ts`, с тестом): левое выравнивание, поля вьюпорта, потолок высоты; состояние, aria и Escape — у поверхности (колокол — `outbid-notice.ts`, клавишу уступает открытому окну).
 - Карточка Лота — одно представление (`src/lib/lot-view.ts`): слоты и раскладка кадра; поверхность даёт корень и состояние, свои поля (title документа, автор, сортировка) правит сама — `docs/adr/0009`.
 - Звуки колеса — контент: список в `content/sounds.toml`, рантайм-проекция — `public.gamba_sounds` (`just sounds-sync`), фолбэк сборки — генерат (`just sounds-gen`); имена файлов в коде не живут — `docs/adr/0011`.
-- Цвет/визуальный стиль — один источник: палитра D1 в `design-system/alysquezone/MASTER.md`, токены — `@theme` в `src/styles/global.css`; hex в коде не хардкодим — только в `@theme` и в декоративных наборах из MASTER.md.
+- Цвет/визуальный стиль — один источник: палитра D1 в `DESIGN.md`, токены — `@theme` в `src/styles/global.css`; hex в коде не хардкодим — только в `@theme` и в декоративных наборах из `DESIGN.md`.
 - Контраст — часть стиля: muted-текст только `text-mist` (без `/60…80`), акцентный текст — `*-deep` или затемнённый токен (`melon`, `pivko`); проверка — `src/lib/design-tokens.test.ts` в `just test`.
 - Свои скиллы (`.agents/skills/alysque-*`) — в гите и в зоне агента: поддерживать актуальность, править по своему усмотрению; при правке — по скиллу `writing-for-agents`. Чужие (`npx skills`) не в гите и не в зоне агента.
 
@@ -53,7 +53,7 @@
 - Preview-проверка сборки (`preview` + `agent-browser`), гейт перед релизом → `docs/agents/shipping.md`.
 - Supabase-схема / RLS / миграции / отладка → `docs/agents/supabase.md`.
 - Стиль / импорты / рендер / тесты / SQL-гайд / `just` → `docs/agents/code-style.md`.
-- Цвета / токены / типографика / компоненты → `design-system/alysquezone/MASTER.md`.
+- Цвета / токены / типографика / компоненты → `DESIGN.md`.
 - Гамба-звуки / комиссия / рост цены / награда за привет / владение лотом → `docs/agents/economy.md`.
 - Новый звук колеса (`just sound-add`, манифест `content/sounds.toml`) → скилл `alysque-sound`.
 - Эмоуты / чат VOD / мемы / пасты / стата → `docs/agents/twitch-sources.md`.

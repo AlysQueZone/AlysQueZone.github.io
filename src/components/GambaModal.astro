@@ -122,7 +122,7 @@ const POOL_URLS: Record<SoundPool, string> = {
   } from '@/lib/gamba-sounds';
   import { createModal } from '@/lib/modal';
 
-  /** Токены палитры (design-system/alysquezone/MASTER.md) — canvas их не видит,
+  /** Токены палитры (DESIGN.md) — canvas их не видит,
       поэтому читаем значения из :root один раз. */
   const cssVar = (name: string): string =>
     getComputedStyle(document.documentElement).getPropertyValue(name).trim();
