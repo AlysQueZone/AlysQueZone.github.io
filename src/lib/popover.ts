@@ -19,11 +19,6 @@ export interface AnchorRect {
   left: number;
 }
 
-export interface PanelSize {
-  /** Ширина панели после CSS: `max-width` на узком экране уже сработал. */
-  width: number;
-}
-
 export interface ViewportSize {
   width: number;
   height: number;
@@ -48,10 +43,10 @@ function clamp(value: number, min: number, max: number): number {
 
 export function placePanel(
   anchor: AnchorRect,
-  panel: PanelSize,
+  panelWidth: number,
   viewport: ViewportSize
 ): PanelPlacement {
-  const width = Math.min(panel.width, Math.max(0, viewport.width - POPOVER_MARGIN * 2));
+  const width = Math.min(panelWidth, Math.max(0, viewport.width - POPOVER_MARGIN * 2));
   const left = clamp(anchor.left, POPOVER_MARGIN, viewport.width - width - POPOVER_MARGIN);
   const top = anchor.bottom + POPOVER_GAP;
   const room = viewport.height - top - POPOVER_MARGIN;

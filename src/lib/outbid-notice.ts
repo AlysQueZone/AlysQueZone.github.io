@@ -117,11 +117,10 @@ export function initOutbidNotice(): void {
    *  читаем при каждом открытии: на узком экране шапка переносится. */
   function anchorPanel(): void {
     if (!bellPanel || !bellButton) return;
-    const placement = placePanel(
-      bellButton.getBoundingClientRect(),
-      { width: bellPanel.offsetWidth },
-      { width: window.innerWidth, height: window.innerHeight }
-    );
+    const placement = placePanel(bellButton.getBoundingClientRect(), bellPanel.offsetWidth, {
+      width: window.innerWidth,
+      height: window.innerHeight,
+    });
     bellPanel.style.left = `${placement.left}px`;
     bellPanel.style.top = `${placement.top}px`;
     bellPanel.style.maxHeight = `${placement.maxHeight}px`;
