@@ -4,21 +4,27 @@
  * Единственный владелец живых данных: `sb.channel()` и window-шина
  * (`alysque:balance`/`alysque:bought`) вне этого модуля не живут
  * (docs/adr/0003). Здесь — Supabase-транспорт, чтения (uid, баланс, каталог,
- * один Лот) и триггеры перезапроса (тик таблиц, фокус/возврат, смена сессии,
- * своя покупка); состояние, коалесцинг и доменные события — в чистом ядре
- * src/lib/live-store.ts.
+ * страница витрины, мои приветы, один Лот) и триггеры перезапроса (тик таблиц,
+ * фокус/возврат, смена сессии, своя покупка); состояние, коалесцинг и доменные
+ * события — в чистом ядре src/lib/live-store.ts.
  *
- * Поверхности читают снапшот синхронно (`live.uid()`, `live.catalog()`, …)
- * и подписываются на изменения (`live.subscribe`); денежные гейты (гамба,
- * покупка) просят явную свежесть (`live.refreshBalance()`,
- * `live.refreshLot(slug)`). Модуль сам поднимается на первом subscribe /
- * refresh / report — отдельного «старта» у поверхностей нет.
+ * Поверхности читают снапшот синхронно (`live.uid()`, `live.balance()`,
+ * `live.catalog()`, `live.lot(slug)`, …) и подписываются на изменения
+ * (`live.subscribe`); денежные гейты (гамба, покупка) просят явную свежесть
+ * (`live.refreshBalance()`, `live.refreshLot(slug)`). Витрина `/lots/`
+ * включает страницы (`live.useCatalogPages`) и «Мои приветы»
+ * (`live.trackMyLots`); остальные страницы читают каталог целиком
+ * (docs/adr/0012). Модуль сам поднимается на первом subscribe / refresh /
+ * report — отдельного «старта» у поверхностей нет.
  */
 import { getSupabase, withAuthRetry } from './supabase';
+import type { CatalogCursor } from './catalog-page';
 import { createLiveRegistry, type LivePayload, type LiveTransport } from './live-core';
 import {
   createLiveStore,
   normalizeNextPrice,
+  type CatalogMoreResult,
+  type CatalogPageRead,
   type CatalogRead,
   type LiveChange,
   type LiveReaders,
@@ -71,6 +77,17 @@ function fillCatalog(rows: unknown, uid: string | null): Map<string, LotState> {
   return map;
 }
 
+/** Строки страницы в порядке БД (цена, slug): курсор и окно держатся за него. */
+function fillCatalogList(rows: unknown, uid: string | null): LotState[] {
+  if (!Array.isArray(rows)) return [];
+  const list: LotState[] = [];
+  for (const row of rows as LotRow[]) {
+    const state = toLotState(row, uid);
+    if (state) list.push(state);
+  }
+  return list;
+}
+
 /** Баланс из значения строки БД: конечное ≥ 0, иначе null (деньги целы). */
 function normalizeBalance(value: unknown): number | null {
   const n = typeof value === 'number' ? value : Number(value);
@@ -81,6 +98,12 @@ const VIEW = 'lots_with_next_price';
 const VIEW_COLUMNS =
   'slug,title,video_url,price,owner_login,owner_uid,suggested_by_login,next_price';
 const TABLE_COLUMNS = 'slug,title,video_url,price,owner_login,owner_uid,suggested_by_login';
+
+/**
+ * Сколько slug уходит в один `.in(...)`: длинный список не должен упираться
+ * в предел длины URL. Окно витрины обычно укладывается в один запрос.
+ */
+const SLUGS_CHUNK = 100;
 
 /** Читатели живых данных поверх Supabase (ядро зовёт их, DOM/сети не знает). */
 function supabaseReaders(): LiveReaders {
@@ -130,6 +153,127 @@ function supabaseReaders(): LiveReaders {
       }
       try {
         const fromTable = await withAuthRetry(() => sb.from('lots').select(TABLE_COLUMNS));
+        if (fromTable.error || !Array.isArray(fromTable.data)) return { ok: false, states: empty };
+        return { ok: true, states: fillCatalog(fromTable.data, uid) };
+      } catch {
+        return { ok: false, states: empty };
+      }
+    },
+
+    /**
+     * Одна страница витрины после курсора (null — первая). Keyset по паре
+     * `(price, slug)`: цена меняется от перекупов, slug добивает ничью и
+     * держит границу страниц на месте (offset бы сдвинулся живой вставкой).
+     * Вью отсутствует — фолбэк на таблицу, как у полного каталога.
+     */
+    async readCatalogPage(
+      uid: string | null,
+      cursor: CatalogCursor | null,
+      limit: number
+    ): Promise<CatalogPageRead> {
+      const sb = getSupabase();
+      if (!sb) return { ok: false, states: [] };
+      const cap = Math.max(1, Math.floor(limit));
+      const read = (table: string, columns: string) => {
+        let query = sb
+          .from(table)
+          .select(columns)
+          .order('price', { ascending: true })
+          .order('slug', { ascending: true })
+          .limit(cap);
+        if (cursor) {
+          query = query.or(
+            `price.gt.${cursor.price},and(price.eq.${cursor.price},slug.gt.${cursor.slug})`
+          );
+        }
+        return query;
+      };
+      try {
+        const fromView = await withAuthRetry(() => read(VIEW, VIEW_COLUMNS));
+        if (!fromView.error && Array.isArray(fromView.data)) {
+          return { ok: true, states: fillCatalogList(fromView.data, uid) };
+        }
+      } catch {
+        // вью нет — фолбэк ниже
+      }
+      try {
+        const fromTable = await withAuthRetry(() => read('lots', TABLE_COLUMNS));
+        if (fromTable.error || !Array.isArray(fromTable.data)) return { ok: false, states: [] };
+        return { ok: true, states: fillCatalogList(fromTable.data, uid) };
+      } catch {
+        return { ok: false, states: [] };
+      }
+    },
+
+    /**
+     * Загруженное окно по slug: освежить цены/владельцев и узнать удалённые
+     * (строка не вернулась). Списки длинные — режем на пачки по `SLUGS_CHUNK`.
+     */
+    async readCatalogBySlugs(uid: string | null, slugs: readonly string[]): Promise<CatalogRead> {
+      const states = new Map<string, LotState>();
+      const sb = getSupabase();
+      if (!sb) return { ok: false, states };
+      const list = [...new Set(slugs)];
+      for (let i = 0; i < list.length; i += SLUGS_CHUNK) {
+        const chunk = list.slice(i, i + SLUGS_CHUNK);
+        try {
+          const fromView = await withAuthRetry(() =>
+            sb.from(VIEW).select(VIEW_COLUMNS).in('slug', chunk)
+          );
+          if (!fromView.error && Array.isArray(fromView.data)) {
+            for (const [slug, state] of fillCatalog(fromView.data, uid)) states.set(slug, state);
+            continue;
+          }
+        } catch {
+          // вью нет — фолбэк ниже
+        }
+        try {
+          const fromTable = await withAuthRetry(() =>
+            sb.from('lots').select(TABLE_COLUMNS).in('slug', chunk)
+          );
+          if (fromTable.error || !Array.isArray(fromTable.data)) {
+            return { ok: false, states: new Map() };
+          }
+          for (const [slug, state] of fillCatalog(fromTable.data, uid)) states.set(slug, state);
+        } catch {
+          return { ok: false, states: new Map() };
+        }
+      }
+      return { ok: true, states };
+    },
+
+    /**
+     * Все мои лоты: окно витрины может их не содержать, поэтому это отдельный
+     * полный запрос владельца (не фильтр загруженных страниц). Порядок — витрины.
+     */
+    async readMyLots(uid: string): Promise<CatalogRead> {
+      const empty = new Map<string, LotState>();
+      const sb = getSupabase();
+      if (!sb) return { ok: false, states: empty };
+      try {
+        const fromView = await withAuthRetry(() =>
+          sb
+            .from(VIEW)
+            .select(VIEW_COLUMNS)
+            .eq('owner_uid', uid)
+            .order('price', { ascending: true })
+            .order('slug', { ascending: true })
+        );
+        if (!fromView.error && Array.isArray(fromView.data)) {
+          return { ok: true, states: fillCatalog(fromView.data, uid) };
+        }
+      } catch {
+        // вью нет — фолбэк ниже
+      }
+      try {
+        const fromTable = await withAuthRetry(() =>
+          sb
+            .from('lots')
+            .select(TABLE_COLUMNS)
+            .eq('owner_uid', uid)
+            .order('price', { ascending: true })
+            .order('slug', { ascending: true })
+        );
         if (fromTable.error || !Array.isArray(fromTable.data)) return { ok: false, states: empty };
         return { ok: true, states: fillCatalog(fromTable.data, uid) };
       } catch {
@@ -243,11 +387,14 @@ function ensureWired(): void {
   });
 
   // Тик лотов — каталог и цены (вью в Realtime-публикацию не входит, поэтому
-  // по событию перечитываем); сделка — сигнал маркизе.
-  registry.subscribe({ table: 'lots', event: '*' }, () => {
-    void store.refreshCatalog();
+  // по событию перечитываем); payload нужен окну витрины для новых лотов.
+  registry.subscribe({ table: 'lots', event: '*' }, (payload) => {
+    void store.reportLotsTick(payload);
   });
-  registry.subscribe({ table: 'purchases', event: 'INSERT' }, () => store.reportDeal());
+  registry.subscribe(
+    { table: 'purchases', event: 'INSERT' },
+    (payload) => void store.reportDeal(payload)
+  );
 
   // Триггеры перезапроса — у модуля: возврат на вкладку и фокус — один синк.
   if (typeof document !== 'undefined') {
@@ -282,9 +429,41 @@ export const live = {
   balance: (): number | null => store.balance(),
   balanceKnown: (): boolean => store.balanceKnown(),
   catalog: (): ReadonlyMap<string, LotState> => store.catalog(),
+  catalogWindow: (): readonly LotState[] => store.catalogWindow(),
+  catalogHasMore: (): boolean => store.catalogHasMore(),
   lot: (slug: string): LotState | null => store.lot(slug),
   catalogKnown: (): boolean => store.catalogKnown(),
   catalogOk: (): boolean => store.catalogOk(),
+  myLots: (): readonly LotState[] => store.myLots(),
+  myLotsKnown: (): boolean => store.myLotsKnown(),
+
+  /**
+   * Витрина листается страницами: до первого чтения. Вызывать на /lots/
+   * до подписки — главная и страница лота читают каталог целиком, как раньше.
+   */
+  useCatalogPages(pageSize?: number): void {
+    // Режим — до ensureWired: иначе первое чтение может стартовать полным.
+    store.useCatalogPages(pageSize);
+    ensureWired();
+  },
+
+  /** Догрузить следующую страницу витрины (общая дорожка на всех вызывающих). */
+  loadCatalogPage(): Promise<CatalogMoreResult> {
+    ensureWired();
+    return store.loadCatalogPage();
+  },
+
+  /** Дочитать страницы, пока лот не окажется в окне (возврат к покупке). */
+  ensureCatalogLot(slug: string): Promise<LotState | null> {
+    ensureWired();
+    return store.ensureCatalogLot(slug);
+  },
+
+  /** «Мои приветы» полным списком владельца — включает отдельный запрос. */
+  trackMyLots(): void {
+    store.trackMyLots();
+    ensureWired();
+  },
 
   subscribe(cb: (change: LiveChange) => void): () => void {
     ensureWired();

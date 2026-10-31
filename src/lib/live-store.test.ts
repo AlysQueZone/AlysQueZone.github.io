@@ -6,6 +6,7 @@
  * швы, из-за которых снапшот вынесен из страниц.
  */
 import { describe, expect, it } from 'vitest';
+import { compareCatalog, type CatalogKey } from './catalog-page';
 import {
   createLiveStore,
   type LiveChange,
@@ -44,7 +45,7 @@ function deferred(): Deferred {
 
 interface FakeReaders {
   readers: LiveReaders;
-  calls: { uid: number; balance: number; catalog: number; lot: number };
+  calls: { uid: number; balance: number; catalog: number; lot: number; page: number; mine: number };
   state: {
     uid: string | null;
     balance: number | null;
@@ -59,7 +60,7 @@ interface FakeReaders {
 }
 
 function fakeReaders(): FakeReaders {
-  const calls = { uid: 0, balance: 0, catalog: 0, lot: 0 };
+  const calls = { uid: 0, balance: 0, catalog: 0, lot: 0, page: 0, mine: 0 };
   const state = {
     uid: null as string | null,
     balance: null as number | null,
@@ -69,6 +70,10 @@ function fakeReaders(): FakeReaders {
   const fail = { catalog: false, balance: false };
   let gate: Promise<void> | null = null;
   let balanceGate: Promise<void> | null = null;
+
+  const ordered = (): LotState[] =>
+    [...state.catalog.values()].sort((a, b) => compareCatalog(a, b));
+  const after = (row: CatalogKey, cursor: CatalogKey): boolean => compareCatalog(row, cursor) > 0;
 
   const readers: LiveReaders = {
     async readUid() {
@@ -87,6 +92,34 @@ function fakeReaders(): FakeReaders {
       calls.catalog += 1;
       if (fail.catalog) return { ok: false, states: new Map<string, LotState>() };
       return { ok: true, states: new Map(state.catalog) };
+    },
+    async readCatalogPage(_uid, cursor, limit) {
+      const wait = gate;
+      if (wait) await wait;
+      calls.page += 1;
+      if (fail.catalog) return { ok: false, states: [] };
+      const rows = ordered().filter((row) => (cursor ? after(row, cursor) : true));
+      return { ok: true, states: rows.slice(0, Math.max(1, limit)) };
+    },
+    async readCatalogBySlugs(_uid, slugs) {
+      const wait = gate;
+      if (wait) await wait;
+      if (fail.catalog) return { ok: false, states: new Map<string, LotState>() };
+      const states = new Map<string, LotState>();
+      for (const slug of slugs) {
+        const lotState = state.catalog.get(slug);
+        if (lotState) states.set(slug, lotState);
+      }
+      return { ok: true, states };
+    },
+    async readMyLots(uid) {
+      calls.mine += 1;
+      if (fail.catalog) return { ok: false, states: new Map<string, LotState>() };
+      const states = new Map<string, LotState>();
+      for (const lotState of ordered()) {
+        if (lotState.owner_uid === uid) states.set(lotState.slug, lotState);
+      }
+      return { ok: true, states };
     },
     async readLot(slug) {
       calls.lot += 1;
@@ -579,5 +612,127 @@ describe('createLiveStore', () => {
     await store.start();
 
     expect(heard.length).toBeGreaterThan(0);
+  });
+
+  it('витрина страницами: первая страница — окно, следующая дописывается, дальше конец', async () => {
+    const f = fakeReaders();
+    for (let i = 0; i < 15; i++) {
+      const slug = `lot-${String(i).padStart(2, '0')}`;
+      f.state.catalog.set(slug, lot({ slug, price: 100 + i }));
+    }
+    const store = createLiveStore(f.readers);
+    store.useCatalogPages(12);
+    await store.start();
+
+    expect(store.catalogWindow()).toHaveLength(12);
+    expect(store.catalog().size).toBe(12);
+    expect(store.catalogHasMore()).toBe(true);
+    expect(store.catalogWindow()[0]?.price).toBe(100);
+
+    expect(await store.loadCatalogPage()).toBe('ok');
+    expect(store.catalogWindow()).toHaveLength(15);
+    expect(store.catalogWindow().at(-1)?.slug).toBe('lot-14');
+    expect(store.catalogHasMore()).toBe(false);
+    expect(await store.loadCatalogPage()).toBe('end');
+  });
+
+  it('живой лот: в ценовом диапазоне окна — сразу, дороже границы — ждёт страницы', async () => {
+    const f = fakeReaders();
+    f.state.catalog.set('lot-a', lot({ slug: 'lot-a', price: 100 }));
+    f.state.catalog.set('lot-b', lot({ slug: 'lot-b', price: 200 }));
+    f.state.catalog.set('lot-c', lot({ slug: 'lot-c', price: 300 }));
+    const store = createLiveStore(f.readers);
+    store.useCatalogPages(2);
+    await store.start();
+    expect(store.catalogWindow().map((st) => st.slug)).toEqual(['lot-a', 'lot-b']);
+
+    f.state.catalog.set('lot-cheap', lot({ slug: 'lot-cheap', price: 150 }));
+    await store.reportLotsTick({ eventType: 'INSERT', new: { slug: 'lot-cheap' } });
+    expect(store.catalogWindow().map((st) => st.slug)).toEqual(['lot-a', 'lot-cheap', 'lot-b']);
+
+    f.state.catalog.set('lot-expensive', lot({ slug: 'lot-expensive', price: 1000 }));
+    await store.reportLotsTick({ eventType: 'INSERT', new: { slug: 'lot-expensive' } });
+    expect(store.catalogWindow().map((st) => st.slug)).toEqual(['lot-a', 'lot-cheap', 'lot-b']);
+
+    // Дорогой лот приходит своей страницей, а не живой вставкой.
+    await store.loadCatalogPage();
+    expect(store.catalogWindow().map((st) => st.slug)).toEqual([
+      'lot-a',
+      'lot-cheap',
+      'lot-b',
+      'lot-c',
+      'lot-expensive',
+    ]);
+  });
+
+  it('«Мои приветы» — полный список вне окна; ушедший лот даёт перекуп', async () => {
+    const f = fakeReaders();
+    f.state.uid = 'u1';
+    f.state.balance = 1000;
+    f.state.catalog.set(
+      'lot-mine',
+      lot({ slug: 'lot-mine', price: 900, owner_uid: 'u1', owner_login: 'me', mine: true })
+    );
+    f.state.catalog.set('lot-a', lot({ slug: 'lot-a', price: 100, owner_uid: 'u2' }));
+    const store = createLiveStore(f.readers);
+    store.useCatalogPages(1);
+    store.trackMyLots();
+    const events = collect(store);
+    await store.start();
+
+    expect(store.catalogWindow().map((st) => st.slug)).toEqual(['lot-a']);
+    expect(store.myLots().map((st) => st.slug)).toEqual(['lot-mine']);
+    expect(store.myLotsKnown()).toBe(true);
+
+    // Мой лот перекупили: из списка ушёл, свежая строка — у нового владельца.
+    f.state.catalog.set(
+      'lot-mine',
+      lot({
+        slug: 'lot-mine',
+        title: 'Мой',
+        price: 1200,
+        owner_uid: 'u3',
+        owner_login: 'carol',
+      })
+    );
+    f.state.lots.set(
+      'lot-mine',
+      lot({
+        slug: 'lot-mine',
+        title: 'Мой',
+        price: 1200,
+        owner_uid: 'u3',
+        owner_login: 'carol',
+      })
+    );
+    await store.reportDeal();
+
+    const outbids = events.filter((event) => event.kind === 'outbid');
+    expect(outbids).toHaveLength(1);
+    expect(outbids[0]).toMatchObject({
+      kind: 'outbid',
+      event: { slug: 'lot-mine', title: 'Мой', by: 'carol', price: 1200 },
+    });
+    expect(store.myLots()).toHaveLength(0);
+    // Свежая строка — в карте (её найдёт кнопка возврата), но не в окне витрины.
+    expect(store.lot('lot-mine')?.owner_login).toBe('carol');
+    expect(store.catalogWindow().map((st) => st.slug)).toEqual(['lot-a']);
+  });
+
+  it('ensureCatalogLot дочитывает страницы до нужного лота', async () => {
+    const f = fakeReaders();
+    for (let i = 0; i < 5; i++) {
+      const slug = `lot-${i}`;
+      f.state.catalog.set(slug, lot({ slug, price: 100 + i }));
+    }
+    const store = createLiveStore(f.readers);
+    store.useCatalogPages(2);
+    await store.start();
+    expect(store.catalogWindow()).toHaveLength(2);
+
+    const found = await store.ensureCatalogLot('lot-4');
+    expect(found?.slug).toBe('lot-4');
+    expect(store.catalogWindow().map((st) => st.slug)).toContain('lot-4');
+    expect(await store.ensureCatalogLot('lot-missing')).toBeNull();
   });
 });

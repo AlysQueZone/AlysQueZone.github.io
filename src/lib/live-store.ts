@@ -4,9 +4,15 @@
  * Решение — docs/adr/0003: живой транспорт и читатели —
  * в src/lib/live.ts; здесь состояние и события:
  *
- * - синхронные чтения снапшота: uid, баланс, каталог, один лот;
- * - одна подписка на изменения (uid / баланс / каталог / покупка / перекуп /
- *   сделки / синк) — поверхности читают снапшот и слушают;
+ * - синхронные чтения снапшота: uid, баланс, каталог, окно витрины, «мои
+ *   приветы», один лот;
+ * - витрина может листаться страницами (`useCatalogPages`): снапшот хранит
+ *   загруженное окно, живой тик обновляет только его, а лот снаружи окна
+ *   ждёт своей страницы (механика — src/lib/catalog-page.ts); «Мои приветы»
+ *   в этом режиме — отдельный полный список владельца (`trackMyLots`), не
+ *   фильтр окна;
+ * - одна подписка на изменения (uid / баланс / каталог / мои приветы / покупка /
+ *   перекуп / сделки / синк) — поверхности читают снапшот и слушают;
  * - коалесцинг триггеров: одновременные перечитывания схлопываются в одно,
  *   триггер во время чтения не теряется — копится один догоняющий проход;
  * - неудача перечитывания не затирает последнее хорошее: данные остаются,
@@ -18,6 +24,15 @@
  *
  * Читатели инъектируются: тесты — src/lib/live-store.test.ts с fake-readers.
  */
+
+import {
+  CATALOG_PAGE_SIZE,
+  catalogCursor,
+  catalogPageHasMore,
+  insertCatalogEntry,
+  type CatalogCursor,
+} from './catalog-page';
+import type { LivePayload } from './live-core';
 
 /** Живое состояние Лота (было в lots.ts; чтения переехали в live.ts). */
 export interface LotState {
@@ -39,6 +54,15 @@ export interface CatalogRead {
   states: Map<string, LotState>;
 }
 
+/** Ответ чтения страницы витрины: строки в порядке показа (цена, slug). */
+export interface CatalogPageRead {
+  ok: boolean;
+  states: LotState[];
+}
+
+/** Итог подгрузки страницы витрины: ок — дописана, end — больше нет, error — БД/сеть. */
+export type CatalogMoreResult = 'ok' | 'end' | 'error';
+
 /** Ответ чтения одного Лота: нет строки ≠ БД недоступна. */
 export interface LotStateRead {
   ok: boolean;
@@ -52,6 +76,16 @@ export interface LiveReaders {
   /** Свой баланс; null — не прочитался / строки нет / гость. */
   readBalance(uid: string): Promise<number | null>;
   readCatalog(uid: string | null): Promise<CatalogRead>;
+  /** Одна страница витрины после курсора (null — первая); порядок — цена, slug. */
+  readCatalogPage(
+    uid: string | null,
+    cursor: CatalogCursor | null,
+    limit: number
+  ): Promise<CatalogPageRead>;
+  /** Строки каталога по slug — обновить загруженное окно; отсутствие = удалён. */
+  readCatalogBySlugs(uid: string | null, slugs: readonly string[]): Promise<CatalogRead>;
+  /** Полный список моих лотов (владелец — uid); не окно витрины. */
+  readMyLots(uid: string): Promise<CatalogRead>;
   readLot(slug: string, uid: string | null): Promise<LotStateRead>;
 }
 
@@ -76,6 +110,7 @@ export type LiveChange =
   | { kind: 'uid'; uid: string | null }
   | { kind: 'balance'; balance: number | null; fresh: boolean }
   | { kind: 'catalog'; changed: ReadonlySet<string>; fresh: boolean }
+  | { kind: 'mine'; changed: ReadonlySet<string> }
   | { kind: 'purchase'; purchase: LivePurchase }
   | { kind: 'outbid'; event: LiveOutbid }
   | { kind: 'deals' }
@@ -97,6 +132,21 @@ export interface LiveStore {
   /** Был ли ответ по балансу для текущего uid (для честного прочерка без мигания). */
   balanceKnown(): boolean;
   catalog(): ReadonlyMap<string, LotState>;
+  /** Окно витрины в порядке показа: загруженные страницы (или весь каталог). */
+  catalogWindow(): readonly LotState[];
+  /** Есть ли ещё страница витрины (в полном режиме — нет). */
+  catalogHasMore(): boolean;
+  /** Включить страницы витрины; размер — до первого чтения, иначе no-op. */
+  useCatalogPages(pageSize?: number): void;
+  /** Догрузить следующую страницу витрины (общая дорожка на всех вызывающих). */
+  loadCatalogPage(): Promise<CatalogMoreResult>;
+  /** Дочитать страницы, пока лот не окажется в окне (возврат к покупке). */
+  ensureCatalogLot(slug: string): Promise<LotState | null>;
+  /** Полный список «Моих приветов» владельца — включается поверхностью. */
+  trackMyLots(): void;
+  myLots(): readonly LotState[];
+  /** Был ли ответ по «Моим приветам» (для честного скелетона). */
+  myLotsKnown(): boolean;
   lot(slug: string): LotState | null;
   /** Был ли ответ по каталогу (пустой каталог — тоже ответ). */
   catalogKnown(): boolean;
@@ -108,6 +158,8 @@ export interface LiveStore {
   start(): Promise<void>;
   sync(): Promise<void>;
   refreshCatalog(): Promise<void>;
+  /** Тик `lots` с payload: в режиме страниц запоминает slug новорождённого лота. */
+  reportLotsTick(payload: LivePayload): Promise<void>;
   applyUid(uid: string | null): void;
   // Явная свежесть для денежных гейтов (гамба, покупка).
   refreshBalance(): Promise<number | null>;
@@ -123,7 +175,7 @@ export interface LiveStore {
   /** Своя покупка: событие сразу, перечитка — следом (промис — вся дорожка). */
   reportPurchase(purchase: LivePurchase): Promise<void>;
   /** Сделка случилась (тик purchases) — сигнал своим проекциям (маркиза). */
-  reportDeal(): void;
+  reportDeal(payload?: LivePayload): Promise<void>;
 }
 
 export function createLiveStore(readers: LiveReaders): LiveStore {
@@ -146,9 +198,32 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
   let catalogKnown = false;
   let started = false;
 
+  /** Витрина страницами: режим включается поверхностью до первого чтения. */
+  let catalogPaged = false;
+  let catalogPageSize = CATALOG_PAGE_SIZE;
+  /** Окно — slug загруженных страниц в порядке показа (значения — в catalogValue). */
+  let catalogWindowSlugs: string[] = [];
+  let catalogNextCursor: CatalogCursor | null = null;
+  let catalogHasMore = false;
+  /** Общая дорожка подгрузки страницы: веерный вызов не задваивает запрос. */
+  let catalogPageInFlight: Promise<CatalogMoreResult> | null = null;
+  /** Новые лоты из Realtime: решаем по границе окна, когда обновим его. */
+  const catalogInsertSlugs = new Set<string>();
+
+  /** «Мои приветы» полным списком владельца — включается поверхностью. */
+  let mineTracked = false;
+  let myLotsValue = new Map<string, LotState>();
+  let myLotsTried = false;
+  /** Чей список сейчас в снапшоте: смена uid не подхватывает чужой ответ. */
+  let myLotsUid: string | null = null;
+  let myLotsInFlight: Promise<void> | null = null;
+  let myLotsInFlightUid: string | null = null;
+
   /** Одна дорожка перечитывания: 'all' (uid+баланс+каталог) или 'catalog' (тик). */
   let inFlight: Promise<void> | null = null;
   let pending: 'all' | 'catalog' | null = null;
+  /** Догоняющий проход просит свежий «Мои приветы» (sync/покупка). */
+  let pendingMine = false;
   /** Дедуп чтения баланса: явная свежесть и тики — одна дорожка на запрос.
    *  Дорожка привязана к uid: после смены сессии чужой ответ не подхватываем. */
   let balanceInFlight: Promise<number | null> | null = null;
@@ -223,6 +298,67 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
     return changed;
   }
 
+  /** Нормализовать «мой» флаг под текущую сессию (ответ мог прийти после смены uid). */
+  function normalizeMine(st: LotState): LotState {
+    const mine = uidValue !== null && st.owner_uid === uidValue;
+    return mine === st.mine ? st : { ...st, mine };
+  }
+
+  /** Влить строку с переиспользованием неизменившейся ссылки; вернуть объект снапшота. */
+  function mergeState(
+    target: Map<string, LotState>,
+    raw: LotState,
+    changed: Set<string>
+  ): LotState {
+    const st = normalizeMine(raw);
+    const old = target.get(st.slug);
+    const stable = old && sameLot(old, st) ? old : st;
+    target.set(st.slug, stable);
+    if (old !== stable) changed.add(st.slug);
+    return stable;
+  }
+
+  /** Окно в порядке показа: slug из catalogWindowSlugs, значения — из карты. */
+  function windowStatesOf(states: ReadonlyMap<string, LotState>): LotState[] {
+    const window: LotState[] = [];
+    for (const slug of catalogWindowSlugs) {
+      const st = states.get(slug);
+      if (st) window.push(st);
+    }
+    return window;
+  }
+
+  /**
+   * Перекупы из диффа снапшота: у лота, который был моим, сменился владелец на
+   * не-меня. Смена сессии сюда не попадает (uid сравнивается внутри), удаление
+   * лота — тоже (ему некому продавать).
+   */
+  function collectOutbids(
+    prev: ReadonlyMap<string, LotState>,
+    next: ReadonlyMap<string, LotState>,
+    changed: ReadonlySet<string>
+  ): LiveOutbid[] {
+    if (uidValue === null) return [];
+    const outbids: LiveOutbid[] = [];
+    for (const slug of changed) {
+      const old = prev.get(slug);
+      const st = next.get(slug);
+      if (!old || !st) continue;
+      if (old.owner_uid !== uidValue) continue;
+      if (st.owner_uid === uidValue || st.owner_uid === null) continue;
+      if (!Number.isFinite(st.price)) continue;
+      outbids.push({
+        slug,
+        title: st.title,
+        by: st.owner_login ?? 'Чатерс',
+        price: st.price,
+        at: Date.now(),
+        video: st.video_url,
+      });
+    }
+    return outbids;
+  }
+
   /**
    * Применить прочитанный каталог: «мой» флаг — под текущий uid (ответ мог
    * прийти уже после смены сессии), дифф владельца даёт событие перекупа
@@ -237,26 +373,10 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
   ): void {
     const prev = catalogValue;
     const { merged, changed } = mergeCatalog(withMine(next, uidValue));
-
-    const outbids: LiveOutbid[] = [];
-    if (uidValue !== null) {
-      for (const [slug, st] of merged) {
-        const old = prev.get(slug);
-        if (!old || old.owner_uid !== uidValue) continue;
-        if (st.owner_uid === uidValue || st.owner_uid === null) continue;
-        if (!Number.isFinite(st.price)) continue;
-        outbids.push({
-          slug,
-          title: st.title,
-          by: st.owner_login ?? 'Чатерс',
-          price: st.price,
-          at: Date.now(),
-          video: st.video_url,
-        });
-      }
-    }
+    const outbids = collectOutbids(prev, merged, changed);
 
     catalogValue = merged;
+    // В режиме страниц значения окна берутся из карты — порядок не трогаем.
     if (updateHealth) {
       const freshChanged = ok !== catalogFresh;
       catalogFresh = ok;
@@ -270,6 +390,14 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
     }
     // Перекуп — после каталога: кнопкам возврата уже видна свежая N.
     for (const event of outbids) emit({ kind: 'outbid', event });
+  }
+
+  /** БД не ответила: последнее хорошее остаётся, свежесть — false. */
+  function markCatalogUnavailable(): void {
+    const notify = !catalogKnown || catalogFresh;
+    catalogKnown = true;
+    catalogFresh = false;
+    if (notify) emit({ kind: 'catalog', changed: new Set(), fresh: false });
   }
 
   /** Баланс пришёл (или не пришёл): null не затирает последнее хорошее. */
@@ -323,6 +451,13 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
     balanceFresh = false;
     // Значение прежнего uid не раскроется под церемонией нового.
     heldBalance = null;
+    // «Мои приветы» прежнего uid чужому не показываем; список перечитается.
+    if (mineTracked) {
+      if (myLotsValue.size > 0) emit({ kind: 'mine', changed: new Set(myLotsValue.keys()) });
+      myLotsValue = new Map();
+      myLotsTried = false;
+      myLotsUid = null;
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -362,40 +497,312 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
     return run;
   }
 
-  async function readCatalogNow(): Promise<void> {
-    let read: CatalogRead;
-    try {
-      read = await readers.readCatalog(uidValue);
-    } catch {
-      read = { ok: false, states: catalogValue };
+  /**
+   * Применить страницу витрины: `start` — первая (окно с нуля), иначе дописать.
+   * Дубли по slug не задваиваются; курсор и «есть ещё» — по сырой странице.
+   */
+  function applyPage(states: readonly LotState[], start: boolean): void {
+    const wasKnown = catalogKnown;
+    const freshChanged = !catalogFresh;
+    const prev = catalogValue;
+    const next = new Map(prev);
+    const changed = new Set<string>();
+
+    if (start) catalogWindowSlugs = [];
+    const seen = new Set(catalogWindowSlugs);
+    for (const raw of states) {
+      const stable = mergeState(next, raw, changed);
+      if (seen.has(stable.slug)) continue;
+      seen.add(stable.slug);
+      catalogWindowSlugs.push(stable.slug);
     }
-    applyCatalog(read.ok ? read.states : catalogValue, read.ok);
+    // Вставки, уже попавшие в страницу, больше не ждут границы окна.
+    for (const slug of catalogInsertSlugs) {
+      if (seen.has(slug)) catalogInsertSlugs.delete(slug);
+    }
+
+    catalogValue = next;
+    catalogKnown = true;
+    catalogFresh = true;
+    const nextCursor = catalogCursor(states);
+    if (nextCursor !== null) catalogNextCursor = nextCursor;
+    else if (start) catalogNextCursor = null;
+    catalogHasMore = catalogPageHasMore(states.length, catalogPageSize);
+
+    const outbids = collectOutbids(prev, next, changed);
+    if (changed.size > 0 || freshChanged || !wasKnown) {
+      emit({ kind: 'catalog', changed, fresh: true });
+    }
+    for (const event of outbids) emit({ kind: 'outbid', event });
   }
 
-  async function readAllNow(): Promise<void> {
+  /** Одна страница витрины: общая дорожка для старта, скролла и ensureLot. */
+  function loadCatalogPageNow(): Promise<CatalogMoreResult> {
+    if (catalogPageInFlight) return catalogPageInFlight;
+    const start = catalogWindowSlugs.length === 0;
+    if (!start && !catalogHasMore) return Promise.resolve('end');
+    const run = (async (): Promise<CatalogMoreResult> => {
+      let read: CatalogPageRead;
+      try {
+        read = await readers.readCatalogPage(
+          uidValue,
+          start ? null : catalogNextCursor,
+          catalogPageSize
+        );
+      } catch {
+        read = { ok: false, states: [] };
+      }
+      if (!read.ok) {
+        markCatalogUnavailable();
+        return 'error';
+      }
+      applyPage(read.states, start);
+      return read.states.length === 0 ? 'end' : 'ok';
+    })();
+    catalogPageInFlight = run;
+    void run.finally(() => {
+      if (catalogPageInFlight === run) catalogPageInFlight = null;
+    });
+    return run;
+  }
+
+  /**
+   * Освежить загруженное окно одним запросом по slug: цена/владелец, удалённые
+   * уходят. Новые лоты из Realtime — только если по цене попадают в окно.
+   */
+  async function refreshWindowNow(): Promise<void> {
+    const windowSlugs = [...catalogWindowSlugs];
+    const inserts = [...catalogInsertSlugs];
+    const wanted = [...new Set([...windowSlugs, ...inserts])];
+    if (wanted.length === 0) return;
+
+    let read: CatalogRead;
+    try {
+      read = await readers.readCatalogBySlugs(uidValue, wanted);
+    } catch {
+      read = { ok: false, states: new Map() };
+    }
+    if (!read.ok) {
+      markCatalogUnavailable();
+      return;
+    }
+
+    const prev = catalogValue;
+    const next = new Map(prev);
+    const changed = new Set<string>();
+    const kept: string[] = [];
+    for (const slug of windowSlugs) {
+      const raw = read.states.get(slug);
+      if (!raw) {
+        // Строки нет — лот удалён: окно и карта его больше не держат.
+        next.delete(slug);
+        changed.add(slug);
+        continue;
+      }
+      mergeState(next, raw, changed);
+      kept.push(slug);
+    }
+    catalogWindowSlugs = kept;
+
+    for (const slug of inserts) {
+      const raw = read.states.get(slug);
+      if (!raw) continue;
+      if (catalogWindowSlugs.includes(slug)) {
+        mergeState(next, raw, changed);
+        continue;
+      }
+      const st = normalizeMine(raw);
+      const inserted = insertCatalogEntry(windowStatesOf(next), st, catalogHasMore);
+      if (inserted === null) continue; // дороже границы — придёт своей страницей
+      next.set(st.slug, st);
+      catalogWindowSlugs = inserted.map((entry) => entry.slug);
+      changed.add(st.slug);
+    }
+    for (const slug of inserts) catalogInsertSlugs.delete(slug);
+
+    catalogValue = next;
+    const freshChanged = !catalogFresh;
+    catalogFresh = true;
+    const outbids = collectOutbids(prev, next, changed);
+    if (changed.size > 0 || freshChanged) emit({ kind: 'catalog', changed, fresh: true });
+    for (const event of outbids) emit({ kind: 'outbid', event });
+  }
+
+  /**
+   * «Мои приветы» полным списком: окно витрины может не содержать часть моих
+   * лотов, поэтому это отдельный запрос владельца. Ушедшие лоты дочитываются
+   * по одному — событию перекупа нужен новый владелец и цена.
+   */
+  function readMyLotsNow(uid: string, force = false): Promise<void> {
+    if (!mineTracked) return Promise.resolve();
+    if (!force && myLotsUid === uid) return myLotsInFlight ?? Promise.resolve();
+    if (myLotsInFlight && myLotsInFlightUid === uid) return myLotsInFlight;
+
+    const run = (async (): Promise<void> => {
+      let read: CatalogRead;
+      try {
+        read = await readers.readMyLots(uid);
+      } catch {
+        read = { ok: false, states: new Map() };
+      }
+      if (uid !== uidValue || !mineTracked) return;
+      // Отказ не выдаём за «пусто»: скелетон честнее; синк/фокус повторят.
+      if (!read.ok) return;
+
+      const prev = myLotsValue;
+      const next = new Map<string, LotState>();
+      const changed = new Set<string>();
+      for (const [slug, raw] of read.states) {
+        const st = normalizeMine(raw);
+        const old = prev.get(slug);
+        const stable = old && sameLot(old, st) ? old : st;
+        next.set(slug, stable);
+        if (old !== stable) changed.add(slug);
+      }
+
+      const gone = [...prev.keys()].filter((slug) => !next.has(slug));
+      const sold: LotState[] = [];
+      for (const slug of gone) {
+        changed.add(slug);
+        try {
+          const one = await readers.readLot(slug, uid);
+          if (one.ok && one.state && one.state.owner_uid !== uid) sold.push(one.state);
+        } catch {
+          // best effort: колокол догонит сделку на фокусе/синке
+        }
+      }
+      if (uid !== uidValue || !mineTracked) return;
+
+      myLotsValue = next;
+      myLotsTried = true;
+      myLotsUid = uid;
+      emit({ kind: 'mine', changed });
+
+      if (sold.length > 0) {
+        // Свежие строки — в карту, но не в окно: кнопке возврата нужна их N.
+        const merged = new Map(catalogValue);
+        const touched = new Set<string>();
+        for (const st of sold) mergeState(merged, st, touched);
+        catalogValue = merged;
+        for (const st of sold) {
+          emit({
+            kind: 'outbid',
+            event: {
+              slug: st.slug,
+              title: st.title,
+              by: st.owner_login ?? 'Чатерс',
+              price: st.price,
+              at: Date.now(),
+              video: st.video_url,
+            },
+          });
+        }
+      }
+    })();
+    myLotsInFlight = run;
+    myLotsInFlightUid = uid;
+    void run.finally(() => {
+      if (myLotsInFlight === run) {
+        myLotsInFlight = null;
+        myLotsInFlightUid = null;
+      }
+    });
+    return run;
+  }
+
+  /** Дочитать страницы, пока лот не окажется в окне (возврат к покупке). */
+  async function ensureLotNow(slug: string): Promise<LotState | null> {
+    const find = (): LotState | null =>
+      catalogWindowSlugs.includes(slug) ? (catalogValue.get(slug) ?? null) : null;
+    if (find()) return find();
+    if (!catalogPaged) return refreshLotNow(slug);
+    if (catalogWindowSlugs.length === 0) {
+      const first = await loadCatalogPageNow();
+      if (find()) return find();
+      if (first === 'error') return null;
+    }
+    let guard = 0;
+    while (catalogHasMore && guard < 100) {
+      guard += 1;
+      const result = await loadCatalogPageNow();
+      if (find()) return find();
+      if (result === 'error') break;
+    }
+    return find();
+  }
+
+  async function readCatalogNow(): Promise<void> {
+    if (!catalogPaged) {
+      let read: CatalogRead;
+      try {
+        read = await readers.readCatalog(uidValue);
+      } catch {
+        read = { ok: false, states: catalogValue };
+      }
+      applyCatalog(read.ok ? read.states : catalogValue, read.ok);
+      return;
+    }
+    if (catalogWindowSlugs.length === 0) {
+      await loadCatalogPageNow();
+      return;
+    }
+    if (catalogPageInFlight) {
+      await catalogPageInFlight;
+      await refreshWindowNow();
+      return;
+    }
+    await refreshWindowNow();
+  }
+
+  /** Один лот: модалка и денежные гейты. Здоровье каталога им не подменяем. */
+  async function refreshLotNow(slug: string): Promise<LotState | null> {
+    let read: LotStateRead;
+    try {
+      read = await readers.readLot(slug, uidValue);
+    } catch {
+      return null;
+    }
+    if (!read.ok) return null;
+    const next = new Map(catalogValue);
+    if (read.state) next.set(slug, read.state);
+    else {
+      next.delete(slug);
+      if (catalogPaged) catalogWindowSlugs = catalogWindowSlugs.filter((s) => s !== slug);
+    }
+    // Одиночное чтение не выдаёт весь каталог за свежий (флаг здоровья — каталога).
+    applyCatalog(next, true, false);
+    return read.state;
+  }
+
+  async function readAllNow(refreshMine: boolean): Promise<void> {
     const u = await readUidSafe();
     applyUid(u);
     // Баланс раньше каталога: поверхности рисуют каталог уже с балансом
     // (без мигания «не хватает»), как было до переезда.
     if (u !== null) await readBalanceNow(u);
     await readCatalogNow();
+    if (mineTracked && u !== null) await readMyLotsNow(u, refreshMine);
   }
 
   /**
    * Единственная дорожка перечитывания. Триггер во время чтения не теряется:
    * копится один догоняющий проход сильнейшего охвата ('all' > 'catalog').
    */
-  function schedule(scope: 'all' | 'catalog'): Promise<void> {
+  function schedule(scope: 'all' | 'catalog', refreshMine = false): Promise<void> {
     if (inFlight) {
       pending = pending === 'all' || scope === 'all' ? 'all' : 'catalog';
+      pendingMine = pendingMine || refreshMine;
       return inFlight;
     }
     const run = (async () => {
       let current: 'all' | 'catalog' | null = scope;
+      let mine = refreshMine;
       while (current !== null) {
         pending = null;
-        await (current === 'all' ? readAllNow() : readCatalogNow());
+        pendingMine = false;
+        await (current === 'all' ? readAllNow(mine) : readCatalogNow());
         current = pending;
+        mine = pendingMine;
       }
     })();
     inFlight = run;
@@ -413,7 +820,16 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
     uidKnown = true;
     const before = uidValue;
     setUid(next);
-    if (next !== before && next !== null) void readBalanceNow(next);
+    if (next !== before && next !== null) {
+      void readBalanceNow(next);
+      if (mineTracked) void readMyLotsNow(next);
+    }
+  }
+
+  /** Окно в порядке показа: в режиме страниц — загруженные, иначе весь каталог. */
+  function catalogWindow(): readonly LotState[] {
+    if (!catalogPaged) return [...catalogValue.values()];
+    return windowStatesOf(catalogValue);
   }
 
   return {
@@ -421,9 +837,36 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
     balance: () => balanceValue,
     balanceKnown: () => balanceTried,
     catalog: () => catalogValue,
-    lot: (slug) => catalogValue.get(slug) ?? null,
+    catalogWindow,
+    catalogHasMore: () => catalogPaged && catalogHasMore,
+    lot: (slug) => catalogValue.get(slug) ?? myLotsValue.get(slug) ?? null,
     catalogKnown: () => catalogKnown,
     catalogOk: () => catalogFresh,
+
+    useCatalogPages(pageSize = CATALOG_PAGE_SIZE) {
+      // Режим выбирается до первого чтения: окно и полный каталог — разные снапшоты.
+      if (started || catalogKnown) return;
+      catalogPaged = true;
+      catalogPageSize = Math.max(1, Math.floor(pageSize));
+    },
+
+    loadCatalogPage() {
+      if (!catalogPaged) return Promise.resolve('end');
+      return loadCatalogPageNow();
+    },
+
+    ensureCatalogLot(slug) {
+      return ensureLotNow(slug);
+    },
+
+    trackMyLots() {
+      if (mineTracked) return;
+      mineTracked = true;
+      if (uidKnown && uidValue !== null) void readMyLotsNow(uidValue);
+    },
+
+    myLots: () => [...myLotsValue.values()],
+    myLotsKnown: () => myLotsTried,
 
     subscribe(cb) {
       listeners.push(cb);
@@ -443,6 +886,9 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
       if (catalogKnown) {
         prime({ kind: 'catalog', changed: new Set(catalogValue.keys()), fresh: catalogFresh });
       }
+      if (myLotsTried) {
+        prime({ kind: 'mine', changed: new Set(myLotsValue.keys()) });
+      }
       let active = true;
       return () => {
         if (!active) return;
@@ -460,10 +906,19 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
 
     sync() {
       emit({ kind: 'sync' });
-      return schedule('all');
+      return schedule('all', true);
     },
 
     refreshCatalog() {
+      return schedule('catalog');
+    },
+
+    reportLotsTick(payload) {
+      // Вставка в окно: запоминаем slug, границу окна решим при обновлении.
+      if (catalogPaged && payload.eventType === 'INSERT') {
+        const slug = (payload.new ?? {})['slug'];
+        if (typeof slug === 'string' && slug.length > 0) catalogInsertSlugs.add(slug);
+      }
       return schedule('catalog');
     },
 
@@ -476,21 +931,7 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
       return readBalanceNow(u);
     },
 
-    async refreshLot(slug) {
-      let read: LotStateRead;
-      try {
-        read = await readers.readLot(slug, uidValue);
-      } catch {
-        return null;
-      }
-      if (!read.ok) return null;
-      const next = new Map(catalogValue);
-      if (read.state) next.set(slug, read.state);
-      else next.delete(slug);
-      // Одиночное чтение не выдаёт весь каталог за свежий (флаг здоровья — каталога).
-      applyCatalog(next, true, false);
-      return read.state;
-    },
+    refreshLot: refreshLotNow,
 
     deferBalance() {
       // Повторный defer подряд (не должен случаться) не теряет уже накопленное.
@@ -508,11 +949,17 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
 
     reportPurchase(purchase) {
       emit({ kind: 'purchase', purchase });
-      return schedule('all');
+      return schedule('all', true);
     },
 
-    reportDeal() {
+    reportDeal(payload) {
       emit({ kind: 'deals' });
+      if (!mineTracked || uidValue === null) return Promise.resolve();
+      // Чужая сделка не трогает мои лоты: payload несёт продавца, лишний
+      // запрос на каждую покупку в чате не нужен. Без payload — перечитываем.
+      const seller = (payload?.new ?? {})['seller_uid'];
+      if (typeof seller === 'string' && seller !== uidValue) return Promise.resolve();
+      return readMyLotsNow(uidValue, true);
     },
   };
 }

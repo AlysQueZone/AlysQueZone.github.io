@@ -293,11 +293,18 @@ export function initOutbidNotice(): void {
     });
   }
 
-  function pushHistory(ev: OutbidEvent): void {
+  /**
+   * Добавить перекуп в колокол; `false` — тот же уже показан. Одно событие
+   * может прийти из двух диффов (окно витрины и «Мои приветы») — не дублируем.
+   */
+  function pushHistory(ev: OutbidEvent): boolean {
+    const key = eventKey(ev);
+    if (history.some((entry) => eventKey(entry) === key)) return false;
     history.unshift(ev);
     while (history.length > MAX_HISTORY) history.pop();
     unread += 1;
     renderBell();
+    return true;
   }
 
   function eventKey(ev: OutbidEvent): string {
@@ -336,7 +343,7 @@ export function initOutbidNotice(): void {
   }
 
   function onOutbid(ev: OutbidEvent): void {
-    pushHistory(ev);
+    if (!pushHistory(ev)) return;
     playOutbidSound(interacted);
     if (document.hidden) {
       missed.push(ev);

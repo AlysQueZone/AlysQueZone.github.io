@@ -5,9 +5,12 @@ import LotCardSkeleton from '@/components/LotCardSkeleton.astro';
 import BuyModal from '@/components/BuyModal.astro';
 import SuggestGreeting from '@/components/SuggestGreeting.astro';
 import BrandHeadline from '@/components/BrandHeadline.astro';
+import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
 
 // Витрина — каркас: карточек в HTML нет, сетку целиком рисует клиент из БД
 // (см. docs/adr/0002). Шаблон карточки — единственный источник разметки.
+// Скелетонов — ровно на первую страницу: столько же карточек вернёт первый
+// запрос, поэтому загрузка не прыгает.
 ---
 
 <BaseLayout
@@ -44,10 +47,26 @@ import BrandHeadline from '@/components/BrandHeadline.astro';
       Загружаю лоты…
     </p>
     <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3" data-lot-grid>
-      {Array.from({ length: 6 }, () => (
+      {Array.from({ length: CATALOG_PAGE_SIZE }, () => (
         <LotCardSkeleton />
       ))}
     </div>
+
+    <div data-lots-more class="mt-4 hidden">
+      <div class="flex flex-col items-center gap-2">
+        <button
+          type="button"
+          class="btn-arcade btn-arcade-ghost px-5 py-2 text-sm"
+          data-lots-more-btn
+        >
+          Показать ещё
+        </button>
+        <p data-lots-more-status class="text-sm font-bold text-mist" role="status"></p>
+      </div>
+    </div>
+    <p data-lots-end class="mt-4 hidden text-center text-sm font-bold text-mist">
+      Это все приветы
+    </p>
 
     <SuggestGreeting />
   </section>
@@ -57,24 +76,51 @@ import BrandHeadline from '@/components/BrandHeadline.astro';
   <template data-lot-card-template>
     <LotCard />
   </template>
+  <template data-lot-skeleton-template>
+    <LotCardSkeleton />
+  </template>
 </BaseLayout>
 
 <script>
-  // Живая витрина: каталог + цены + «мой» флаг — снапшот живых данных
-  // (lib/live.ts). Набор карточек строится/сносится по событиям каталога
-  // (INSERT/DELETE в lots), слоты карточки и раскладку кадра заполняет
-  // lib/lot-view.ts (fillLot). «Мои приветы» — только из БД: лоты, где mine
-  // (owner_uid == uid сессии). Локальный инвентарь не читаем; тик, фокус и
-  // смена сессии — триггеры модуля, поверхность только рисует снапшот.
+  // Витрина — окно каталога: страницы по CATALOG_PAGE_SIZE (lib/catalog-page.ts),
+  // их догружает скролл к кнопке «Показать ещё» (она же фолбэк без
+  // IntersectionObserver). «Мои приветы» — отдельный полный список владельца
+  // (live.trackMyLots), а не фильтр загруженных страниц: лот с дальней страницы
+  // не должен пропадать. Карточки, слоты и раскладку кадра заполняет
+  // lib/lot-view.ts (fillLot), как на главной и странице лота.
   import { live, type LotState } from '@/lib/live';
   import { fillLot, lotUrl } from '@/lib/lot-view';
+  import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
+  import { peekPendingBuy } from '@/lib/supabase';
 
   const GUEST_TEXT = 'Войди через Twitch — тут будут твои приветы';
   const EMPTY_TEXT = 'Пока пусто — забери первый привет ниже';
   const GRID_EMPTY_TEXT = 'Пока лотов нет — скоро появятся';
   const FAIL_TEXT = 'Лоты не загрузились. Проверь связь и обнови страницу';
+  const MORE_FAIL_TEXT = 'Не получилось подгрузить — попробуй ещё';
   /** Баланс — зеркало гейта: не хватает — кнопки гаснут. */
   let myBalance: number | null = null;
+  /** Состояние подгрузки: ошибка блокирует авто-повтор до клика по кнопке. */
+  let moreState: 'idle' | 'loading' | 'error' = 'idle';
+
+  // Режим страниц — до первого чтения: остальные страницы читают каталог целиком.
+  live.useCatalogPages(CATALOG_PAGE_SIZE);
+  live.trackMyLots();
+
+  // Возврат к покупке после логина: лот мог быть на дальней странице — без его
+  // карточки модалка не найдёт кнопку и возврат потеряется.
+  const pendingBuy = peekPendingBuy();
+  if (pendingBuy) void live.ensureCatalogLot(pendingBuy);
+
+  const moreWrap = document.querySelector('[data-lots-more]');
+  const moreBtn = document.querySelector('[data-lots-more-btn]');
+  const moreStatus = document.querySelector('[data-lots-more-status]');
+  const endNote = document.querySelector('[data-lots-end]');
+  const skeletonTpl = document.querySelector('[data-lot-skeleton-template]');
+
+  function toggle(el: Element | null, show: boolean): void {
+    if (el instanceof HTMLElement) el.classList.toggle('hidden', !show);
+  }
 
   function showMyNote(text: string, count: number): void {
     const slot = document.querySelector('[data-my-privety]');
@@ -86,6 +132,22 @@ import BrandHeadline from '@/components/BrandHeadline.astro';
     p.className = 'text-sm font-bold text-mist';
     p.textContent = text;
     slot.appendChild(p);
+  }
+
+  /** Пока список владельца едет — тот же скелетон, что на первой загрузке. */
+  function showMySkeleton(): void {
+    const slot = document.querySelector('[data-my-privety]');
+    const counter = document.querySelector('[data-my-privety-count]');
+    if (counter) counter.textContent = '—';
+    if (!slot) return;
+    slot.innerHTML = '';
+    const box = document.createElement('div');
+    box.className = 'border-2 border-milk bg-panel px-3 py-2';
+    box.setAttribute('aria-hidden', 'true');
+    const bar = document.createElement('div');
+    bar.className = 'skeleton-block h-4 w-1/2';
+    box.appendChild(bar);
+    slot.appendChild(box);
   }
 
   function setGridNote(text: string | null): void {
@@ -106,7 +168,7 @@ import BrandHeadline from '@/components/BrandHeadline.astro';
     document.querySelectorAll('[data-lot-skeleton]').forEach((el) => el.remove());
   }
 
-  function renderMyGreetings(states: ReadonlyMap<string, LotState>, uid: string | null): void {
+  function renderMyGreetings(uid: string | null): void {
     const slot = document.querySelector('[data-my-privety]');
     const counter = document.querySelector('[data-my-privety-count]');
     if (!slot) return;
@@ -114,7 +176,13 @@ import BrandHeadline from '@/components/BrandHeadline.astro';
       showMyNote(GUEST_TEXT, 0);
       return;
     }
-    const mine = [...states.values()].filter((s) => s.mine);
+    // Ответа по «Моим приветам» ещё нет — скелетон честнее пустоты и чужого
+    // списка, который мог остаться после смены сессии.
+    if (!live.myLotsKnown()) {
+      showMySkeleton();
+      return;
+    }
+    const mine = live.myLots();
     if (counter) counter.textContent = String(mine.length);
     if (mine.length === 0) {
       showMyNote(EMPTY_TEXT, 0);
@@ -149,20 +217,20 @@ import BrandHeadline from '@/components/BrandHeadline.astro';
   // slug → узел карточки: reconcile набора (создать/снести/обновить).
   const rendered = new Map<string, HTMLElement>();
 
-  function reconcile(states: ReadonlyMap<string, LotState>): void {
+  function reconcile(states: readonly LotState[]): void {
     const grid = document.querySelector('[data-lot-grid]');
     const tpl = document.querySelector('[data-lot-card-template]');
     if (!(grid instanceof HTMLElement) || !(tpl instanceof HTMLTemplateElement)) return;
 
+    const bySlug = new Map(states.map((st) => [st.slug, st]));
     for (const [slug, el] of [...rendered]) {
-      if (!states.has(slug)) {
+      if (!bySlug.has(slug)) {
         el.remove();
         rendered.delete(slug);
       }
     }
 
-    for (const st of states.values()) {
-      if (!Number.isFinite(st.price)) continue;
+    for (const st of states) {
       const card = rendered.get(st.slug);
       if (card) {
         fillCard(card, st);
@@ -173,7 +241,7 @@ import BrandHeadline from '@/components/BrandHeadline.astro';
       const created = fresh.cloneNode(true) as HTMLElement;
       rendered.set(st.slug, created);
       fillCard(created, st);
-      insertSorted(grid, created, states);
+      insertSorted(grid, created, bySlug);
     }
   }
 
@@ -192,35 +260,103 @@ import BrandHeadline from '@/components/BrandHeadline.astro';
     grid.insertBefore(card, before ?? null);
   }
 
-  /** Полная перерисовка из снапшота: карточки, «мои приветы» и заметки. */
+  /** Подгрузка идёт скелетонами — не текстом-заглушкой (AGENTS.md). */
+  function addLoadingSkeletons(): void {
+    const grid = document.querySelector('[data-lot-grid]');
+    if (!(grid instanceof HTMLElement) || !(skeletonTpl instanceof HTMLTemplateElement)) return;
+    for (let i = 0; i < 3; i++) {
+      const fresh = skeletonTpl.content.firstElementChild;
+      if (!(fresh instanceof HTMLElement)) return;
+      const clone = fresh.cloneNode(true) as HTMLElement;
+      clone.dataset.lotsLoading = '1';
+      grid.appendChild(clone);
+    }
+  }
+
+  function removeLoadingSkeletons(): void {
+    document.querySelectorAll('[data-lots-loading]').forEach((el) => el.remove());
+  }
+
+  function updateMoreUi(): void {
+    const known = live.catalogKnown();
+    const hasMore = live.catalogHasMore();
+    const count = live.catalogWindow().length;
+    toggle(moreWrap, known && hasMore);
+    toggle(endNote, known && !hasMore && count > 0);
+    if (moreBtn instanceof HTMLButtonElement) {
+      moreBtn.disabled = moreState === 'loading';
+      moreBtn.textContent =
+        moreState === 'loading'
+          ? 'Загружаю ещё…'
+          : moreState === 'error'
+            ? 'Повторить'
+            : 'Показать ещё';
+    }
+    if (moreStatus instanceof HTMLElement) {
+      moreStatus.textContent = moreState === 'error' ? MORE_FAIL_TEXT : '';
+    }
+  }
+
+  /** Догрузить страницу; `manual` — клик по кнопке, он же снимает блок ошибки. */
+  async function loadMore(manual: boolean): Promise<void> {
+    if (moreState === 'loading' || !live.catalogHasMore()) return;
+    if (moreState === 'error' && !manual) return;
+    moreState = 'loading';
+    updateMoreUi();
+    addLoadingSkeletons();
+    try {
+      const result = await live.loadCatalogPage();
+      moreState = result === 'error' ? 'error' : 'idle';
+    } finally {
+      removeLoadingSkeletons();
+      updateMoreUi();
+      render();
+    }
+  }
+
+  /** Полная перерисовка окна: карточки, «мои приветы» и заметки. */
   function render(): void {
-    // Ответа БД ещё не было — скелетоны честнее «пусто» и «не загрузилось».
-    if (!live.catalogKnown()) return;
-    const states = live.catalog();
     const uid = live.uid();
     myBalance = live.balance();
-    reconcile(states);
-    const empty = states.size === 0;
-    // Пусто ≠ не загрузилось: заметка честная, последнее хорошее не трём.
-    const gridMsg = !live.catalogOk() && empty ? FAIL_TEXT : empty ? GRID_EMPTY_TEXT : null;
-    setGridNote(gridMsg);
-    setStatus(gridMsg ?? '');
-    clearSkeletons();
-    renderMyGreetings(states, uid);
+    renderMyGreetings(uid);
+    // Ответа БД ещё не было — скелетоны честнее «пусто» и «не загрузилось».
+    if (live.catalogKnown()) {
+      const states = live.catalogWindow();
+      reconcile(states);
+      const empty = states.length === 0;
+      // Пусто ≠ не загрузилось: заметка честная, последнее хорошее не трём.
+      const gridMsg = !live.catalogOk() && empty ? FAIL_TEXT : empty ? GRID_EMPTY_TEXT : null;
+      setGridNote(gridMsg);
+      setStatus(gridMsg ?? '');
+      clearSkeletons();
+    }
+    updateMoreUi();
   }
 
   /** Баланс пришёл — перекрасить кнопки, не перезапрашивая каталог. */
   function repaintCards(): void {
-    const states = live.catalog();
     for (const [slug, el] of rendered) {
-      const st = states.get(slug);
+      const st = live.lot(slug);
       if (st) fillCard(el, st);
     }
   }
 
-  // Снапшот живых данных — единственный источник: каталог, uid и баланс.
+  // Подгрузка — скроллом к сентинелу; кнопка остаётся для клавиатуры и как
+  // повтор после ошибки. rootMargin — чтобы страница начинала грузиться заранее.
+  if (moreWrap && 'IntersectionObserver' in window) {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) void loadMore(false);
+      },
+      { rootMargin: '600px 0px' }
+    );
+    observer.observe(moreWrap);
+  }
+  moreBtn?.addEventListener('click', () => void loadMore(true));
+
+  // Снапшот живых данных — единственный источник: окно каталога, uid и баланс.
   live.subscribe((change) => {
-    if (change.kind === 'catalog' || change.kind === 'uid') render();
+    if (change.kind === 'catalog' || change.kind === 'uid' || change.kind === 'mine') render();
     if (change.kind === 'balance') {
       myBalance = change.balance;
       repaintCards();

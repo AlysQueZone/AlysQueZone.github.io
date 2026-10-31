@@ -23,6 +23,8 @@ export interface LiveSubscription {
 
 /** Полезная нагрузка postgres_changes: new/old — как их отдаёт Supabase. */
 export interface LivePayload {
+  /** Фактический вид события (канал слушает `*`): нужен для вставок в окно. */
+  eventType?: 'INSERT' | 'UPDATE' | 'DELETE';
   new?: Record<string, unknown>;
   old?: Record<string, unknown>;
 }
