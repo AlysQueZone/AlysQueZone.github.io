@@ -92,13 +92,24 @@ format:
 test:
     pnpm test
 
-# Все гейты разом: типы, линт, тесты, формат (его же зовёт pre-commit)
+# Кодовые гейты разом: типы, линт, тесты, формат (его же зовёт pre-commit)
 check:
     pnpm exec tsc --noEmit
     pnpm lint
     pnpm test
     pnpm format:check
     python3 scripts/sounds_sync.py check
+
+# Preview собранного dist: остановить старый сервер и поднять свежий
+preview:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ./node_modules/.bin/astro preview stop >/dev/null 2>&1 || true
+    ./node_modules/.bin/astro preview
+
+# Остановить preview-сервер (идемпотентно)
+preview-stop:
+    ./node_modules/.bin/astro preview stop || true
 
 # -------------------------------------
 # Контент лотов
@@ -174,7 +185,11 @@ submission-reward *args:
 
 # Поднять локальный Supabase и до-накатить миграции (данные сохраняются)
 db-up:
-    ./node_modules/.bin/supabase start
+    #!/usr/bin/env bash
+    set -euo pipefail
+    out=$(./node_modules/.bin/supabase start) || { printf '%s\n' "$out" >&2; exit 1; }
+    json=$(printf '%s\n' "$out" | grep -o '^{.*}$' | tail -1)
+    printf '%s' "$json" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(("Локальная БД: " + d["API_URL"]) if d.get("API_URL") else d.get("message", "Supabase запущен"))'
     ./node_modules/.bin/supabase migration up --local
 
 # Остановить локальный Supabase
@@ -234,6 +249,13 @@ run-local: db-up db-vault
 
 # Push/deploy идут от аккаунта-владельца AlysQueZone (у активного может не
 # быть прав); прежний активный аккаунт возвращается в конце даже при ошибке.
+
+# Статус миграций Supabase: какие локальные ещё не применены (read-only)
+migration-status:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ./node_modules/.bin/supabase migration list --linked 2>/dev/null \
+      | python3 -c 'import json,sys; m=json.load(sys.stdin)["migrations"]; p=[x["local"] for x in m if x["local"] and not x["remote"]]; print("pending:", len(p)); print("\n".join("  " + v for v in p))'
 
 # Дождаться применения всех локальных миграций Supabase после push в main
 wait-migrations:
