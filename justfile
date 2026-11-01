@@ -92,13 +92,14 @@ format:
 test:
     pnpm test
 
-# Кодовые гейты разом: типы, линт, тесты, формат (его же зовёт pre-commit)
+# Кодовые гейты разом: типы, линт, тесты, формат, сборка, звуки
 check:
     pnpm exec tsc --noEmit
     pnpm lint
     pnpm test
     pnpm format:check
     python3 scripts/sounds_sync.py check
+    pnpm build
 
 # Preview собранного dist: остановить старый сервер и поднять свежий
 preview:
@@ -242,6 +243,12 @@ run-local: db-up db-vault
     [ -n "$key" ] || { echo 'Не нашёл publishable-ключ локального стека (supabase status -o env)' >&2; exit 1; }
     echo "Локальная БД: $url"
     PUBLIC_SUPABASE_URL="$url" PUBLIC_SUPABASE_PUBLISHABLE_KEY="$key" pnpm run dev --force
+
+# Локальный вход для залогиненных экранов (колокол, гамба, покупка): dev-юзеры,
+# фикстура перекупа и сессия продавца в /tmp/alysque-dev-session.json.
+# Стек должен быть поднят (just run-local); ключ localStorage печатает сам.
+dev-auth:
+    python3 scripts/dev_auth.py
 
 # -------------------------------------
 # Релиз
