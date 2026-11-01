@@ -106,7 +106,8 @@ export interface LiveReaders {
     cursor: CatalogCursor | null,
     limit: number
   ): Promise<CatalogPageRead>;
-  /** Строки каталога по slug — обновить загруженное окно; отсутствие = удалён. */
+  /** Строки каталога по slug — обновить известные лоты (окно, история
+   *  колокола); отсутствие строки = лота нет в БД. */
   readCatalogBySlugs(uid: string | null, slugs: readonly string[]): Promise<CatalogRead>;
   /** Полный список моих лотов (владелец — uid); не окно витрины. */
   readMyLots(uid: string): Promise<CatalogRead>;

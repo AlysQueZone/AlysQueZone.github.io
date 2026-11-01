@@ -417,8 +417,9 @@ export function initOutbidNotice(): void {
     }
     if (change.kind === 'catalog') {
       if (change.changed.size === 0) return;
+      // Строки записи статичны (факт и комиссия), живая — только кнопка:
+      // точечная правка подписей не сбрасывает прокрутку и фокус панели.
       refreshRebuyButtons();
-      if (isOpen()) renderPanel();
       return;
     }
     if (change.kind === 'sync') {

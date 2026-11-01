@@ -574,6 +574,36 @@ describe('createLiveStore', () => {
     expect(f.calls.bySlugs).toBe(1);
   });
 
+  it('refreshLots: отказ не выдаёт себя за удаление, повтор дочитывает', async () => {
+    const f = fakeReaders();
+    f.state.uid = 'u1';
+    f.state.catalog.set('lot-a', lot());
+    const store = createLiveStore(f.readers);
+    store.useRandomLots(1);
+    const events = collect(store);
+    await store.start();
+    const before = store.lot('lot-a');
+    events.length = 0;
+
+    f.fail.catalog = true;
+    await store.refreshLots(['lot-a']);
+    expect(store.lot('lot-a')).toBe(before);
+    expect(kinds(events)).toEqual([]);
+
+    f.fail.catalog = false;
+    f.state.catalog.set('lot-a', lot({ price: 120, nextPrice: 130 }));
+    await store.refreshLots(['lot-a']);
+    expect(store.lot('lot-a')?.nextPrice).toBe(130);
+    expect(kinds(events)).toEqual(['catalog']);
+
+    // Пустой ответ: лота нет — история решает сама, снапшот не трогаем.
+    events.length = 0;
+    await store.refreshLots(['lot-gone']);
+    expect(store.lot('lot-gone')).toBeNull();
+    expect(store.lot('lot-a')?.nextPrice).toBe(130);
+    expect(kinds(events)).toEqual([]);
+  });
+
   it('смена uid во время чтения баланса: чужой ответ не подхватывается, свой читается', async () => {
     const f = fakeReaders();
     f.state.uid = 'u1';
