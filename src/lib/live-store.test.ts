@@ -542,6 +542,38 @@ describe('createLiveStore', () => {
     expect(store.lot('lot-b')).toBeNull();
   });
 
+  it('refreshLots: цены истории вне окна дочитываются без перекупа и без правки окна', async () => {
+    const f = fakeReaders();
+    f.state.uid = 'u1';
+    f.state.catalog.set('lot-a', lot());
+    f.state.catalog.set('lot-b', lot({ slug: 'lot-b', price: 200 }));
+    f.state.catalog.set('lot-c', lot({ slug: 'lot-c', price: 300 }));
+    const store = createLiveStore(f.readers);
+    store.useRandomLots(2);
+    const events = collect(store);
+    await store.start();
+    expect(store.catalogWindow().map((st) => st.slug)).toEqual(['lot-a', 'lot-b']);
+    expect(store.lot('lot-c')).toBeNull();
+
+    // Вкладка спала: оффлайн-догон знает факт сделки, но не N, а lot-c в окне
+    // витрины нет вовсе — цены истории дочитывает колокол по slug'ам.
+    f.state.catalog.set(
+      'lot-a',
+      lot({ price: 400, nextPrice: 440, owner_uid: 'u2', owner_login: 'bob' })
+    );
+    f.state.catalog.set('lot-c', lot({ slug: 'lot-c', price: 320, nextPrice: 350 }));
+    events.length = 0;
+
+    await store.refreshLots(['lot-a', 'lot-c']);
+
+    expect(store.lot('lot-a')).toMatchObject({ nextPrice: 440, owner_login: 'bob' });
+    expect(store.lot('lot-c')?.nextPrice).toBe(350);
+    // Окно витрины не пополнилось и не переехало; перекуп не задвоился.
+    expect(store.catalogWindow().map((st) => st.slug)).toEqual(['lot-a', 'lot-b']);
+    expect(kinds(events)).toEqual(['catalog']);
+    expect(f.calls.bySlugs).toBe(1);
+  });
+
   it('смена uid во время чтения баланса: чужой ответ не подхватывается, свой читается', async () => {
     const f = fakeReaders();
     f.state.uid = 'u1';

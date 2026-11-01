@@ -193,6 +193,8 @@ export interface LiveStore {
   // Явная свежесть для денежных гейтов (гамба, покупка).
   refreshBalance(): Promise<number | null>;
   refreshLot(slug: string): Promise<LotState | null>;
+  /** Свежие строки по slug'ам вне окна — кнопкам возврата колокола нужна N. */
+  refreshLots(slugs: readonly string[]): Promise<void>;
   /**
    * Придержать баланс под церемонию (гамба): значения копятся, снапшот
    * и события — до release. Возвращает идемпотентный release: раскрыть
@@ -823,6 +825,32 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
     return read.state;
   }
 
+  /**
+   * Цены истории колокола: оффлайн-догон приходит из `purchases`, где N нет,
+   * а лота в окне витрины может не быть (ADR 0012) — строки ложатся в карту
+   * снапшота, но не в окно. Перекупы не пересчитываем: их уже объявил дифф
+   * среза или догон, второй звук и вторая запись тут не нужны.
+   */
+  async function refreshLotsNow(slugs: readonly string[]): Promise<void> {
+    const wanted = [...new Set(slugs)].filter((slug) => slug.length > 0);
+    if (wanted.length === 0) return;
+    let read: CatalogRead;
+    try {
+      read = await readers.readCatalogBySlugs(uidValue, wanted);
+    } catch {
+      return;
+    }
+    // Отказ не выдаём за «удалён»: без строк история остаётся как была.
+    if (!read.ok || read.states.size === 0) return;
+
+    const next = new Map(catalogValue);
+    for (const raw of read.states.values()) next.set(raw.slug, raw);
+    const { merged, changed } = mergeCatalog(withMine(next, uidValue));
+    if (changed.size === 0) return;
+    catalogValue = merged;
+    emit({ kind: 'catalog', changed, fresh: catalogFresh });
+  }
+
   async function readAllNow(refreshMine: boolean): Promise<void> {
     const u = await readUidSafe();
     applyUid(u);
@@ -995,6 +1023,8 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
     },
 
     refreshLot: refreshLotNow,
+
+    refreshLots: refreshLotsNow,
 
     deferBalance() {
       // Повторный defer подряд (не должен случаться) не теряет уже накопленное.

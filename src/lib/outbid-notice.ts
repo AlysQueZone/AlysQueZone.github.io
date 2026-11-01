@@ -14,6 +14,9 @@
  *   (до 3 свежих), остальное — в истории колокольчика;
  * - колокольчик в шапке: счётчик непрочитанных + панель истории за сессию
  *   (макс 10, у каждой записи кнопка перекупа). Только залогиненным.
+ *   Цену кнопки история дочитывает по своим slug'ам (`live.refreshLots`):
+ *   оффлайн-догон приходит из purchases без N, а лота может не быть в окне
+ *   витрины (ADR 0012).
  *   Оффлайн-догон: при старте/фокусе/смене сессии история донаполняется
  *   из purchases (сделки, где я был продавцом), поэтому перекуп с закрытой
  *   вкладкой тоже виден; выкупленные обратно лоты из истории исключаются.
@@ -139,6 +142,7 @@ export function initOutbidNotice(): void {
     bellPanel.style.display = 'block';
     anchorPanel();
     startHeaderWatch();
+    refreshHistoryPrices();
     unread = 0;
     markSeen();
     renderBell();
@@ -291,6 +295,14 @@ export function initOutbidNotice(): void {
     });
   }
 
+  /** Догон приносит записи без N, а срез витрины их лотов может не содержать
+   *  (ADR 0012) — историю цен дочитываем одним запросом по slug'ам; ответ
+   *  придёт событием каталога и обновит кнопки. */
+  function refreshHistoryPrices(): void {
+    if (history.length === 0) return;
+    void live.refreshLots(history.map((ev) => ev.slug));
+  }
+
   /**
    * Добавить перекуп в колокол; `false` — тот же уже показан. Одно событие
    * может прийти из двух диффов (окно витрины и «Мои приветы») почти
@@ -338,6 +350,7 @@ export function initOutbidNotice(): void {
         unread += added;
         renderBell();
         if (isOpen()) renderPanel();
+        refreshHistoryPrices();
       }
     } catch {
       // догон — best effort, лайв-канал работает и без него

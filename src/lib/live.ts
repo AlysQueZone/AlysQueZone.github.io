@@ -465,6 +465,12 @@ export const live = {
     return store.refreshLot(slug);
   },
 
+  /** Цены лотов вне окна витрины — кнопкам возврата в истории колокола. */
+  refreshLots(slugs: readonly string[]): Promise<void> {
+    ensureWired();
+    return store.refreshLots(slugs);
+  },
+
   /**
    * Придержать баланс под церемонию (гамба): оба источника (серверный ответ
    * и тик профиля) копятся, снапшот и чип раскрываются на release. Возвращает
