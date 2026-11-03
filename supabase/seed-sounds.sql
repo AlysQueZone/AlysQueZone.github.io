@@ -23,6 +23,7 @@ insert into public.gamba_sounds (pool, file) values
   ('win', 'gamba-win-oooo.mp3'),
   ('win', 'gamba-win-pivo.mp3'),
   ('win', 'gamba-win-ya-lublu-pivo.mp3'),
+  ('win', 'gamba-win-obozhayu-pit.mp3'),
   ('jackpot', 'gamba-win100k.mp3'),
   ('jackpot', 'gamba-super-vanna.mp3'),
   ('jackpot', 'gamba-super-snow.mp3'),

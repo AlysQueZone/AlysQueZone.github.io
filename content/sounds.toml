@@ -97,6 +97,10 @@ pool = "win"
 file = "gamba-win-ya-lublu-pivo.mp3"
 
 [[sounds]]
+pool = "win"
+file = "gamba-win-obozhayu-pit.mp3"
+
+[[sounds]]
 pool = "jackpot"
 file = "gamba-win100k.mp3"
 

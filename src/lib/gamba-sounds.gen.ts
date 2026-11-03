@@ -26,6 +26,7 @@ export const GAMBA_SOUND_POOLS_FALLBACK = {
     'gamba-win-oooo.mp3',
     'gamba-win-pivo.mp3',
     'gamba-win-ya-lublu-pivo.mp3',
+    'gamba-win-obozhayu-pit.mp3',
   ],
   jackpot: [
     'gamba-win100k.mp3',
