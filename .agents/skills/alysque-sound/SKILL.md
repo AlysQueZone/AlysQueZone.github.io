@@ -13,7 +13,7 @@ description: 'Звук колеса гамбы: `just sound-add` (mp3 из фа�
 
 1. Выбери пул по стадии (таблица выше).
 2. `just sound-add <файл|URL> --pool <пул>` — одной командой: `ffmpeg` достаёт mp3 из клипа, залив в Storage, проверка публичного URL, блок в манифесте, пересборка сида и фолбэка, синк в БД, печать URL.
-   - `--name <имя>` — когда слаг из источника невнятный (URL клипа часто даёт `alert-orig`): `--name gamba-spin-rgg-koleso`.
+   - `--name <имя>` — когда слаг из источника невнятный (URL клипа часто даёт `alert-orig`): `--name gamba-spin-rgg-koleso`. Имя — по смыслу фразы; клип не слышно — распознай локально: `whisper small -f <клип> -l ru` (whisper.cpp, модели в `~/.local/share/whisper-models`).
    - Локальный исходник из `privets/` уедет в `privets/already added/`; бинарники в репо не кладём, работаем через `/tmp`.
 3. Глазами сверь новый блок в `content/sounds.toml`: пул и имя.
 
