@@ -211,6 +211,46 @@ describe('appendHistory', () => {
   });
 });
 
+describe('лог сделок: курсор, слияние и дописывание', () => {
+  const sameTime = '2026-11-04T10:00:00.000Z';
+
+  it('курсор по записям лога: id разводит одинаковое время соседей', () => {
+    expect(
+      historyCursor([
+        deal({ id: 12, created_at: sameTime }),
+        deal({ id: 11, created_at: sameTime }),
+      ])
+    ).toEqual({ created_at: sameTime, id: 11 });
+  });
+
+  it('следующая страница с одинаковым временем соседей не теряет и не дублирует строки', () => {
+    const shown = [deal({ id: 12, created_at: sameTime }), deal({ id: 11, created_at: sameTime })];
+    const appended = appendHistory(shown, [
+      deal({ id: 11, created_at: sameTime }),
+      deal({ id: 10, created_at: sameTime }),
+      deal({ id: 9, created_at: sameTime }),
+    ]);
+    expect(appended.map((entry) => entry.id)).toEqual([12, 11, 10, 9]);
+    expect(new Set(appended.map((entry) => entry.id)).size).toBe(4);
+  });
+
+  it('свежая страница встаёт сверху без дублей, пролистанное остаётся', () => {
+    const shown = [deal({ id: 10 }), deal({ id: 9 }), deal({ id: 8 })];
+    const merged = mergeHistory(shown, [deal({ id: 12 }), deal({ id: 11 }), deal({ id: 10 })]);
+    expect(merged.map((entry) => entry.id)).toEqual([12, 11, 10, 9, 8]);
+  });
+
+  it('пустая свежая страница лога ничего не меняет', () => {
+    const shown = [deal({ id: 10 }), deal({ id: 9 })];
+    expect(mergeHistory(shown, [])).toEqual(shown);
+  });
+
+  it('пустая следующая страница не сдвигает показанное', () => {
+    const shown = [deal({ id: 10 }), deal({ id: 9 })];
+    expect(appendHistory(shown, [])).toEqual(shown);
+  });
+});
+
 describe('formatRelativeTime', () => {
   const now = Date.parse('2026-10-16T12:00:00.000Z');
   const ago = (seconds: number): string => new Date(now - seconds * 1000).toISOString();

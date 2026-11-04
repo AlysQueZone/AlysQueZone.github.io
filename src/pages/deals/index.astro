@@ -74,6 +74,29 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
   </p>
 
   <div data-log-body class="mt-6 hidden"></div>
+
+  <!-- Запасной путь пагинации: автоподгрузку сторожит этот же блок. -->
+  <div data-log-more class="mt-6 hidden">
+    <div class="flex justify-center">
+      <button
+        type="button"
+        data-log-load-more
+        class="btn-arcade btn-arcade-ghost px-6 py-3 text-sm"
+      >
+        Показать ещё
+      </button>
+    </div>
+  </div>
+
+  <!-- Новые сделки при прокрутке копятся здесь, а не прыгают в список. -->
+  <button
+    type="button"
+    data-log-new
+    class="fixed left-1/2 z-[65] hidden -translate-x-1/2 border-[3px] border-milk bg-stream px-4 py-2 text-sm font-black text-cream shadow-[4px_4px_0_var(--color-milk)]"
+    style="top: var(--deals-sticky-top, 6rem)"
+  >
+    ↑ 0 новых сделок
+  </button>
 </BaseLayout>
 
 <style is:global>
@@ -103,9 +126,12 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
   import { live } from '@/lib/live';
   import { videoSources } from '@/lib/lot-video';
   import {
+    appendHistory,
     DEAL_PAGE_SIZE,
     formatRelativeTime,
     groupDealDays,
+    historyCursor,
+    mergeHistory,
     type DealDay,
     type DealEntry,
   } from '@/lib/trade-history';
@@ -118,11 +144,20 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
   const error = document.querySelector('[data-log-error]');
   const retry = document.querySelector('[data-log-retry]');
   const status = document.querySelector('[data-log-status]');
+  const more = document.querySelector('[data-log-more]');
+  const moreButton = document.querySelector('[data-log-load-more]');
+  const pill = document.querySelector('[data-log-new]');
 
   /** Показанные записи: новые сверху; дни считает ядро при каждой перерисовке. */
   let entries: DealEntry[] = [];
+  /** Свежие сделки, придержанные, пока пользователь прокручен ниже верха лога. */
+  let pending: DealEntry[] = [];
   let loaded = false;
-  let loading = false;
+  let loadingFirst = false;
+  let loadingMore = false;
+  let refreshing = false;
+  let hasMore = false;
+  let observer: IntersectionObserver | null = null;
 
   function toggle(el: Element | null, show: boolean): void {
     if (el instanceof HTMLElement) el.classList.toggle('hidden', !show);
@@ -310,48 +345,166 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
     return section;
   }
 
+  function dealsLabel(count: number): string {
+    return `${count} ${plural(count, 'сделка', 'сделки', 'сделок')}`;
+  }
+
+  function newDealsLabel(count: number): string {
+    return `${count} ${plural(count, 'новая сделка', 'новые сделки', 'новых сделок')}`;
+  }
+
   function render(): void {
     if (!body) return;
     toggle(skeleton, false);
     toggle(error, false);
     body.replaceChildren();
-    toggle(body, entries.length > 0);
-    toggle(empty, loaded && entries.length === 0);
-    if (entries.length === 0) return;
-    const wrap = el('div', 'flex flex-col gap-5');
-    for (const day of groupDealDays(entries)) wrap.append(daySection(day));
-    body.append(wrap);
+    const shown = entries.length > 0;
+    toggle(body, shown);
+    toggle(empty, loaded && !shown);
+    toggle(more, shown && hasMore);
+    if (shown) {
+      const wrap = el('div', 'flex flex-col gap-5');
+      for (const day of groupDealDays(entries)) wrap.append(daySection(day));
+      body.append(wrap);
+    }
+    syncObserver();
   }
 
   function showError(): void {
     toggle(skeleton, false);
     toggle(body, false);
     toggle(empty, false);
+    toggle(more, false);
     toggle(error, true);
     announce('Лог не загрузился');
   }
 
+  function renderPill(): void {
+    if (!(pill instanceof HTMLElement)) return;
+    if (pending.length === 0) {
+      pill.classList.add('hidden');
+      return;
+    }
+    pill.textContent = `↑ ${newDealsLabel(pending.length)}`;
+    pill.classList.remove('hidden');
+  }
+
+  /**
+   * Автоподгрузка сторожит блок кнопки с запасом в 240 px. Пересоздаём
+   * наблюдатель после каждой перерисовки: иначе блок, оставшийся в зоне
+   * видимости, не даст нового события и список не дочитается без клика.
+   */
+  function syncObserver(): void {
+    observer?.disconnect();
+    observer = null;
+    if (!hasMore || loadingFirst || !more || !('IntersectionObserver' in window)) return;
+    observer = new IntersectionObserver(
+      (records) => {
+        if (records.some((record) => record.isIntersecting)) void loadMore();
+      },
+      { rootMargin: '240px' }
+    );
+    observer.observe(more);
+  }
+
+  /** Верх лога виден, если его начало не уехало под липкую шапку. */
+  function logTopVisible(): boolean {
+    // Пустой лог показывать нечему — первая же сделка сразу встаёт на место.
+    if (entries.length === 0 || !(body instanceof HTMLElement)) return true;
+    const header = document.querySelector('header');
+    const sticky = header instanceof HTMLElement ? header.offsetHeight : 0;
+    return body.getBoundingClientRect().top >= sticky;
+  }
+
   /** Первая страница: скелетон → записи, пусто или ошибка. */
   async function load(): Promise<void> {
-    if (loading) return;
-    loading = true;
+    if (loadingFirst) return;
+    loadingFirst = true;
     loaded = false;
     entries = [];
+    pending = [];
+    hasMore = false;
+    renderPill();
     toggle(error, false);
     toggle(empty, false);
     toggle(body, false);
+    toggle(more, false);
     toggle(skeleton, true);
     announce('Загружаю лог сделок…');
     const page = await fetchDealLog(DEAL_PAGE_SIZE);
-    loading = false;
+    loadingFirst = false;
     if (!page.ok) {
       showError();
       return;
     }
     entries = page.entries;
+    hasMore = page.entries.length === DEAL_PAGE_SIZE;
     loaded = true;
     render();
-    announce(entries.length > 0 ? `Загружено ${entries.length} сделок` : 'Сделок пока нет');
+    announce(
+      entries.length === 0
+        ? 'Сделок пока нет'
+        : hasMore
+          ? `Загружено ${dealsLabel(entries.length)}`
+          : `Лог дочитан — всего ${dealsLabel(entries.length)}`
+    );
+  }
+
+  /** Следующая (более старая) страница по курсору показанного. */
+  async function loadMore(): Promise<void> {
+    if (!hasMore || loadingFirst || loadingMore) return;
+    const cursor = historyCursor(entries);
+    if (!cursor) {
+      hasMore = false;
+      render();
+      return;
+    }
+    loadingMore = true;
+    if (moreButton instanceof HTMLButtonElement) moreButton.disabled = true;
+    const page = await fetchDealLog(DEAL_PAGE_SIZE, cursor);
+    loadingMore = false;
+    if (moreButton instanceof HTMLButtonElement) moreButton.disabled = false;
+    if (!page.ok) {
+      announce('Не получилось подгрузить — попробуй ещё');
+      return;
+    }
+    const next = appendHistory(entries, page.entries);
+    const grew = next.length > entries.length;
+    entries = next;
+    // Полная страница без единой новой строки — дальше курсор не сдвинется.
+    hasMore = page.entries.length === DEAL_PAGE_SIZE && grew;
+    render();
+    announce(
+      hasMore
+        ? `Показано ${dealsLabel(entries.length)}`
+        : `Лог дочитан — всего ${dealsLabel(entries.length)}`
+    );
+  }
+
+  /**
+   * Живое событие `deals`: перечитываем только первую страницу. Верх виден —
+   * вставляем новые строки сверху; прокручено ниже — копим в плашке, чтобы
+   * список не прыгал под пальцем.
+   */
+  async function refresh(): Promise<void> {
+    if (!loaded || refreshing) return;
+    refreshing = true;
+    const page = await fetchDealLog(DEAL_PAGE_SIZE);
+    refreshing = false;
+    if (!page.ok) return;
+    const known = new Set([...entries, ...pending].map((entry) => entry.id));
+    const fresh = page.entries.filter((entry) => !known.has(entry.id));
+    if (fresh.length === 0) return;
+    if (logTopVisible()) {
+      entries = mergeHistory(entries, [...fresh, ...pending]);
+      pending = [];
+      renderPill();
+      render();
+    } else {
+      pending = mergeHistory(pending, fresh);
+      renderPill();
+    }
+    announce(`${newDealsLabel(fresh.length)}: в логе`);
   }
 
   /** Липкая полоса дня встаёт под фактической высотой шапки, а не под догадкой. */
@@ -363,10 +516,24 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
   }
 
   retry?.addEventListener('click', () => void load());
+  moreButton?.addEventListener('click', () => void loadMore());
 
-  // Сессия: «ТВОЙ» перерисовывается при смене uid. Событие `deals` — тикет 02.
+  pill?.addEventListener('click', () => {
+    if (pending.length === 0) return;
+    const count = pending.length;
+    entries = mergeHistory(entries, pending);
+    pending = [];
+    renderPill();
+    render();
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
+    announce(`${newDealsLabel(count)}: в логе`);
+  });
+
+  // Сессия: «ТВОЙ» перерисовывается при смене uid; `deals` — свежая страница.
   live.subscribe((change) => {
     if (change.kind === 'uid' && loaded) render();
+    if (change.kind === 'deals') void refresh();
   });
 
   measureHeader();
