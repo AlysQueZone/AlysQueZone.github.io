@@ -234,15 +234,19 @@ export interface DealLogPage {
 
 /**
  * Лог сделок всей биржи: публичный `SELECT` из `purchases` с соединённым лотом
- * (`lots(slug,title,video_url)`), новые первыми. Без курсора — первая страница;
- * с курсором (`historyCursor`) — следующая: keyset по паре `(created_at, id)`,
- * поэтому живые вставки не сдвигают границу (offset бы сдвинул). Индекс —
- * `purchases_time_idx (created_at desc, id desc)`. `ok: false` — БД недоступна
- * или ответ битый; пустой успешный ответ — честное «сделок нет».
+ * (`lots(slug,title,video_url)`), новые первыми. `buyerUid` — фильтр «Мои
+ * покупки»; без него — вся биржа. Без курсора — первая страница; с курсором
+ * (`historyCursor`) — следующая: keyset по паре `(created_at, id)`, поэтому
+ * живые вставки не сдвигают границу (offset бы сдвинул). Индексы уже есть:
+ * `purchases_time_idx (created_at desc, id desc)` для всей биржи и
+ * `purchases_buyer_time_idx (buyer_uid, created_at desc)` для фильтра — новых
+ * не заводим. `ok: false` — БД недоступна или ответ битый; пустой успешный
+ * ответ — честное «сделок нет».
  */
 export async function fetchDealLog(
   limit: number = DEAL_PAGE_SIZE,
-  cursor: HistoryCursor | null = null
+  cursor: HistoryCursor | null = null,
+  buyerUid?: string | null
 ): Promise<DealLogPage> {
   const sb = getSupabase();
   if (!sb) return { ok: false, entries: [] };
@@ -252,6 +256,7 @@ export async function fetchDealLog(
       .select(
         'id,seller_login,buyer_login,buyer_uid,price_paid,created_at,lots(slug,title,video_url)'
       );
+    if (buyerUid) query = query.eq('buyer_uid', buyerUid);
     if (cursor && cursor.created_at.length > 0) {
       query = query.or(
         `created_at.lt.${cursor.created_at},and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`

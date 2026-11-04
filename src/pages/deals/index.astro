@@ -2,10 +2,10 @@
 import BaseLayout from '@/layouts/BaseLayout.astro';
 
 // «Лог сделок» — статический каркас, данные рисует клиент из БД (docs/adr/0002).
-// Первая страница — 20 сделок новыми сверху, сгруппированные по локальным дням
-// чистым ядром (lib/trade-history.ts). Живые события, пагинация и фильтр — не
-// здесь: страница читает один срез и перерисовывается, чтобы их можно было
-// добавить без переписывания.
+// Страница держит три вещи: листание по курсору (lib/trade-history.ts), живое
+// событие `deals` модуля живых данных (docs/adr/0003) и фильтр «Все / Мои
+// покупки» (`?mine=1`, uid — только через live.ts). Отбор строк и деление на
+// дни — чистое ядро; здесь состояния, URL, разметка и перерисовка.
 ---
 
 <BaseLayout title="Лог сделок — AlysQueZone">
@@ -15,6 +15,24 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
       <p class="mt-2 max-w-xl text-sm font-bold text-mist">
         Кто, когда, что и за сколько забрал. Новые сверху.
       </p>
+    </div>
+    <div data-log-filter class="flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        data-log-mine="0"
+        aria-pressed="true"
+        class="btn-arcade btn-arcade-primary px-4 py-2 text-sm"
+      >
+        Все
+      </button>
+      <button
+        type="button"
+        data-log-mine="1"
+        aria-pressed="false"
+        class="btn-arcade btn-arcade-ghost px-4 py-2 text-sm"
+      >
+        Мои покупки
+      </button>
     </div>
   </div>
 
@@ -73,6 +91,11 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
     Сделок пока нет — забери первый привет
   </p>
 
+  <!-- «Мои покупки» без входа: подсказка вместо пустого лога. -->
+  <p data-log-guest class="card-pixel mt-6 hidden p-5 text-sm font-bold text-mist sm:p-6">
+    Войди через Twitch — тут будут твои покупки
+  </p>
+
   <div data-log-body class="mt-6 hidden"></div>
 
   <!-- Запасной путь пагинации: автоподгрузку сторожит этот же блок. -->
@@ -121,7 +144,8 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 
 <script>
   // Страница рисует срез лога: запрос — lib/supabase.ts, отбор и деление на дни —
-  // lib/trade-history.ts. Здесь только состояния, разметка и перерисовка.
+  // lib/trade-history.ts. Здесь состояния, фильтр «Все / Мои» и его URL, разметка
+  // и перерисовка; uid и сессию знает только live.ts (docs/adr/0003).
   import { fetchDealLog } from '@/lib/supabase';
   import { live } from '@/lib/live';
   import { videoSources } from '@/lib/lot-video';
@@ -141,12 +165,14 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
   const skeleton = document.querySelector('[data-log-skeleton]');
   const body = document.querySelector('[data-log-body]');
   const empty = document.querySelector('[data-log-empty]');
+  const guest = document.querySelector('[data-log-guest]');
   const error = document.querySelector('[data-log-error]');
   const retry = document.querySelector('[data-log-retry]');
   const status = document.querySelector('[data-log-status]');
   const more = document.querySelector('[data-log-more]');
   const moreButton = document.querySelector('[data-log-load-more]');
   const pill = document.querySelector('[data-log-new]');
+  const filterButtons = document.querySelectorAll('[data-log-mine]');
 
   /** Показанные записи: новые сверху; дни считает ядро при каждой перерисовке. */
   let entries: DealEntry[] = [];
@@ -161,12 +187,81 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
   let hasMore = false;
   let observer: IntersectionObserver | null = null;
 
+  /** «Мои покупки» (`?mine=1`); состояние фильтра живёт в URL. */
+  let mine = new URL(window.location.href).searchParams.get('mine') === '1';
+  /** uid прочитан хотя бы раз: до этого гостевую подсказку не показываем. */
+  let uidReady = false;
+  /** Последний uid из снапшота — смена перезагружает «Мои покупки». */
+  let seenUid: string | null = null;
+  /**
+   * Поколение списка: смена фильтра или uid отменяет ответы прошлых запросов.
+   * Иначе медленный «Все» перезаписал бы уже показанные «Мои».
+   */
+  let generation = 0;
+
   function toggle(el: Element | null, show: boolean): void {
     if (el instanceof HTMLElement) el.classList.toggle('hidden', !show);
   }
 
   function announce(text: string): void {
     if (status) status.textContent = text;
+  }
+
+  /** Фильтр запроса: «Мои» — uid сессии; «Все» — без фильтра. */
+  function buyerUid(): string | null {
+    return mine ? live.uid() : null;
+  }
+
+  function syncFilterUi(): void {
+    for (const node of filterButtons) {
+      if (!(node instanceof HTMLElement)) continue;
+      const active = node.dataset.logMine === '1' ? mine : !mine;
+      node.classList.toggle('btn-arcade-primary', active);
+      node.classList.toggle('btn-arcade-ghost', !active);
+      node.setAttribute('aria-pressed', String(active));
+    }
+  }
+
+  /** Состояние фильтра в URL: `?mine=1` — «Мои», без параметра — «Все». */
+  function writeMineToUrl(): void {
+    const url = new URL(window.location.href);
+    if (mine) url.searchParams.set('mine', '1');
+    else url.searchParams.delete('mine');
+    window.history.replaceState(null, '', url.toString());
+  }
+
+  /** Сброс списка при смене фильтра или uid: курсор, плашка и ответы прошлых запросов. */
+  function resetList(): void {
+    generation += 1;
+    loadingFirst = false;
+    loadingMore = false;
+    refreshing = false;
+    refreshQueued = false;
+    loaded = false;
+    entries = [];
+    pending = [];
+    hasMore = false;
+    observer?.disconnect();
+    observer = null;
+    if (moreButton instanceof HTMLButtonElement) moreButton.disabled = false;
+    renderPill();
+    toggle(error, false);
+    toggle(empty, false);
+    toggle(guest, false);
+    toggle(body, false);
+    toggle(more, false);
+    toggle(skeleton, true);
+  }
+
+  /** «Мои покупки» без входа — подсказка вместо пустого лога. */
+  function showGuest(): void {
+    toggle(skeleton, false);
+    toggle(body, false);
+    toggle(empty, false);
+    toggle(more, false);
+    toggle(error, false);
+    toggle(guest, true);
+    announce('Войди через Twitch — тут будут твои покупки');
   }
 
   function el<K extends keyof HTMLElementTagNameMap>(
@@ -359,6 +454,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
     if (!body) return;
     toggle(skeleton, false);
     toggle(error, false);
+    toggle(guest, false);
     body.replaceChildren();
     const shown = entries.length > 0;
     toggle(body, shown);
@@ -376,6 +472,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
     toggle(skeleton, false);
     toggle(body, false);
     toggle(empty, false);
+    toggle(guest, false);
     toggle(more, false);
     toggle(error, true);
     announce('Лог не загрузился');
@@ -421,6 +518,12 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
   /** Первая страница: скелетон → записи, пусто или ошибка. */
   async function load(): Promise<void> {
     if (loadingFirst) return;
+    // «Мои» без входа — подсказка, а не запрос без фильтра (он показал бы чужие).
+    if (mine && !live.uid()) {
+      showGuest();
+      return;
+    }
+    const token = generation;
     loadingFirst = true;
     loaded = false;
     entries = [];
@@ -429,11 +532,14 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
     renderPill();
     toggle(error, false);
     toggle(empty, false);
+    toggle(guest, false);
     toggle(body, false);
     toggle(more, false);
     toggle(skeleton, true);
     announce('Загружаю лог сделок…');
-    const page = await fetchDealLog(DEAL_PAGE_SIZE);
+    const page = await fetchDealLog(DEAL_PAGE_SIZE, null, buyerUid());
+    // Пока читали, фильтр или сессия сменились — ответ устарел, состоянием владеет новый сброс.
+    if (token !== generation) return;
     loadingFirst = false;
     if (!page.ok) {
       showError();
@@ -465,9 +571,11 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
       render();
       return;
     }
+    const token = generation;
     loadingMore = true;
     if (moreButton instanceof HTMLButtonElement) moreButton.disabled = true;
-    const page = await fetchDealLog(DEAL_PAGE_SIZE, cursor);
+    const page = await fetchDealLog(DEAL_PAGE_SIZE, cursor, buyerUid());
+    if (token !== generation) return;
     loadingMore = false;
     if (moreButton instanceof HTMLButtonElement) moreButton.disabled = false;
     if (!page.ok) {
@@ -488,17 +596,21 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
   }
 
   /**
-   * Живое событие `deals`: перечитываем только первую страницу. Верх виден —
-   * вставляем новые строки сверху; прокручено ниже — копим в плашке, чтобы
-   * список не прыгал под пальцем.
+   * Живое событие `deals`: перечитываем только первую страницу с текущим
+   * фильтром — в «Моих» чужие покупки так не приезжают, даже если событие
+   * пришло по чужой сделке. Верх виден — вставляем новые строки сверху;
+   * прокручено ниже — копим в плашке, чтобы список не прыгал под пальцем.
    */
   async function refresh(): Promise<void> {
+    if (mine && !live.uid()) return;
     if (!loaded || refreshing) {
       refreshQueued = true;
       return;
     }
+    const token = generation;
     refreshing = true;
-    const page = await fetchDealLog(DEAL_PAGE_SIZE);
+    const page = await fetchDealLog(DEAL_PAGE_SIZE, null, buyerUid());
+    if (token !== generation) return;
     refreshing = false;
     if (page.ok) {
       const known = new Set([...entries, ...pending].map((entry) => entry.id));
@@ -522,6 +634,39 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
     }
   }
 
+  /** Переключить фильтр: URL, оформление и список начинаются заново. */
+  function setMine(next: boolean): void {
+    if (mine === next) return;
+    mine = next;
+    writeMineToUrl();
+    syncFilterUi();
+    resetList();
+    if (!mine) {
+      void load();
+      return;
+    }
+    // uid ещё не прочитан — не показываем гостевую подсказку зря:
+    // первый uid-событие подписки само решит «список или вход».
+    if (!uidReady) return;
+    if (live.uid()) void load();
+    else showGuest();
+  }
+
+  /** uid снапшота: «ТВОЙ» в «Все», перезагрузка списка в «Моих», подсказка гостю. */
+  function onUid(uid: string | null): void {
+    const changed = !uidReady || uid !== seenUid;
+    uidReady = true;
+    seenUid = uid;
+    if (!changed) return;
+    if (mine) {
+      resetList();
+      if (uid) void load();
+      else showGuest();
+    } else if (loaded) {
+      render();
+    }
+  }
+
   /** Липкая полоса дня встаёт под фактической высотой шапки, а не под догадкой. */
   function measureHeader(): void {
     const header = document.querySelector('header');
@@ -532,6 +677,12 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 
   retry?.addEventListener('click', () => void load());
   moreButton?.addEventListener('click', () => void loadMore());
+  for (const node of filterButtons) {
+    node.addEventListener('click', () => {
+      if (!(node instanceof HTMLElement)) return;
+      setMine(node.dataset.logMine === '1');
+    });
+  }
 
   pill?.addEventListener('click', () => {
     if (pending.length === 0) return;
@@ -545,9 +696,9 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
     announce(`${newDealsLabel(count)}: в логе`);
   });
 
-  // Сессия: «ТВОЙ» перерисовывается при смене uid; `deals` — свежая страница.
+  // Сессия: «ТВОЙ» и «Мои покупки» зависят от uid; `deals` — свежая страница.
   live.subscribe((change) => {
-    if (change.kind === 'uid' && loaded) render();
+    if (change.kind === 'uid') onUid(change.uid);
     if (change.kind === 'deals') void refresh();
   });
 
@@ -556,5 +707,10 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
   // Press Start 2P меняет высоту шапки после загрузки шрифта.
   void document.fonts?.ready.then(measureHeader);
 
-  void load();
+  // Подписка уже могла отдать прочитанный uid (prime в live.subscribe);
+  // в «Моих» без него список ждёт первого uid-события.
+  syncFilterUi();
+  if (!mine) void load();
+  else if (uidReady && live.uid()) void load();
+  else if (uidReady) showGuest();
 </script>
