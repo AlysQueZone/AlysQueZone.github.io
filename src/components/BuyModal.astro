@@ -543,7 +543,7 @@ const clapSound = s3Sound('clap.mp3');
   }
 
   // Возврат из логина: Чатерс залогинен — переоткрыть модалку того
-  // же Лота. Лот не стираем, пока кнопка не найдена, — иначе возврат теряется.
+  // же Лота. Лот не стираем, пока модалка не открылась, — иначе возврат теряется.
   void (async () => {
     const sb = getSupabase();
     if (!sb) return;
@@ -552,8 +552,23 @@ const clapSound = s3Sound('clap.mp3');
     const id = peekPendingBuy();
     if (!id) return;
     const btn = await waitForBuyButton(id, 8000);
-    if (!(btn instanceof HTMLElement)) return;
+    if (btn instanceof HTMLElement) {
+      clearPendingBuy();
+      btn.click();
+      return;
+    }
+    // Карточки на странице может не быть вовсе (/deals/, 404): модалка живёт
+    // в макете, поэтому открываем её по свежим данным лота, без кнопки-якоря.
+    const st = await live.refreshLot(id);
+    if (!st) return;
+    pending = {
+      slug: st.slug,
+      title: st.title,
+      price: st.nextPrice,
+      owner: st.owner_login ?? '—',
+      video: st.video_url,
+    };
     clearPendingBuy();
-    btn.click();
+    buyModal?.open(null);
   })();
 </script>
