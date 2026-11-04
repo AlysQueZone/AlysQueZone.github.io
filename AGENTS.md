@@ -53,7 +53,7 @@
 
 - Preview-проверка сборки (`preview` + `agent-browser`), гейт перед релизом → `docs/agents/shipping.md`.
 - Supabase-схема / RLS / миграции / отладка → `docs/agents/supabase.md`.
-- Стиль / импорты / рендер / тесты / SQL-гайд / `just` → `docs/agents/code-style.md`.
+- Стандарты кода / стиль / импорты / рендер / тесты / SQL-гайд / `just` → `CODING_STANDARDS.md`.
 - Цвета / токены / типографика / компоненты → `DESIGN.md`.
 - Гамба-звуки / комиссия / рост цены / награда за привет / владение лотом → `docs/agents/economy.md`.
 - Новый звук колеса (`just sound-add`, манифест `content/sounds.toml`) → скилл `alysque-sound`.

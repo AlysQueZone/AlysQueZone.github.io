@@ -1,4 +1,6 @@
-# Стиль кода, импорты, SQL-гайд
+# Стандарты кода
+
+Стиль, импорты, рендер, тесты, SQL-гайд и команды. Читаются на ревью; механическое уже enforced тулингом.
 
 Качество: Prettier 3 (+ prettier-plugin-astro, tailwind-плагин последним) + ESLint 10 flat (`recommended`, без type-aware), `eslint-config-prettier` последним; тесты ядра — vitest без DOM (`src/**/*.test.ts`); enforcement — только pre-commit хук (husky: `lint-staged` + `tsc --noEmit` + тесты), без CI; кодовые гейты разом — `just check` (типы, линт, тесты, формат), по отдельности — `just lint` / `just format` / `just test`.
 

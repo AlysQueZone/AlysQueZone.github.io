@@ -18,7 +18,7 @@
 - `GLOSSARY.md` — «Лог сделок», «Бегущая строка», «Сделка»
 - `DESIGN.md` — палитра и компоненты
 - ADR: `docs/adr/0002-market-client-projection.md`, `0003-live-data-single-owner.md`, `0012-catalog-pages.md`
-- `docs/agents/shipping.md`, `docs/agents/supabase.md`, `docs/agents/code-style.md`
+- `docs/agents/shipping.md`, `docs/agents/supabase.md`, `CODING_STANDARDS.md`
 - спеку и тикеты выше
 
 ## Прототип
