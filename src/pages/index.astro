@@ -1,7 +1,6 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import RulesModal from '@/components/RulesModal.astro';
-import BuyModal from '@/components/BuyModal.astro';
 import LotCard from '@/components/LotCard.astro';
 import LotCardSkeleton from '@/components/LotCardSkeleton.astro';
 import BrandHeadline from '@/components/BrandHeadline.astro';
@@ -107,7 +106,6 @@ const base = import.meta.env.BASE_URL;
     </div>
   </section>
   <RulesModal />
-  <BuyModal />
   <!-- Шаблон случайной карточки: тот же LotCard, что на витрине (одно
        представление Лота), заполняет lib/lot-view.ts. -->
   <template data-lot-card-template>
@@ -120,7 +118,7 @@ const base = import.meta.env.BASE_URL;
   // `random_lots` читает БД (docs/adr/0012), свежие цены/владельцев тик
   // обновляет по slug выбранных лотов. Карточки — каноничный LotCard (шаблон
   // в разметке): слоты Лота и раскладку кадра заполняет lib/lot-view.ts, как
-  // на витрине; цена и покупка — в кнопке, модалка покупки на странице
+  // на витрине; цена и покупка — в кнопке, модалка покупки — в общем макете
   // (BuyModal). Одно представление Лота на всех поверхностях (docs/adr/0009).
   import { live, type LotState } from '@/lib/live';
   import { fillLot } from '@/lib/lot-view';

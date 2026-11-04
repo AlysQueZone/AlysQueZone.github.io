@@ -2,7 +2,6 @@
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import LotCard from '@/components/LotCard.astro';
 import LotCardSkeleton from '@/components/LotCardSkeleton.astro';
-import BuyModal from '@/components/BuyModal.astro';
 import SuggestGreeting from '@/components/SuggestGreeting.astro';
 import BrandHeadline from '@/components/BrandHeadline.astro';
 import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
@@ -70,8 +69,6 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
 
     <SuggestGreeting />
   </section>
-
-  <BuyModal />
 
   <template data-lot-card-template>
     <LotCard />

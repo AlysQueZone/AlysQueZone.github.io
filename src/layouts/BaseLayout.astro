@@ -14,6 +14,7 @@ import '@fontsource/rubik/cyrillic-700.css';
 import '@fontsource/rubik/cyrillic-800.css';
 import '@fontsource/rubik/cyrillic-900.css';
 import GambaModal from '@/components/GambaModal.astro';
+import BuyModal from '@/components/BuyModal.astro';
 import DailyLogin from '@/components/DailyLogin.astro';
 import AuthButton from '@/components/AuthButton.astro';
 import { assertSupabaseConfigured } from '@/lib/supabase';
@@ -155,6 +156,9 @@ assertSupabaseConfigured();
     </main>
     <!-- Гамба-рулетка: кнопка в шапке открывает модалку-колесо. -->
     <GambaModal />
+    <!-- Покупка Лота — на всех страницах: кнопку возврата из колокола
+         (уведомления о перекупе) видно везде, значит и модалка нужна везде. -->
+    <BuyModal />
     <!-- Инфо-плашка: звук + VPN, снизу на всех страницах, только крестик, память в localStorage. -->
     <div
       id="info-plaska"
