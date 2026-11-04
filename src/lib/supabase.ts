@@ -230,6 +230,8 @@ export async function fetchSharedHistory(
 export interface DealLogPage {
   ok: boolean;
   entries: DealEntry[];
+  /** За последней строкой есть ещё (читатель берёт на одну строку больше). */
+  hasMore: boolean;
 }
 
 /**
@@ -237,7 +239,9 @@ export interface DealLogPage {
  * (`lots(slug,title,video_url)`), новые первыми. `buyerUid` — фильтр «Мои
  * покупки»; без него — вся биржа. Без курсора — первая страница; с курсором
  * (`historyCursor`) — следующая: keyset по паре `(created_at, id)`, поэтому
- * живые вставки не сдвигают границу (offset бы сдвинул). Индексы уже есть:
+ * живые вставки не сдвигают границу (offset бы сдвинул). Строк берём на одну
+ * больше: по сырому ответу честно знаем «есть ещё», даже если последняя строка
+ * не разобралась и отброшена (`dealEntries`). Индексы уже есть:
  * `purchases_time_idx (created_at desc, id desc)` для всей биржи и
  * `purchases_buyer_time_idx (buyer_uid, created_at desc)` для фильтра — новых
  * не заводим. `ok: false` — БД недоступна или ответ битый; пустой успешный
@@ -249,7 +253,8 @@ export async function fetchDealLog(
   buyerUid?: string | null
 ): Promise<DealLogPage> {
   const sb = getSupabase();
-  if (!sb) return { ok: false, entries: [] };
+  if (!sb) return { ok: false, entries: [], hasMore: false };
+  const cap = Math.max(1, Math.floor(limit));
   try {
     let query = sb
       .from('purchases')
@@ -266,12 +271,17 @@ export async function fetchDealLog(
       query
         .order('created_at', { ascending: false })
         .order('id', { ascending: false })
-        .limit(Math.max(1, Math.floor(limit)))
+        .limit(cap + 1)
     );
-    if (error || !Array.isArray(data)) return { ok: false, entries: [] };
-    return { ok: true, entries: dealEntries(data as unknown as TradeRow[]) };
+    if (error || !Array.isArray(data)) return { ok: false, entries: [], hasMore: false };
+    const rows = data as unknown as TradeRow[];
+    return {
+      ok: true,
+      entries: dealEntries(rows).slice(0, cap),
+      hasMore: rows.length > cap,
+    };
   } catch {
-    return { ok: false, entries: [] };
+    return { ok: false, entries: [], hasMore: false };
   }
 }
 

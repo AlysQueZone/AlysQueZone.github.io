@@ -153,6 +153,11 @@ export function normalizeNextPrice(value: unknown): number | null {
 export interface LiveStore {
   // Снапшот — синхронные чтения (что есть на текущий момент).
   uid(): string | null;
+  /**
+   * Когда uid прочитан впервые (гостем — null): ждать без поллинга и таймаута.
+   * Все ожидающие получают одно значение; прочитанный uid — резолв сразу.
+   */
+  whenUidKnown(): Promise<string | null>;
   balance(): number | null;
   /** Был ли ответ по балансу для текущего uid (для честного прочерка без мигания). */
   balanceKnown(): boolean;
@@ -217,6 +222,8 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
   /** uid прочитан хотя бы раз (значение могло быть null — гость): подписка
    *  сразу отдаёт состояние, пришедшее до неё (авторизация между скриптами). */
   let uidKnown = false;
+  /** Ожидающие первого applyUid: резолвятся разом и отпускаются. */
+  let uidWaiters: ((uid: string | null) => void)[] | null = null;
   let balanceValue: number | null = null;
   /** Ответ по балансу уже был (для честного прочерка без мигания). */
   let balanceTried = false;
@@ -898,6 +905,10 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
     uidKnown = true;
     const before = uidValue;
     setUid(next);
+    // Первый ответ по uid (даже гостевой null) отпускает всех ожидающих.
+    const waiters = uidWaiters;
+    uidWaiters = null;
+    if (waiters) for (const resolve of waiters) resolve(next);
     if (next !== before && next !== null) {
       void readBalanceNow(next);
       if (myLotsTracked) void readMyLotsNow(next);
@@ -909,6 +920,14 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
     return windowStatesOf(catalogValue);
   }
 
+  /** Первый прочитанный uid (гостем — null); один резолв на всех ожидающих. */
+  function whenUidKnownNow(): Promise<string | null> {
+    if (uidKnown) return Promise.resolve(uidValue);
+    return new Promise((resolve) => {
+      (uidWaiters ??= []).push(resolve);
+    });
+  }
+
   /** Срез фиксируется до первого чтения: позже смена — no-op. */
   function setScope(scope: CatalogScope): void {
     if (started || catalogKnown) return;
@@ -918,6 +937,7 @@ export function createLiveStore(readers: LiveReaders): LiveStore {
 
   return {
     uid: () => uidValue,
+    whenUidKnown: whenUidKnownNow,
     balance: () => balanceValue,
     balanceKnown: () => balanceTried,
     catalog: () => catalogValue,

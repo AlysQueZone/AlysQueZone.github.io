@@ -400,6 +400,11 @@ function ensureWired(): void {
 /** Снапшот и подписка: поверхности читают синхронно, слушают изменения. */
 export const live = {
   uid: (): string | null => store.uid(),
+  /** Первый прочитанный uid (гостем — null): честное ожидание без таймера. */
+  whenUidKnown(): Promise<string | null> {
+    ensureWired();
+    return store.whenUidKnown();
+  },
   balance: (): number | null => store.balance(),
   balanceKnown: (): boolean => store.balanceKnown(),
   catalog: (): ReadonlyMap<string, LotState> => store.catalog(),

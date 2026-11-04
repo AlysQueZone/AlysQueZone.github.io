@@ -212,6 +212,44 @@ describe('createLiveStore', () => {
     expect(kinds(events)).toEqual(['catalog']);
   });
 
+  it('whenUidKnown: гость — промис резолвится null после старта, ожидающие получают то же', async () => {
+    const f = fakeReaders();
+    const store = createLiveStore(f.readers);
+    const first = store.whenUidKnown();
+    const second = store.whenUidKnown();
+    let settled = false;
+    void first.then(() => {
+      settled = true;
+    });
+    expect(settled).toBe(false);
+
+    await store.start();
+
+    await expect(first).resolves.toBeNull();
+    await expect(second).resolves.toBeNull();
+    expect(store.uid()).toBeNull();
+  });
+
+  it('whenUidKnown: залогиненный — uid после старта', async () => {
+    const f = fakeReaders();
+    f.state.uid = 'u1';
+    const store = createLiveStore(f.readers);
+    const pending = store.whenUidKnown();
+
+    await store.start();
+
+    await expect(pending).resolves.toBe('u1');
+  });
+
+  it('whenUidKnown: uid уже прочитан — резолв сразу, без ожидания', async () => {
+    const f = fakeReaders();
+    f.state.uid = 'u1';
+    const store = createLiveStore(f.readers);
+    await store.start();
+
+    await expect(store.whenUidKnown()).resolves.toBe('u1');
+  });
+
   it('выборка: правка и удаление — changed ровно эти slug; новый лот ждёт перезагрузки', async () => {
     const f = fakeReaders();
     const keep = lot({ slug: 'lot-keep' });

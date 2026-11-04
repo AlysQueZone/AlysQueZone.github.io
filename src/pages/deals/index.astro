@@ -122,26 +122,6 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
   </button>
 </BaseLayout>
 
-<style is:global>
-  /* Карточка телефона целиком — ссылка на привет: заголовок растянут на всю
-     карточку (`::after`), поэтому клик по миниатюре и пустому месту тоже
-     открывает лот. Кольцо фокуса — вокруг карточки, а не текста заголовка. */
-  [data-deal-card] a[data-deal-link]::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-  }
-
-  [data-deal-card] a[data-deal-link]:focus-visible {
-    outline: none;
-  }
-
-  [data-deal-card]:has(a[data-deal-link]:focus-visible) {
-    outline: 3px solid var(--color-blush);
-    outline-offset: 2px;
-  }
-</style>
-
 <script>
   // Страница рисует срез лога: запрос — lib/supabase.ts, отбор и деление на дни —
   // lib/trade-history.ts. Здесь состояния, фильтр «Все / Мои» и его URL, разметка
@@ -546,7 +526,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
       return;
     }
     entries = page.entries;
-    hasMore = page.entries.length === DEAL_PAGE_SIZE;
+    hasMore = page.hasMore;
     loaded = true;
     render();
     announce(
@@ -579,14 +559,17 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
     loadingMore = false;
     if (moreButton instanceof HTMLButtonElement) moreButton.disabled = false;
     if (!page.ok) {
+      // Автоподгрузку не перевооружаем: следующее пересечение/клик — новый шанс,
+      // без немедленного цикла запросов на упавшей БД.
       announce('Не получилось подгрузить — попробуй ещё');
       return;
     }
     const next = appendHistory(entries, page.entries);
     const grew = next.length > entries.length;
     entries = next;
-    // Полная страница без единой новой строки — дальше курсор не сдвинется.
-    hasMore = page.entries.length === DEAL_PAGE_SIZE && grew;
+    // hasMore — по сырому ответу транспорта; grew защищает от вечного цикла,
+    // если страница целиком состоит из уже показанных id (курсор не сдвинется).
+    hasMore = page.hasMore && grew;
     render();
     announce(
       hasMore
@@ -645,9 +628,12 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
       void load();
       return;
     }
-    // uid ещё не прочитан — не показываем гостевую подсказку зря:
-    // первый uid-событие подписки само решит «список или вход».
-    if (!uidReady) return;
+    // uid ещё не прочитан — ждём честного «uid прочитан» (это ловит и гостя:
+    // на холодном визите uid-события не будет), а не гадаем с подсказкой входа.
+    if (!uidReady) {
+      void live.whenUidKnown().then(onUid);
+      return;
+    }
     if (live.uid()) void load();
     else showGuest();
   }
@@ -708,9 +694,16 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
   void document.fonts?.ready.then(measureHeader);
 
   // Подписка уже могла отдать прочитанный uid (prime в live.subscribe);
-  // в «Моих» без него список ждёт первого uid-события.
+  // в «Моих» без него ждём whenUidKnown — гость иначе не дождался бы.
   syncFilterUi();
-  if (!mine) void load();
-  else if (uidReady && live.uid()) void load();
-  else if (uidReady) showGuest();
+  if (!mine) {
+    void load();
+  } else if (uidReady) {
+    if (live.uid()) void load();
+    else showGuest();
+  } else {
+    // Холодный гость не получит uid-события (значение не менялось) — только
+    // разрешение «uid прочитан» решает «список или подсказка входа».
+    void live.whenUidKnown().then(onUid);
+  }
 </script>
