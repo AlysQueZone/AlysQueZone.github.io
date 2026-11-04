@@ -7,7 +7,12 @@
 agent-browser (ключ печатается).
 
 Использование (из корня репо; локальный стек уже поднят — just run-local):
-  python3 scripts/dev_auth.py
+  python3 scripts/dev_auth.py            полная фикстура + сессия продавца
+  python3 scripts/dev_auth.py prepare    лот снова у продавца, без покупки
+  python3 scripts/dev_auth.py buy        покупатель забирает dev-лот
+
+Рецепты `just dev-outbid-prepare` / `just dev-outbid-buy` — для живого
+перекупа на открытой странице (покупка приходит событием, а не догоном).
 
 Ключи локального стека берутся из `supabase status -o env` и НИКОГДА не
 печатаются. Не локальный API или пустой status — стоп: прод не трогаем.
@@ -273,20 +278,50 @@ def sign_in(base, anon, spec):
     return session
 
 
-def main():
-    base, anon, service = local_config()
+def lot_id_of(base, key):
+    rows = expect(
+        call("GET", "%s/rest/v1/lots?slug=eq.%s&select=id" % (base, LOT_SLUG), key),
+        (200,),
+        "GET lots/%s" % LOT_SLUG,
+    )
+    return rows[0]["id"] if isinstance(rows, list) and rows else None
+
+
+def write_session(base, anon):
+    session = sign_in(base, anon, SELLER)
+    with open(SESSION_PATH, "w", encoding="utf-8") as fh:
+        json.dump(session, fh, ensure_ascii=False)
+    os.chmod(SESSION_PATH, 0o600)
+    host = urllib.parse.urlparse(base).hostname or ""
+    storage_key = "sb-%s-auth-token" % host.split(".")[0]
+    say("Ключ localStorage: %s" % storage_key)
+    say("Сессия: %s" % SESSION_PATH)
+    say(
+        'Дальше: agent-browser storage local set %s "$(cat %s)"'
+        % (storage_key, SESSION_PATH)
+    )
+
+
+def prepare_fixture(base, service):
+    """Dev-лот снова у продавца, покупок нет — страница должна увидеть его своим."""
     seller = ensure_user(base, service, SELLER)
     buyer = ensure_user(base, service, BUYER)
     set_balance(base, service, seller["id"], DEV_BALANCE)
     set_balance(base, service, buyer["id"], DEV_BALANCE)
-
     lot_id = ensure_lot(base, service, seller)
     expect(
         call("DELETE", "%s/rest/v1/purchases?lot_id=eq.%s" % (base, lot_id), service),
         (200, 204),
         "DELETE purchases/%s" % LOT_SLUG,
     )
+    return seller
 
+
+def purchase_lot(base, anon, service):
+    lot_id = lot_id_of(base, anon)
+    if lot_id is None:
+        die("dev-лот не найден — сначала `just dev-auth` или `just dev-outbid-prepare`")
+    buyer = ensure_user(base, service, BUYER)
     buyer_session = sign_in(base, anon, BUYER)
     purchase = expect(
         call(
@@ -303,14 +338,39 @@ def main():
     row = purchase[0] if isinstance(purchase, list) and purchase else purchase
     if not isinstance(row, dict):
         die("покупка не вернула строку")
+    return row
 
-    session = sign_in(base, anon, SELLER)
-    with open(SESSION_PATH, "w", encoding="utf-8") as fh:
-        json.dump(session, fh, ensure_ascii=False)
-    os.chmod(SESSION_PATH, 0o600)
 
-    host = urllib.parse.urlparse(base).hostname or ""
-    storage_key = "sb-%s-auth-token" % host.split(".")[0]
+def main():
+    mode = (sys.argv[1] if len(sys.argv) > 1 else "session").lstrip("-")
+    if mode not in ("session", "prepare", "buy"):
+        die("режим %r: ожидается session, prepare или buy" % mode)
+
+    base, anon, service = local_config()
+
+    if mode == "buy":
+        # Без фикстуры: лот и юзеры уже должны существовать после dev-auth/prepare.
+        row = purchase_lot(base, anon, service)
+        say(
+            "Перекуп: %s забрал «%s» за %s 🍺 — уведомление живёт несколько секунд"
+            % (
+                row.get("buyer_login") or BUYER["login"],
+                LOT_TITLE,
+                row.get("price_paid") or "?",
+            )
+        )
+        return 0
+
+    seller = prepare_fixture(base, service)
+
+    if mode == "prepare":
+        write_session(base, anon)
+        say("Лот снова у продавца %s." % SELLER["login"])
+        say("Перезагрузи страницу (или дождись синка), затем: just dev-outbid-buy")
+        return 0
+
+    row = purchase_lot(base, anon, service)
+    write_session(base, anon)
     say("Локальный вход готов: %s" % SELLER["email"])
     say(
         "Фикстура: %s забрал «%s» за %s 🍺"
@@ -319,12 +379,6 @@ def main():
             LOT_TITLE,
             row.get("price_paid") or "?",
         )
-    )
-    say("Ключ localStorage: %s" % storage_key)
-    say("Сессия: %s" % SESSION_PATH)
-    say(
-        'Дальше: agent-browser storage local set %s "$(cat %s)"'
-        % (storage_key, SESSION_PATH)
     )
     return 0
 

@@ -272,6 +272,15 @@ run-local: db-up db-vault
 dev-auth:
     python3 scripts/dev_auth.py
 
+# Живой перекуп, шаг 1: dev-лот снова у продавца. После — перезагрузить страницу.
+dev-outbid-prepare:
+    python3 scripts/dev_auth.py prepare
+
+# Живой перекуп, шаг 2: покупатель забирает dev-лот — на открытой странице
+# продавца прилетает событие (колокол и всплывающее уведомление).
+dev-outbid-buy:
+    python3 scripts/dev_auth.py buy
+
 # -------------------------------------
 # Релиз
 # -------------------------------------
