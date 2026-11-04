@@ -31,8 +31,8 @@
   --color-legend: #b3127a;
   --color-cream: #fffbea;
   /* Пивное золото, затемнено для контраста: на панели 5.0:1, на void 5.5:1.
-     В коде — текст (цена) и бейдж «ТВОЙ» поверх кадра (фон pivko + текст
-     cream, ~5:1); других подложек нет. */
+     В коде — текст (цена), бейдж «ТВОЙ» поверх кадра и полоса дня в «Логе
+     сделок» (фон pivko + текст cream, ~5:1); других подложек нет. */
   --color-pivko: #7a5f00;
   /* Бренд-фиолетовый Twitch (кнопка входа) */
   --color-twitch: #9146ff;
@@ -304,10 +304,26 @@ html[data-plaska='on'] main {
     }
   }
 
+  /* Бегущая строка — ссылка на «Лог сделок»: вся полоса кликабельна.
+     Фокус заметен на полосе и замирает движение (WCAG 2.2.2). */
+  .marquee-link {
+    display: block;
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .marquee-link:focus-visible {
+    position: relative;
+    z-index: 1;
+    outline: 3px solid var(--color-blush);
+    outline-offset: 2px;
+  }
+
   /* Вечные анимации (бегущий лог, мигание) должны уметь останавливаться:
      под курсором и на клавиатурном фокусе замирают — WCAG 2.2.2.
      Для «совсем не анимировать» есть prefers-reduced-motion ниже. */
   .marquee:hover .marquee-track,
+  .marquee-link:focus-visible .marquee-track,
   .animate-blink:hover,
   .animate-blink:focus-visible {
     animation-play-state: paused;

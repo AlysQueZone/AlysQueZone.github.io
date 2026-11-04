@@ -9,12 +9,15 @@
 import { describe, expect, it } from 'vitest';
 import {
   appendHistory,
+  dealEntries,
   formatRelativeTime,
+  groupDealDays,
   historyCursor,
   historyEntries,
   mergeHistory,
   outbidCatchup,
   PURCHASE_SELLER_FALLBACK,
+  type DealEntry,
   type HistoryEntry,
   type TradeRow,
 } from './trade-history';
@@ -380,5 +383,167 @@ describe('outbidCatchup', () => {
       10
     );
     expect(events.map((event) => event.slug)).toEqual(['ok']);
+  });
+});
+
+/** Запись лога напрямую — для тестов группировки по дням. */
+function deal(overrides: Partial<DealEntry> = {}): DealEntry {
+  return {
+    id: 1,
+    slug: 'lot-a',
+    title: 'Привет',
+    seller: 'author',
+    buyer: 'buyer',
+    buyer_uid: 'buyer-uid',
+    price: 880,
+    created_at: '2026-10-13T12:00:00.000Z',
+    video_url: null,
+    ...overrides,
+  };
+}
+
+/** Локальная дата как ISO — сутки считаются в зоне браузера, не в UTC. */
+function localIso(
+  year: number,
+  month: number,
+  day: number,
+  hours = 12,
+  minutes = 0,
+  seconds = 0,
+  ms = 0
+): string {
+  return new Date(year, month - 1, day, hours, minutes, seconds, ms).toISOString();
+}
+
+describe('dealEntries', () => {
+  it('строка purchases + лот превращается в запись лога', () => {
+    const entries = dealEntries([
+      purchase({
+        id: 7,
+        seller_login: 'melkij_strateg',
+        buyer_login: 'foxindique',
+        buyer_uid: 'buyer-uid',
+        price_paid: 990,
+        created_at: '2026-11-04T10:00:00.000Z',
+        lots: lot({ slug: 'privet', title: 'Привет с дачи', video_url: 'https://media/a.webm' }),
+      }),
+    ]);
+    expect(entries).toEqual([
+      {
+        id: 7,
+        slug: 'privet',
+        title: 'Привет с дачи',
+        seller: 'melkij_strateg',
+        buyer: 'foxindique',
+        buyer_uid: 'buyer-uid',
+        price: 990,
+        created_at: '2026-11-04T10:00:00.000Z',
+        video_url: 'https://media/a.webm',
+      },
+    ]);
+  });
+
+  it('пустой продавец — «Биржа», а не пустая строка', () => {
+    const entries = dealEntries([purchase({ seller_login: null })]);
+    expect(entries[0]?.seller).toBe(PURCHASE_SELLER_FALLBACK);
+  });
+
+  it('лот без названия — запись остаётся с slug вместо названия', () => {
+    const entries = dealEntries([purchase({ lots: lot({ slug: 'bez-nazvaniya', title: '' }) })]);
+    expect(entries[0]?.title).toBe('bez-nazvaniya');
+  });
+
+  it('битые строки отбрасываются: нет id, времени, цены, покупателя, лота или slug', () => {
+    const entries = dealEntries([
+      purchase({ id: 1 }),
+      purchase({ id: null }),
+      purchase({ id: 2, created_at: null }),
+      purchase({ id: 3, created_at: 'не дата' }),
+      purchase({ id: 4, price_paid: 0 }),
+      purchase({ id: 5, price_paid: 'нет' }),
+      purchase({ id: 6, buyer_login: null }),
+      purchase({ id: 7, buyer_login: '' }),
+      purchase({ id: 8, lots: null }),
+      purchase({ id: 9, lots: lot({ slug: '' }) }),
+      purchase({ id: 10, lots: [] }),
+    ]);
+    expect(entries.map((entry) => entry.id)).toEqual([1]);
+  });
+
+  it('порядок входа сохраняется (новые сверху — от запроса)', () => {
+    const entries = dealEntries([
+      purchase({ id: 3, lots: lot({ slug: 'new' }) }),
+      purchase({ id: 2, lots: lot({ slug: 'mid' }) }),
+      purchase({ id: 1, lots: lot({ slug: 'old' }) }),
+    ]);
+    expect(entries.map((entry) => entry.slug)).toEqual(['new', 'mid', 'old']);
+  });
+
+  it('пустой вход — пустой лог', () => {
+    expect(dealEntries([])).toEqual([]);
+  });
+});
+
+describe('groupDealDays', () => {
+  const now = new Date(2026, 10, 4, 10, 0, 0).getTime();
+
+  it('«Сегодня», «Вчера», дата; год — только у другого года', () => {
+    const days = groupDealDays(
+      [
+        deal({ id: 3, created_at: localIso(2026, 11, 4, 9) }),
+        deal({ id: 2, created_at: localIso(2026, 11, 3, 23, 30) }),
+        deal({ id: 1, created_at: localIso(2026, 11, 2, 12) }),
+        deal({ id: 0, created_at: localIso(2025, 12, 31, 12) }),
+      ],
+      now
+    );
+    expect(days.map((day) => day.label)).toEqual([
+      'Сегодня',
+      'Вчера',
+      '2 ноября',
+      '31 декабря 2025',
+    ]);
+  });
+
+  it('границы локальных суток: полночь — уже новый день, 23:59:59 — старый', () => {
+    const days = groupDealDays(
+      [
+        deal({ id: 2, created_at: localIso(2026, 11, 4, 0, 0, 0, 0) }),
+        deal({ id: 1, created_at: localIso(2026, 11, 3, 23, 59, 59, 999) }),
+      ],
+      now
+    );
+    expect(days.map((day) => day.label)).toEqual(['Сегодня', 'Вчера']);
+  });
+
+  it('в дне — количество, сумма и записи в исходном порядке', () => {
+    const days = groupDealDays(
+      [
+        deal({ id: 3, price: 100, created_at: localIso(2026, 11, 4, 9) }),
+        deal({ id: 2, price: 50, created_at: localIso(2026, 11, 4, 8) }),
+        deal({ id: 1, price: 70, created_at: localIso(2026, 11, 3, 20) }),
+      ],
+      now
+    );
+    expect(days.map((day) => day.count)).toEqual([2, 1]);
+    expect(days.map((day) => day.total)).toEqual([150, 70]);
+    expect(days[0]?.entries.map((entry) => entry.id)).toEqual([3, 2]);
+    expect(days[1]?.entries.map((entry) => entry.id)).toEqual([1]);
+  });
+
+  it('дни идут в порядке появления, а не по календарю', () => {
+    const days = groupDealDays(
+      [
+        deal({ id: 3, created_at: localIso(2026, 11, 2, 9) }),
+        deal({ id: 2, created_at: localIso(2026, 11, 4, 9) }),
+        deal({ id: 1, created_at: localIso(2026, 11, 3, 9) }),
+      ],
+      now
+    );
+    expect(days.map((day) => day.label)).toEqual(['2 ноября', 'Сегодня', 'Вчера']);
+  });
+
+  it('пустой лог — пустой список дней', () => {
+    expect(groupDealDays([], now)).toEqual([]);
   });
 });

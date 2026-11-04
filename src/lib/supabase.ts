@@ -15,9 +15,12 @@
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import {
+  DEAL_PAGE_SIZE,
+  dealEntries,
   HISTORY_PAGE_SIZE,
   historyEntries,
   outbidCatchup,
+  type DealEntry,
   type HistoryCursor,
   type HistoryEntry,
   type TradeRow,
@@ -220,6 +223,50 @@ export async function fetchSharedHistory(
     return historyEntries(data as unknown as TradeRow[]);
   } catch {
     return [];
+  }
+}
+
+/** Страница «Лога сделок»: `ok` отличает честное «пусто» от ошибки чтения. */
+export interface DealLogPage {
+  ok: boolean;
+  entries: DealEntry[];
+}
+
+/**
+ * Лог сделок всей биржи: публичный `SELECT` из `purchases` с соединённым лотом
+ * (`lots(slug,title,video_url)`), новые первыми. Без курсора — первая страница;
+ * с курсором (`historyCursor`) — следующая: keyset по паре `(created_at, id)`,
+ * поэтому живые вставки не сдвигают границу (offset бы сдвинул). Индекс —
+ * `purchases_time_idx (created_at desc, id desc)`. `ok: false` — БД недоступна
+ * или ответ битый; пустой успешный ответ — честное «сделок нет».
+ */
+export async function fetchDealLog(
+  limit: number = DEAL_PAGE_SIZE,
+  cursor: HistoryCursor | null = null
+): Promise<DealLogPage> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, entries: [] };
+  try {
+    let query = sb
+      .from('purchases')
+      .select(
+        'id,seller_login,buyer_login,buyer_uid,price_paid,created_at,lots(slug,title,video_url)'
+      );
+    if (cursor && cursor.created_at.length > 0) {
+      query = query.or(
+        `created_at.lt.${cursor.created_at},and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`
+      );
+    }
+    const { data, error } = await withAuthRetry(() =>
+      query
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .limit(Math.max(1, Math.floor(limit)))
+    );
+    if (error || !Array.isArray(data)) return { ok: false, entries: [] };
+    return { ok: true, entries: dealEntries(data as unknown as TradeRow[]) };
+  } catch {
+    return { ok: false, entries: [] };
   }
 }
 

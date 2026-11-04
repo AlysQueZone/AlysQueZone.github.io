@@ -1,0 +1,378 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+
+// «Лог сделок» — статический каркас, данные рисует клиент из БД (docs/adr/0002).
+// Первая страница — 20 сделок новыми сверху, сгруппированные по локальным дням
+// чистым ядром (lib/trade-history.ts). Живые события, пагинация и фильтр — не
+// здесь: страница читает один срез и перерисовывается, чтобы их можно было
+// добавить без переписывания.
+---
+
+<BaseLayout title="Лог сделок — AlysQueZone">
+  <div class="flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <h1 class="font-display text-xl uppercase sm:text-2xl">Лог сделок</h1>
+      <p class="mt-2 max-w-xl text-sm font-bold text-mist">
+        Кто, когда, что и за сколько забрал. Новые сверху.
+      </p>
+    </div>
+  </div>
+
+  <p data-log-status class="sr-only" role="status">
+    Загружаю лог сделок…
+  </p>
+
+  <!-- Скелетон до первого ответа БД: та же геометрия, что у таблицы на десктопе
+       и карточек на телефоне, поэтому загрузка не прыгает. -->
+  <div data-log-skeleton class="mt-6 flex flex-col gap-5" aria-hidden="true">
+    <div class="hidden flex-col gap-2 md:flex">
+      <div class="border-2 border-milk bg-pivko px-3 py-2">
+        <div class="skeleton-block skeleton-block-cream h-3 w-48"></div>
+      </div>
+      <div class="card-pixel overflow-hidden">
+        <div class="border-b-2 border-milk/15 bg-bar px-3 py-2">
+          <div class="skeleton-block h-3 w-64"></div>
+        </div>
+        {Array.from({ length: 5 }, () => (
+          <div class="flex items-center gap-3 border-b-2 border-milk/15 px-3 py-2 last:border-b-0">
+            <div class="skeleton-block h-3 w-16"></div>
+            <div class="skeleton-block aspect-[77/136] w-10"></div>
+            <div class="skeleton-block h-4 flex-1"></div>
+            <div class="skeleton-block h-3 w-20"></div>
+            <div class="skeleton-block h-3 w-20"></div>
+            <div class="skeleton-block h-3 w-12"></div>
+          </div>
+        ))}
+      </div>
+    </div>
+    <div class="flex flex-col gap-2 md:hidden">
+      <div class="border-2 border-milk bg-pivko px-3 py-2">
+        <div class="skeleton-block skeleton-block-cream h-3 w-40"></div>
+      </div>
+      {Array.from({ length: 4 }, () => (
+        <div class="flex gap-3 border-2 border-milk bg-void px-3 py-2">
+          <div class="skeleton-block aspect-[77/136] w-16 shrink-0"></div>
+          <div class="flex flex-1 flex-col gap-2 py-1">
+            <div class="skeleton-block h-4 w-2/3"></div>
+            <div class="skeleton-block h-3 w-1/2"></div>
+            <div class="skeleton-block h-3 w-24"></div>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+
+  <div data-log-error class="card-pixel mt-6 hidden p-5 sm:p-6">
+    <p class="text-sm font-bold text-mist">Лог не загрузился — проверь связь и обнови страницу.</p>
+    <button type="button" data-log-retry class="btn-arcade btn-arcade-ghost mt-3 px-5 py-2 text-sm">
+      Обновить
+    </button>
+  </div>
+
+  <p data-log-empty class="card-pixel mt-6 hidden p-5 text-sm font-bold text-mist sm:p-6">
+    Сделок пока нет — забери первый привет
+  </p>
+
+  <div data-log-body class="mt-6 hidden"></div>
+</BaseLayout>
+
+<style is:global>
+  /* Карточка телефона целиком — ссылка на привет: заголовок растянут на всю
+     карточку (`::after`), поэтому клик по миниатюре и пустому месту тоже
+     открывает лот. Кольцо фокуса — вокруг карточки, а не текста заголовка. */
+  [data-deal-card] a[data-deal-link]::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
+
+  [data-deal-card] a[data-deal-link]:focus-visible {
+    outline: none;
+  }
+
+  [data-deal-card]:has(a[data-deal-link]:focus-visible) {
+    outline: 3px solid var(--color-blush);
+    outline-offset: 2px;
+  }
+</style>
+
+<script>
+  // Страница рисует срез лога: запрос — lib/supabase.ts, отбор и деление на дни —
+  // lib/trade-history.ts. Здесь только состояния, разметка и перерисовка.
+  import { fetchDealLog } from '@/lib/supabase';
+  import { live } from '@/lib/live';
+  import { videoSources } from '@/lib/lot-video';
+  import {
+    DEAL_PAGE_SIZE,
+    formatRelativeTime,
+    groupDealDays,
+    type DealDay,
+    type DealEntry,
+  } from '@/lib/trade-history';
+
+  const base = import.meta.env.BASE_URL;
+
+  const skeleton = document.querySelector('[data-log-skeleton]');
+  const body = document.querySelector('[data-log-body]');
+  const empty = document.querySelector('[data-log-empty]');
+  const error = document.querySelector('[data-log-error]');
+  const retry = document.querySelector('[data-log-retry]');
+  const status = document.querySelector('[data-log-status]');
+
+  /** Показанные записи: новые сверху; дни считает ядро при каждой перерисовке. */
+  let entries: DealEntry[] = [];
+  let loaded = false;
+  let loading = false;
+
+  function toggle(el: Element | null, show: boolean): void {
+    if (el instanceof HTMLElement) el.classList.toggle('hidden', !show);
+  }
+
+  function announce(text: string): void {
+    if (status) status.textContent = text;
+  }
+
+  function el<K extends keyof HTMLElementTagNameMap>(
+    tag: K,
+    className = '',
+    text?: string
+  ): HTMLElementTagNameMap[K] {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  function money(value: number): string {
+    return value.toLocaleString('ru-RU');
+  }
+
+  function plural(n: number, one: string, few: string, many: string): string {
+    const mod10 = n % 10;
+    const mod100 = n % 100;
+    if (mod10 === 1 && mod100 !== 11) return one;
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return few;
+    return many;
+  }
+
+  function lotHref(entry: DealEntry): string {
+    return `${base}lot/?id=${encodeURIComponent(entry.slug)}`;
+  }
+
+  /** Миниатюра кадра из `video_url`; без постера — честная заглушка-🍺. */
+  function thumb(entry: DealEntry, sizeClass: string): HTMLElement {
+    const frame = el('span', `lot-media-frame block shrink-0 overflow-hidden ${sizeClass}`);
+    const poster = videoSources(entry.video_url).poster;
+    if (poster) {
+      const img = el('img', 'h-full w-full object-cover');
+      img.src = poster;
+      img.alt = '';
+      img.loading = 'lazy';
+      frame.append(img);
+    } else {
+      frame.append(
+        el('span', 'flex h-full w-full items-center justify-center bg-card text-base', '🍺')
+      );
+    }
+    return frame;
+  }
+
+  /** Пометка «ТВОЙ» только на своей покупке: uid из снапшота живых данных. */
+  function mineMark(entry: DealEntry): HTMLElement | null {
+    const uid = live.uid();
+    if (!uid || entry.buyer_uid === '' || entry.buyer_uid !== uid) return null;
+    return el('span', 'badge-pixel ml-1 bg-pivko text-cream', 'ТВОЙ');
+  }
+
+  function priceEl(price: number): HTMLElement {
+    return el('span', 'font-black whitespace-nowrap text-pivko', `${money(price)} 🍺`);
+  }
+
+  function whoLine(entry: DealEntry): HTMLElement {
+    const line = el('div', 'flex flex-wrap items-baseline gap-x-1.5');
+    line.append(
+      el('b', 'break-all', entry.seller),
+      el('span', 'text-mist', '→'),
+      el('b', 'break-all', entry.buyer)
+    );
+    const mark = mineMark(entry);
+    if (mark) line.append(mark);
+    return line;
+  }
+
+  function tableHead(): HTMLTableSectionElement {
+    const head = el('thead', 'bg-bar');
+    const row = el('tr');
+    const headers: ReadonlyArray<[string, string]> = [
+      ['Когда', 'w-28 text-left'],
+      ['Привет', 'text-left'],
+      ['Продал', 'w-40 text-left'],
+      ['Купил', 'w-40 text-left'],
+      ['Цена', 'w-28 text-right'],
+    ];
+    for (const [title, width] of headers) {
+      const th = el('th', `px-3 py-2 font-display text-[9px] uppercase ${width}`, title);
+      th.scope = 'col';
+      row.append(th);
+    }
+    head.append(row);
+    return head;
+  }
+
+  /** Строка десктопной таблицы: миниатюра и название — одна ссылка на привет. */
+  function dealRow(entry: DealEntry): HTMLTableRowElement {
+    const tr = el('tr', 'border-t-2 border-milk/15 hover:bg-void/50');
+    tr.append(
+      el('td', 'px-3 py-2 whitespace-nowrap text-mist', formatRelativeTime(entry.created_at))
+    );
+
+    const lotCell = el('td', 'px-3 py-2');
+    const lotLink = el('a', 'flex items-center gap-2 hover:text-ember');
+    lotLink.href = lotHref(entry);
+    lotLink.append(
+      thumb(entry, 'aspect-[77/136] w-10'),
+      el('span', 'font-extrabold break-words', entry.title)
+    );
+    lotCell.append(lotLink);
+
+    const buyerCell = el('td', 'px-3 py-2 break-all');
+    buyerCell.append(el('b', '', entry.buyer));
+    const mark = mineMark(entry);
+    if (mark) buyerCell.append(mark);
+
+    const priceCell = el('td', 'px-3 py-2 text-right whitespace-nowrap');
+    priceCell.append(priceEl(entry.price));
+
+    tr.append(lotCell, el('td', 'px-3 py-2 break-all', entry.seller), buyerCell, priceCell);
+    return tr;
+  }
+
+  /** Карточка телефона: вся площадь кликабельна через растяжку ссылки. */
+  function dealCard(entry: DealEntry): HTMLLIElement {
+    const li = el(
+      'li',
+      'relative border-2 border-milk bg-void px-3 py-2 text-sm font-bold shadow-[3px_3px_0_var(--color-milk)]'
+    );
+    li.dataset.dealCard = 'true';
+
+    const row = el('div', 'flex gap-3');
+    row.append(thumb(entry, 'aspect-[77/136] w-16'));
+
+    const main = el('div', 'min-w-0 flex-1');
+    const top = el('div', 'flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1');
+    const lotLink = el('a', 'font-extrabold break-words hover:text-ember', entry.title);
+    lotLink.href = lotHref(entry);
+    lotLink.dataset.dealLink = 'true';
+    top.append(lotLink, priceEl(entry.price));
+    main.append(
+      top,
+      whoLine(entry),
+      el('div', 'mt-0.5 text-xs font-bold text-mist', formatRelativeTime(entry.created_at))
+    );
+    row.append(main);
+    li.append(row);
+    return li;
+  }
+
+  function dayHead(day: DealDay): HTMLElement {
+    const head = el(
+      'h2',
+      'sticky z-[5] flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-2 border-milk bg-pivko px-3 py-2 font-display text-[9px] uppercase text-cream'
+    );
+    // Липнет ровно под шапкой сайта: высоту меряет скрипт ниже.
+    head.style.top = 'var(--deals-sticky-top, 6rem)';
+    head.append(
+      el('span', '', day.label),
+      el(
+        'span',
+        'font-sans text-xs font-bold normal-case text-cream',
+        `${day.count} ${plural(day.count, 'сделка', 'сделки', 'сделок')} · ${money(day.total)} 🍺`
+      )
+    );
+    return head;
+  }
+
+  function daySection(day: DealDay): HTMLElement {
+    const section = el('section', 'flex flex-col');
+
+    const tableWrap = el('div', 'card-pixel mt-2 hidden overflow-hidden md:block');
+    const table = el('table', 'w-full border-collapse text-sm');
+    table.append(el('caption', 'sr-only', `${day.label}: сделки, новые сверху`), tableHead());
+    const tbody = el('tbody');
+    for (const entry of day.entries) tbody.append(dealRow(entry));
+    table.append(tbody);
+    tableWrap.append(table);
+
+    const cards = el('ul', 'mt-2 flex flex-col gap-2 md:hidden');
+    for (const entry of day.entries) cards.append(dealCard(entry));
+
+    section.append(dayHead(day), tableWrap, cards);
+    return section;
+  }
+
+  function render(): void {
+    if (!body) return;
+    toggle(skeleton, false);
+    toggle(error, false);
+    body.replaceChildren();
+    toggle(body, entries.length > 0);
+    toggle(empty, loaded && entries.length === 0);
+    if (entries.length === 0) return;
+    const wrap = el('div', 'flex flex-col gap-5');
+    for (const day of groupDealDays(entries)) wrap.append(daySection(day));
+    body.append(wrap);
+  }
+
+  function showError(): void {
+    toggle(skeleton, false);
+    toggle(body, false);
+    toggle(empty, false);
+    toggle(error, true);
+    announce('Лог не загрузился');
+  }
+
+  /** Первая страница: скелетон → записи, пусто или ошибка. */
+  async function load(): Promise<void> {
+    if (loading) return;
+    loading = true;
+    loaded = false;
+    entries = [];
+    toggle(error, false);
+    toggle(empty, false);
+    toggle(body, false);
+    toggle(skeleton, true);
+    announce('Загружаю лог сделок…');
+    const page = await fetchDealLog(DEAL_PAGE_SIZE);
+    loading = false;
+    if (!page.ok) {
+      showError();
+      return;
+    }
+    entries = page.entries;
+    loaded = true;
+    render();
+    announce(entries.length > 0 ? `Загружено ${entries.length} сделок` : 'Сделок пока нет');
+  }
+
+  /** Липкая полоса дня встаёт под фактической высотой шапки, а не под догадкой. */
+  function measureHeader(): void {
+    const header = document.querySelector('header');
+    if (header instanceof HTMLElement) {
+      document.documentElement.style.setProperty('--deals-sticky-top', `${header.offsetHeight}px`);
+    }
+  }
+
+  retry?.addEventListener('click', () => void load());
+
+  // Сессия: «ТВОЙ» перерисовывается при смене uid. Событие `deals` — тикет 02.
+  live.subscribe((change) => {
+    if (change.kind === 'uid' && loaded) render();
+  });
+
+  measureHeader();
+  window.addEventListener('resize', measureHeader);
+  // Press Start 2P меняет высоту шапки после загрузки шрифта.
+  void document.fonts?.ready.then(measureHeader);
+
+  void load();
+</script>

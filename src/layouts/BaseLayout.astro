@@ -133,12 +133,21 @@ assertSupabaseConfigured();
         из purchases через realtime-подписку. До первого ответа — скелетон;
         сделок нет/БД недоступна — честная строка живых правил (те же цифры,
         что в окне «Правила биржи»). Подмена идёт под fade, см. скрипт. -->
-      <div class="marquee border-t-2 border-milk/20 bg-milk py-1" aria-hidden="true">
-        <p class="marquee-track font-display text-[9px] text-cream uppercase" data-deal-log-track>
-          <span class="mx-4" data-deal-log-a set:html={MQ_SKELETON} />
-          <span class="mx-4" data-deal-log-b set:html={MQ_SKELETON} />
-        </p>
-      </div>
+      <!-- Вся полоса — вход в «Лог сделок»: по движущейся строке трудно
+           целиться в мелкую кнопку. Внутренняя лента скрыта от скринридера,
+           доступное имя даёт ссылка; движение замирает на hover и focus. -->
+      <a
+        href={`${base}deals/`}
+        class="marquee-link block border-t-2 border-milk/20 bg-milk py-1"
+        aria-label="Открыть лог сделок"
+      >
+        <div class="marquee" aria-hidden="true">
+          <p class="marquee-track font-display text-[9px] text-cream uppercase" data-deal-log-track>
+            <span class="mx-4" data-deal-log-a set:html={MQ_SKELETON} />
+            <span class="mx-4" data-deal-log-b set:html={MQ_SKELETON} />
+          </p>
+        </div>
+      </a>
       <template data-deal-log-rules>{MQ_RULES}</template>
     </header>
     <main id="main" class="mx-auto max-w-6xl px-4 py-8">
