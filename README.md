@@ -28,7 +28,9 @@ pnpm dev
 just run-local   # db-up + dev на локальной БД
 just db-up       # только поднять БД и до-накатить миграции
 just db-reset    # чистая БД: миграции + сид (данные теряются)
+just dev-stop    # остановить dev-сервер
 just db-stop     # остановить БД
+just stop        # остановить dev, preview и локальную БД
 ```
 
 Вход через Twitch работает и локально: в `.env` нужны `TWITCH_APP_CLIENT_ID` и `TWITCH_APP_CLIENT_SECRET`, а в Twitch-приложении — redirect `http://localhost:54321/auth/v1/callback`.

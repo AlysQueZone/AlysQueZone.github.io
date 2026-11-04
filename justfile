@@ -101,16 +101,38 @@ check:
     python3 scripts/sounds_sync.py check
     pnpm build
 
-# Preview собранного dist: остановить старый сервер и поднять свежий
+# Чужой сервер на 4321 не убиваем: занятый порт — ошибка с PID, а не тихий
+# уход на 4322, иначе проверки стучатся не туда.
+# Preview собранного dist на фиксированном 4321
 preview:
     #!/usr/bin/env bash
     set -euo pipefail
     ./node_modules/.bin/astro preview stop >/dev/null 2>&1 || true
+    if ss -ltn 2>/dev/null | grep -q ':4321 '; then
+      printf '%s\n' 'Порт 4321 занят другим сервером:' >&2
+      ss -ltnp 2>/dev/null | grep ':4321 ' >&2 || true
+      printf '%s\n' 'Останови его (`just preview-stop` в том worktree, `just dev-stop` для dev) и повтори.' >&2
+      exit 1
+    fi
     ./node_modules/.bin/astro preview
 
 # Остановить preview-сервер (идемпотентно)
 preview-stop:
     ./node_modules/.bin/astro preview stop || true
+
+# Остановить dev-сервер (идемпотентно)
+dev-stop:
+    ./node_modules/.bin/astro dev stop || true
+
+# Остановить всё локальное: dev/preview и локальный Supabase (идемпотентно)
+stop: dev-stop preview-stop
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ./node_modules/.bin/supabase status >/dev/null 2>&1; then
+      ./node_modules/.bin/supabase stop
+    else
+      printf '%s\n' 'Локальный Supabase не запущен'
+    fi
 
 # -------------------------------------
 # Контент лотов
