@@ -156,6 +156,8 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
   let loadingFirst = false;
   let loadingMore = false;
   let refreshing = false;
+  /** Событие пришло во время чтения: один повтор после ответа, без параллели. */
+  let refreshQueued = false;
   let hasMore = false;
   let observer: IntersectionObserver | null = null;
 
@@ -448,6 +450,10 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
           ? `Загружено ${dealsLabel(entries.length)}`
           : `Лог дочитан — всего ${dealsLabel(entries.length)}`
     );
+    if (refreshQueued) {
+      refreshQueued = false;
+      void refresh();
+    }
   }
 
   /** Следующая (более старая) страница по курсору показанного. */
@@ -487,24 +493,33 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
    * список не прыгал под пальцем.
    */
   async function refresh(): Promise<void> {
-    if (!loaded || refreshing) return;
+    if (!loaded || refreshing) {
+      refreshQueued = true;
+      return;
+    }
     refreshing = true;
     const page = await fetchDealLog(DEAL_PAGE_SIZE);
     refreshing = false;
-    if (!page.ok) return;
-    const known = new Set([...entries, ...pending].map((entry) => entry.id));
-    const fresh = page.entries.filter((entry) => !known.has(entry.id));
-    if (fresh.length === 0) return;
-    if (logTopVisible()) {
-      entries = mergeHistory(entries, [...fresh, ...pending]);
-      pending = [];
-      renderPill();
-      render();
-    } else {
-      pending = mergeHistory(pending, fresh);
-      renderPill();
+    if (page.ok) {
+      const known = new Set([...entries, ...pending].map((entry) => entry.id));
+      const fresh = page.entries.filter((entry) => !known.has(entry.id));
+      if (fresh.length > 0) {
+        if (logTopVisible()) {
+          entries = mergeHistory(entries, [...fresh, ...pending]);
+          pending = [];
+          renderPill();
+          render();
+        } else {
+          pending = mergeHistory(pending, fresh);
+          renderPill();
+        }
+        announce(`${newDealsLabel(fresh.length)}: в логе`);
+      }
     }
-    announce(`${newDealsLabel(fresh.length)}: в логе`);
+    if (refreshQueued) {
+      refreshQueued = false;
+      void refresh();
+    }
   }
 
   /** Липкая полоса дня встаёт под фактической высотой шапки, а не под догадкой. */
