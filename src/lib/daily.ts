@@ -12,7 +12,7 @@
  * Секретов здесь нет: только publishable-ключ через getSupabase().
  */
 
-import { getSupabase, withAuthRetry } from './supabase';
+import { getSupabase, withAuthRetry } from './session';
 
 /** Ключ локальной метки «автоклейм в этот UTC-день уже отработал». */
 export const AUTO_DAILY_KEY = 'alysque:daily-auto-day';

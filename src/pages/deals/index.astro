@@ -123,10 +123,10 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 </BaseLayout>
 
 <script>
-  // Страница рисует срез лога: запрос — lib/supabase.ts, отбор и деление на дни —
+  // Страница рисует срез лога: запрос — lib/purchases-read.ts, отбор и деление на дни —
   // lib/trade-history.ts. Здесь состояния, фильтр «Все / Мои» и его URL, разметка
   // и перерисовка; uid и сессию знает только live.ts (docs/adr/0003).
-  import { fetchDealLog } from '@/lib/supabase';
+  import { fetchDealLog } from '@/lib/purchases-read';
   import { live } from '@/lib/live';
   import { videoSources } from '@/lib/lot-video';
   import {

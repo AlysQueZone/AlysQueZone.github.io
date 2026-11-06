@@ -15,7 +15,7 @@
  * и стек, что у перекупов, — колокольчик и его окна не задеваем.
  */
 
-import { getSupabase, withAuthRetry } from './supabase';
+import { getSupabase, withAuthRetry } from './session';
 import { MAX_NOTICES, showCornerNotice } from './notice';
 
 async function run(): Promise<void> {

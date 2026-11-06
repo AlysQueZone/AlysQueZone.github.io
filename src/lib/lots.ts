@@ -1,4 +1,5 @@
-import { getSupabase, buyLotShared } from './supabase';
+import { getSupabase } from './session';
+import { buyLotShared } from './purchase-write';
 import { live } from './live';
 import { errorText, isNoAuthError, isOfflineError } from './errors';
 

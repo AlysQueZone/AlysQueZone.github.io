@@ -1,7 +1,7 @@
 ---
 // Шапка-вход через Twitch:
 // «Войти через Twitch» гостю / логин + «Выйти» Чатерсу.
-// Сессия долгая (persist + авторефреш, см. src/lib/supabase.ts).
+// Сессия долгая (persist + авторефреш, см. src/lib/session.ts).
 // Термины — из GLOSSARY.md, тон — как на сайте.
 ---
 
@@ -27,7 +27,7 @@
 </div>
 
 <script>
-  import { getSupabase, displayLogin, signInWithTwitch, signOut } from '@/lib/supabase';
+  import { getSupabase, displayLogin, signInWithTwitch, signOut } from '@/lib/session';
 
   const root = document.querySelector('[data-auth]');
   const loginBtn = root?.querySelector('[data-auth-login]');

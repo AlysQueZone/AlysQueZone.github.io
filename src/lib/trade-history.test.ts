@@ -15,6 +15,7 @@ import {
   formatRelativeTime,
   groupDealDays,
   historyCursor,
+  historyCursorFilter,
   historyEntries,
   mergeHistory,
   outbidCatchup,
@@ -156,6 +157,22 @@ describe('historyCursor', () => {
       entry({ id: 8, created_at: '2026-10-13T12:00:00.000Z' }),
     ]);
     expect(cursor).toEqual({ created_at: '2026-10-13T12:00:00.000Z', id: 8 });
+  });
+});
+
+describe('historyCursorFilter', () => {
+  it('без курсора — фильтра нет', () => {
+    expect(historyCursorFilter(null)).toBeNull();
+  });
+
+  it('курсор с пустым временем фильтром не становится', () => {
+    expect(historyCursorFilter({ created_at: '', id: 5 })).toBeNull();
+  });
+
+  it('курсор — точная строка keyset-фильтра по паре (created_at, id)', () => {
+    expect(historyCursorFilter({ created_at: '2026-10-13T12:00:00.000Z', id: 8 })).toBe(
+      'created_at.lt.2026-10-13T12:00:00.000Z,and(created_at.eq.2026-10-13T12:00:00.000Z,id.lt.8)'
+    );
   });
 });
 

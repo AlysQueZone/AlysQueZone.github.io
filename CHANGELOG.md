@@ -11,6 +11,8 @@
 
 ### Внутри
 
+- `supabase.ts` отвечал сразу за вход, навигацию, чтения и запись — витрина тянула auth ради одного `peek`.
+  → Разделён на `session`, `pending-buy`, `purchases-read` и `purchase-write`; кодек курсора — `historyCursorFilter` в `trade-history`, барреля нет — `docs/adr/0003`.
 - Бегущая строка держала четвёртую копию правил чтения `purchases` — без тестов и с обходом общего лимита.
   → Полоса берёт первую страницу `fetchDealLog` и собирается чистой `dealLogLine` в `src/lib/trade-history.ts`; для чатерса поведение прежнее.
 

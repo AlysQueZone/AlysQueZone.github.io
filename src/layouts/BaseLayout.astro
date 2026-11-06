@@ -17,7 +17,7 @@ import GambaModal from '@/components/GambaModal.astro';
 import BuyModal from '@/components/BuyModal.astro';
 import DailyLogin from '@/components/DailyLogin.astro';
 import AuthButton from '@/components/AuthButton.astro';
-import { assertSupabaseConfigured } from '@/lib/supabase';
+import { assertSupabaseConfigured } from '@/lib/session';
 import { GAMBA_EMOTE_URL } from '@/lib/emotes';
 import { commissionSplit, rewardLine, ROYALTY_PURCHASES } from '@/lib/prices';
 
@@ -204,7 +204,7 @@ assertSupabaseConfigured();
       });
     </script>
     <script>
-      import { fetchDealLog } from '@/lib/supabase';
+      import { fetchDealLog } from '@/lib/purchases-read';
       import { dealLogLine, MARQUEE_DEAL_LIMIT } from '@/lib/trade-history';
       import { live } from '@/lib/live';
       import { initOutbidNotice } from '@/lib/outbid-notice';

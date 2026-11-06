@@ -132,10 +132,10 @@ const base = import.meta.env.BASE_URL;
 <script>
   // Страница лота: slug — из query (`?id=`), состояние — срез снапшота живых
   // данных на один этот лот (lib/live.ts), история — страницами из БД
-  // (lib/supabase.ts), а вся её механика (курсор, слияние, относительное
+  // (lib/purchases-read.ts), а вся её механика (курсор, слияние, относительное
   // время) — чистое ядро (lib/trade-history.ts). Здесь только разметка и
   // перерисовка.
-  import { fetchSharedHistory } from '@/lib/supabase';
+  import { fetchSharedHistory } from '@/lib/purchases-read';
   import {
     HISTORY_PAGE_SIZE,
     appendHistory,

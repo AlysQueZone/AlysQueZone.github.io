@@ -12,7 +12,7 @@
  */
 import { GAMBA_SOUND_POOLS_FALLBACK } from './gamba-sounds.gen';
 import { s3Sound } from './media';
-import { getSupabase } from './supabase';
+import { getSupabase } from './session';
 
 /** Стадии церемонии; каждой соответствует свой пул (check в public.gamba_sounds). */
 export const POOL_NAMES = ['spin', 'win', 'jackpot', 'lose'] as const;

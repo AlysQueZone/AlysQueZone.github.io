@@ -279,6 +279,17 @@ export function historyCursor(entries: readonly CursorEntry[]): HistoryCursor | 
   return { created_at: oldest.created_at, id: oldest.id };
 }
 
+/**
+ * PostgREST-фильтр следующей страницы по курсору: keyset по паре
+ * `(created_at, id)`. `null` — читать с начала; пустое время — тоже `null`
+ * (битая запись не двигает границу). Единственное место, где живёт литерал
+ * keyset-условия: оба чтения с курсором строят фильтр отсюда.
+ */
+export function historyCursorFilter(cursor: HistoryCursor | null): string | null {
+  if (!cursor || cursor.created_at.length === 0) return null;
+  return `created_at.lt.${cursor.created_at},and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`;
+}
+
 /** Записи страницы, которых нет среди показанных, — по `id` (порядок сохраняется). */
 function unseenBy<T extends CursorEntry>(shown: readonly T[], page: readonly T[]): T[] {
   if (page.length === 0) return [];

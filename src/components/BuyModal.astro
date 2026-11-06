@@ -86,15 +86,14 @@ const clapSound = s3Sound('clap.mp3');
     type BuyIntent,
   } from '@/lib/buy-intent';
   import { showSpotNotice } from '@/lib/notice';
+  import { getSupabase, signInWithTwitch } from '@/lib/session';
   import {
-    getSupabase,
-    signInWithTwitch,
     stashPendingBuy,
     peekPendingBuy,
     clearPendingBuy,
     returnUrlForLot,
-    fetchSharedHistory,
-  } from '@/lib/supabase';
+  } from '@/lib/pending-buy';
+  import { fetchSharedHistory } from '@/lib/purchases-read';
 
   const modal = document.getElementById('buy-modal');
   const modalText = document.getElementById('buy-modal-text');

@@ -9,7 +9,7 @@
  * нет). Здесь — клиентская проверка «для UX» и маппинг ошибок сервера на
  * дружелюбные тексты; источник истины — сервер, обход браузера ничего не даёт.
  */
-import { getSupabase } from './supabase';
+import { getSupabase } from './session';
 import { errorText, isNoAuthError, isOfflineError } from './errors';
 
 export const SUBMISSION_TITLE_MAX = 80;

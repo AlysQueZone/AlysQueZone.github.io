@@ -19,7 +19,7 @@
  * Модуль сам поднимается на первом subscribe / refresh / report — отдельного
  * «старта» у поверхностей нет.
  */
-import { getSupabase, withAuthRetry } from './supabase';
+import { getSupabase, withAuthRetry } from './session';
 import type { CatalogCursor } from './catalog-page';
 import { createLiveRegistry, type LivePayload, type LiveTransport } from './live-core';
 import {

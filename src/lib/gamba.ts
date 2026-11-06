@@ -15,7 +15,7 @@
  * Секретов здесь нет: только publishable-ключ через getSupabase().
  */
 
-import { getSupabase } from './supabase';
+import { getSupabase } from './session';
 import { errorText, isNoAuthError, isOfflineError } from './errors';
 
 /** Фиксированная ставка Гамбы — display-mirror, source of truth — DB (c_stake в spin_gamba). */

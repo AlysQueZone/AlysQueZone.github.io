@@ -27,7 +27,7 @@
  * его события и читает цены из снапшота (docs/adr/0003).
  */
 
-import { fetchOutbidCatchup } from './supabase';
+import { fetchOutbidCatchup } from './purchases-read';
 import { live, normalizeNextPrice } from './live';
 import { readBuyIntent, updateBuyIntentPrice } from './buy-intent';
 import { sellerLine, type OutbidEvent } from './outbid-event';
