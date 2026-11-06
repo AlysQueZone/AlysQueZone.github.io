@@ -19,8 +19,20 @@ export const POOL_NAMES = ['spin', 'win', 'jackpot', 'lose'] as const;
 
 export type SoundPool = (typeof POOL_NAMES)[number];
 
-/** Пул -> имена файлов в бакете. */
+/** Пул -> файлы: имена в бакете (БД/манифест) или абсолютные S3-URL (data-атрибут). */
 export type SoundPools = Record<SoundPool, string[]>;
+
+/** Ключ data-атрибута пула в DOMStringMap (`data-spin-pool` → `spinPool`). */
+export type PoolDataKey = `${SoundPool}Pool`;
+
+export function poolDataKey(pool: SoundPool): PoolDataKey {
+  return `${pool}Pool`;
+}
+
+/** Те же ключи таблицей — обход и проверки из одного источника с `poolDataKey`. */
+export const POOL_KEYS: Record<SoundPool, PoolDataKey> = Object.fromEntries(
+  POOL_NAMES.map((pool) => [pool, poolDataKey(pool)])
+) as Record<SoundPool, PoolDataKey>;
 
 /** Фолбэк сборки: пулы манифеста на момент билда. */
 export function fallbackSoundPools(): SoundPools {
@@ -35,6 +47,29 @@ export function fallbackSoundPools(): SoundPools {
 /** Значение data-атрибута пула: абсолютные S3-URL через запятую. */
 export function poolAttribute(files: readonly string[]): string {
   return files.map((file) => s3Sound(file)).join(',');
+}
+
+/** Пулы -> значения data-атрибутов; формат тот же, что печёт разметка. */
+export function encodePools(pools: SoundPools): Record<PoolDataKey, string> {
+  const encoded = {} as Record<PoolDataKey, string>;
+  for (const pool of POOL_NAMES) encoded[poolDataKey(pool)] = poolAttribute(pools[pool]);
+  return encoded;
+}
+
+/** Значение data-атрибута -> файлы (абсолютные S3-URL); пусто и мусор — []. */
+export function decodePool(raw: string | null | undefined): string[] {
+  if (typeof raw !== 'string' || raw.trim() === '') return [];
+  return raw
+    .split(',')
+    .map((file) => file.trim())
+    .filter(Boolean);
+}
+
+/** Чтение всех пулов из dataset; отсутствующий атрибут — пустой пул. */
+export function readPools(dataset: Record<string, string | undefined>): SoundPools {
+  const pools: SoundPools = { spin: [], win: [], jackpot: [], lose: [] };
+  for (const pool of POOL_NAMES) pools[pool] = decodePool(dataset[poolDataKey(pool)]);
+  return pools;
 }
 
 function isSoundPool(value: unknown): value is SoundPool {

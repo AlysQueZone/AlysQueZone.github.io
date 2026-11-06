@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 
 const TOKENS_FILE = '/src/styles/global.css';
-const DECORATIVE = new Set(['/src/lib/confetti.ts', '/src/components/GambaModal.astro']);
+const DECORATIVE = new Set(['/src/lib/confetti.ts', '/src/lib/gamba-ceremony.ts']);
 const PATTERNS: ReadonlyArray<[kind: string, pattern: RegExp]> = [
   ['hex', /#[0-9a-fA-F]{3,8}\b/g],
   ['rgb', /\brgba?\s*\(/gi],
