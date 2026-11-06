@@ -20,6 +20,18 @@ Blocked by: —
 - Тесты: каждый исход, abort, кодек.
 - ADR impact: `none`; ADR-0011/0003 не переоткрываются.
 
+## Recommended answers
+
+> Выбрано по указанию сессии; спека не написана, статус тикета не меняется.
+
+1. **Ядро церемонии.** Новый чистый `gamba-ceremony.ts`: стадии `idle | requesting | spinning | revealed | aborted`, `SPIN_MS = 4200`, события `start | result | finish | abort | reset`; исходы включая legacy `miss`, для пула/стадии `miss → lose`; `outcomePool`: `return|miss → lose`, `small|big → win`, `jackpot → jackpot`. Компонент владеет rAF, canvas, звуком, таймерами и сетью; ядро — переходами и эффектами.
+2. **Abort / release.** Ядро держит `balanceHeld` и выдаёт эффекты `holdBalance` на старте и `releaseBalance` ровно один раз на терминальном переходе (`revealed` / `aborted` / ошибка); повторный release — no-op; `result` после abort игнорируется; закрытие окна в `requesting` / `spinning` → `aborted`.
+3. **`WHEEL_PATTERN`.** Переезжает в `gamba-ceremony.ts` (или `gamba-wheel.ts`): паттерн, `SEGMENT_SPECS`, валидация длины 12 / алфавита RBSJ / счётов 9-1-1-1, `segments`, `targetSegment(outcome, random)`. Canvas-адаптер только рисует; проверка в компоненте исчезает.
+4. **Кодек пулов.** `gamba-sounds.ts` владеет encode/decode: `POOL_KEYS` / `poolDataKey`, `encodePools`, `decodePool`, `readPools(dataset)`, `poolAttribute`; `pool()` в компоненте удаляется; `POOL_NAMES` — единственный источник имён; round-trip тест.
+5. **`setPools` / ошибки.** `fetchSoundPools` → null/неполный список → фолбэк сборки; `setPools` пишет через кодек, `syncPools` при открытии, крутку не блокирует. Ядро не грузит пулы.
+6. **Тесты.** `gamba-ceremony.test.ts`: каждый исход → пул, переходы стадий, abort/release один раз, result после abort, валидация паттерна, выбор сегмента; `gamba-sounds.test.ts`: round-trip и имена. DOM не тестируем.
+7. **ADR.** `none`; ADR-0011/0003 не переоткрываются.
+
 ## Deliverable
 
 `specs/06-gamba-ceremony.md` по шаблону `to-spec` + проектные секции, или мотивированный no-go. Ответ — в `## Answer` этого файла со ссылкой на спеку; статус `resolved`.

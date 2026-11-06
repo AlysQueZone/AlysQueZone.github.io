@@ -19,6 +19,17 @@ Blocked by: 01
 - Тесты: строки собираются из констант; в поверхностях нет захардкоженных чисел.
 - ADR impact: вероятно `amend` ADR-0007 или `none`; решить, не переоткрывая формулу.
 
+## Recommended answers
+
+> Выбрано по указанию сессии; спека не написана, статус тикета не меняется.
+
+1. **Модуль.** Новый `rules.ts` — единственный модуль показа; `prices.ts` растворяется (импорты `outbid-event`, `RulesModal`, `BaseLayout`, `SuggestGreeting` обновляются), барреля не остаётся. Имя `prices.ts` больше не соответствует роли.
+2. **Числа и SQL.** В `rules.ts`: `DAILY_REWARDS = [200, 200, 250, 150, 200, 250, 500]`, `GAMBA_STAKE = 100`, `GAMBA_DAILY_LIMIT = 20`, `START_BALANCE = 1000`, комиссия/роялти/бонус; рядом комментарии-указатели на SQL (`claim_daily`, `spin_gamba`, `seed_opening`, `commission_rate`, `royalty_rate`, `pay_submission_reward`). Это display-mirror: источник истины — SQL, рантайм-конфиг не вводим; `economy.md` дополняется «меняешь SQL — правь rules.ts».
+3. **Рост.** Входит как текст: `GROWTH_STEP_PCT = 10`, `GROWTH_PURCHASES = 15`, `growthLine()`; никакого `nextPrice`/формулы в клиенте. ADR-0007 уточняется, что текст показа допустим, формула — только SQL.
+4. **Строки.** `commissionLine()`, `rewardLine()`, `growthLine()`, `dailyCycleLine()`, `dailyShortLine()` (для маркизы), `gambaLine()`, `startBalanceLine()`. `RulesModal` / `BaseLayout` / `SuggestGreeting` вставляют готовые строки; `GambaModal` / `gamba.ts` берут ставку/лимит из `rules.ts`.
+5. **Тесты.** `rules.test.ts`: длина и значения цикла, строки собираются из констант, рост/комиссия/награда/старт, короткая строка — первые три дня; приёмочный `rg` по трём поверхностям на старые захардкоженные фразы, без структурного теста на все числа.
+6. **ADR.** `amend` ADR-0007: одна фраза «текст показа роста может жить в rules.ts; формула и вычисление — только public.next_lot_price»; формула не переоткрывается. `economy.md` обновляется.
+
 ## Deliverable
 
 `specs/07-rules-numbers.md` по шаблону `to-spec` + проектные секции, или мотивированный no-go. Ответ — в `## Answer` этого файла со ссылкой на спеку; статус `resolved`.
