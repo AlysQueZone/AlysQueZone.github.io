@@ -9,6 +9,7 @@
 - Бэкенд — в Supabase: схема — только миграциями; контент лотов — `content/lots.toml` + `just lots-sync` (публикуется без деплоя, не миграциями), новый лот — `just lot-add <файл|URL>` (общий пайплайн со `submission.py`).
 - Новая таблица → в той же миграции гранты `anon`/`authenticated`/`service_role` и `usage` на sequence (с 30.10.2026 автоматом не выдаются); шаблон — `docs/agents/supabase.md`.
 - Витрина и страницы лотов — клиентская проекция БД (`docs/adr/0002-market-client-projection.md`): билд без запроса к БД, но требует `PUBLIC_SUPABASE_*`.
+- Звук привета — один уровень: `scripts/lot_add.py` меряет громкость и применяет линейный гейн до −16 LUFS (пик −1.5 dBTP), промах — предупреждение; старые видео выравнивает `just lots-normalize` — `docs/adr/0013-privet-loudness.md`.
 - Математика биржи — из одних рук: серверный рост цены — одна функция `public.next_lot_price` (`docs/adr/0007-next-lot-price-single-formula.md`); меняешь механику — обнови витрину и канон в `docs/agents/economy.md`.
 - Владелец лота из заявки — сразу автор привета (`owner_uid`/`owner_login` в `accept_submission`); лот админа ничей; награда живёт поверх владения — `docs/adr/0010-author-owns-lot.md`.
 - Баланс — из снапшота (`src/lib/live.ts`): перед действием гейты читают свежее значение (`live.refreshBalance()`); серверные значения (гамба, ежедневный вход, тик профиля) возвращаются в модуль; намерение покупки и «не хватает Пивкойнов» — `src/lib/buy-intent.ts` (гейт всё равно серверный).

@@ -19,6 +19,8 @@ PUBLIC_SUPABASE_URL, иначе из `.env` (по умолчанию ./.env).
 """
 
 import argparse
+import json
+import math
 import os
 import re
 import shutil
@@ -35,6 +37,13 @@ from supabase_common import load_dotenv, project_base, resolve, resolve_service_
 BUCKET = "media"
 VIDEOS_DEST = "videos/"
 DEFAULT_PRICE = 800
+# Один уровень для всех приветов: речь в вебе, пик — запас под lossy-кодеки
+# и короткие клипы. Константа, а не флаг: разнобой между запусками не нужен.
+TARGET_LUFS = -16.0
+TARGET_TP = -1.5
+LOUDNESS_TOLERANCE = 1.0
+# Меняешь цель — подними версию: иначе /tmp-кэш останется на старом уровне.
+LOUDNESS_MARKER = ".loudness-v1"
 MANIFEST = os.path.join("content", "lots.toml")
 SEED = os.path.join("supabase", "seed.sql")
 DIRECT_SUFFIXES = (".mp4", ".webm", ".mov", ".mkv", ".m4v")
@@ -189,23 +198,123 @@ def run_ffmpeg(args):
     return True
 
 
+def measure_loudness(path):
+    """(интегрированная громкость, истинный пик) или None, если звука нет.
+
+    Замер EBU R128 с гейтингом тишины; видео не декодируется (`-vn`).
+    """
+    try:
+        proc = subprocess.run(
+            [
+                "ffmpeg",
+                "-hide_banner",
+                "-nostats",
+                "-i",
+                path,
+                "-vn",
+                "-af",
+                "loudnorm=print_format=json",
+                "-f",
+                "null",
+                "-",
+            ],
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        raise LotError("не найден ffmpeg — установи его и повтори")
+    if proc.returncode != 0:
+        return None
+    match = re.search(r'\{[^{}]*"input_i"[^{}]*\}', proc.stderr, re.S)
+    if not match:
+        return None
+    try:
+        data = json.loads(match.group(0))
+        loudness = float(data["input_i"])
+        peak = float(data["input_tp"])
+    except (KeyError, ValueError, json.JSONDecodeError):
+        return None
+    if not math.isfinite(loudness) or not math.isfinite(peak):
+        return None
+    return loudness, peak
+
+
+def gain_for(source):
+    """Гейн до TARGET_LUFS по замеру исходника; None — нормализовать нечего.
+
+    Гейн линейный: меняется только уровень, динамика и тембр остаются.
+    Потолок пика важнее цели — если гейн в него упирается, клип останется
+    тише, но без лимитера (на речи он звучит хуже).
+    """
+    measured = measure_loudness(source)
+    if measured is None:
+        say("Громкость исходника: звука нет или замер не удался — без нормализации")
+        return None
+    loudness, peak = measured
+    gain = TARGET_LUFS - loudness
+    ceiling = TARGET_TP - peak
+    if gain > ceiling:
+        say(
+            "Пик не даёт поднять до %.1f LUFS: гейн %.1f dB (потолок %.1f dBTP)"
+            % (TARGET_LUFS, ceiling, TARGET_TP)
+        )
+        gain = ceiling
+    say(
+        "Громкость исходника: %.1f LUFS, пик %.1f dBTP; гейн %+.1f dB"
+        % (loudness, peak, gain)
+    )
+    return gain
+
+
+def check_loudness(path):
+    """Замер результата: промах — предупреждение, публикацию не блокирует."""
+    measured = measure_loudness(path)
+    if measured is None:
+        say(
+            "%s: замер громкости не удался — публикую как есть" % os.path.basename(path)
+        )
+        return
+    loudness, peak = measured
+    say("%s: %.1f LUFS, пик %.1f dBTP" % (os.path.basename(path), loudness, peak))
+    miss = abs(loudness - TARGET_LUFS)
+    if miss > LOUDNESS_TOLERANCE:
+        say(
+            "ПРЕДУПРЕЖДЕНИЕ: %s промахнулся мимо %.1f LUFS на %.1f LU — публикую как есть"
+            % (os.path.basename(path), TARGET_LUFS, miss)
+        )
+
+
 def ready(path):
     """Готовый файл: существует и не пустой (кэш сборки в /tmp)."""
     return os.path.exists(path) and os.path.getsize(path) > 0
 
 
 def build_triple(source, workdir, slug):
-    """Тройка webm/mp4/webp: видео, совместимое с браузером, и постер."""
+    """Тройка webm/mp4/webp: видео, совместимое с браузером, и постер.
+
+    Звук обеих сборок приводится к TARGET_LUFS линейным гейном; промах —
+    предупреждение, публикацию не блокирует.
+    """
     os.makedirs(workdir, exist_ok=True)
     webm = os.path.join(workdir, slug + ".webm")
     mp4 = os.path.join(workdir, slug + ".mp4")
     webp = os.path.join(workdir, slug + ".webp")
-    if not ready(webm):
+    marker = os.path.join(workdir, LOUDNESS_MARKER)
+    # Кэш старой сборки не знает про нормализацию — пересобираем оба видеофайла.
+    fresh = os.path.exists(marker)
+    rebuild = not fresh or not ready(webm) or not ready(mp4)
+    audio_filter = []
+    if rebuild:
+        gain = gain_for(source)
+        if gain is not None:
+            audio_filter = ["-af", "volume=%.2fdB" % gain]
+    if not ready(webm) or not fresh:
         say("Собираю %s…" % os.path.basename(webm))
         run_ffmpeg(
             [
                 "-i",
                 source,
+                *audio_filter,
                 "-c:v",
                 "libvpx-vp9",
                 "-b:v",
@@ -217,12 +326,13 @@ def build_triple(source, workdir, slug):
                 webm,
             ]
         )
-    if not ready(mp4):
+    if not ready(mp4) or not fresh:
         say("Собираю %s…" % os.path.basename(mp4))
         run_ffmpeg(
             [
                 "-i",
                 source,
+                *audio_filter,
                 "-c:v",
                 "libx264",
                 "-crf",
@@ -239,6 +349,12 @@ def build_triple(source, workdir, slug):
     if not ready(webp):
         say("Собираю %s…" % os.path.basename(webp))
         run_ffmpeg(["-i", source, "-vframes", "1", "-q:v", "80", webp])
+    if rebuild:
+        with open(marker, "w", encoding="utf-8") as fh:
+            fh.write("1\n")
+    if audio_filter:
+        check_loudness(webm)
+        check_loudness(mp4)
     return [webm, mp4, webp]
 
 

@@ -160,6 +160,10 @@ lots-title *args:
 lot-add *args:
     python3 scripts/lot_add.py "$@"
 
+# Выровнять громкость опубликованных приветов (dry-run; --apply — залить)
+lots-normalize *args:
+    python3 scripts/lot_normalize.py "$@"
+
 # -------------------------------------
 # Контент звуков гамбы
 # -------------------------------------
