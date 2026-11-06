@@ -23,13 +23,17 @@
  *   Метка просмотра — в localStorage per-uid: открытая панель гасит бейдж
  *   и переживает перезагрузку (непрочитанное между девайсами не синкается).
  *
- * Каналы, снапшот владельцев и живые N — в lib/live.ts: колокол подписан на
- * его события и читает цены из снапшота (docs/adr/0003).
+ * История, счётчик, метка и дедуп — чистый outbid-bell.ts; здесь остаётся
+ * адаптер: DOM панели, Поповер, Escape, ResizeObserver, live-подписка, звук и
+ * Всплывающие уведомления (docs/adr/0005). Каналы, снапшот владельцев и живые
+ * N — в lib/live.ts: колокол подписан на его события и читает цены из
+ * снапшота (docs/adr/0003).
  */
 
 import { fetchOutbidCatchup } from './purchases-read';
 import { live, normalizeNextPrice } from './live';
 import { readBuyIntent, updateBuyIntentPrice } from './buy-intent';
+import { createOutbidBell, outbidEventKey, type OutbidBellStorage } from './outbid-bell';
 import { sellerLine, type OutbidEvent } from './outbid-event';
 import { playOutbidSound } from './outbid-sound';
 import { makeRebuyButton, rebuyLabel, showOutbidNotice } from './outbid-notices';
@@ -38,10 +42,33 @@ import { POPOVER_MARGIN, placePanel } from './popover';
 import { hasOpenModal } from './modal';
 
 const MAX_HISTORY = 10;
+const SEEN_KEY_PREFIX = 'alysque:outbid-seen:';
 const BELL_ID = 'outbid-bell';
 const BELL_COUNT_ID = 'outbid-bell-count';
 const BELL_PANEL_ID = 'outbid-bell-panel';
 const BELL_TITLE = 'Перекупы твоих лотов';
+
+/** Метка просмотра — localStorage per-uid: переживает перезагрузку; между
+ *  девайсами непрочитанное не синкается — осознанный лимит. Приватный режим:
+ *  ошибки глотаем, бейдж просто проживёт до перезагрузки. */
+const seenStorage: OutbidBellStorage = {
+  readSeen(uid: string): number {
+    try {
+      const raw = window.localStorage.getItem(`${SEEN_KEY_PREFIX}${uid}`);
+      const ts = raw === null ? 0 : Number(raw);
+      return Number.isFinite(ts) && ts > 0 ? ts : 0;
+    } catch {
+      return 0;
+    }
+  },
+  writeSeen(uid: string, at: number): void {
+    try {
+      window.localStorage.setItem(`${SEEN_KEY_PREFIX}${uid}`, String(at));
+    } catch {
+      // приватный режим — бейдж проживёт до перезагрузки
+    }
+  },
+};
 
 /** Один раз за страницу. Повторный вызов — noop. */
 export function initOutbidNotice(): void {
@@ -51,37 +78,12 @@ export function initOutbidNotice(): void {
 
   let interacted = false;
   let uid: string | null = null;
-  const history: OutbidEvent[] = [];
   const missed: OutbidEvent[] = [];
-  let unread = 0;
-
-  function seenStorageKey(): string | null {
-    return uid === null ? null : `alysque:outbid-seen:${uid}`;
-  }
-
-  /** Прочитанное — в localStorage per-uid: переживает перезагрузку;
-   *  между девайсами непрочитанное не синкается — осознанный лимит. */
-  function loadSeenAt(): number {
-    try {
-      const key = seenStorageKey();
-      if (!key) return 0;
-      const raw = window.localStorage.getItem(key);
-      const ts = raw === null ? 0 : Number(raw);
-      return Number.isFinite(ts) && ts > 0 ? ts : 0;
-    } catch {
-      return 0;
-    }
-  }
-
-  function markSeen(): void {
-    try {
-      const key = seenStorageKey();
-      if (!key) return;
-      window.localStorage.setItem(key, String(Date.now()));
-    } catch {
-      // приватный режим — бейдж просто проживёт до перезагрузки
-    }
-  }
+  const bell = createOutbidBell({
+    storage: seenStorage,
+    now: () => Date.now(),
+    maxHistory: MAX_HISTORY,
+  });
 
   let bellButton: HTMLElement | null = null;
   let bellCount: HTMLElement | null = null;
@@ -143,8 +145,7 @@ export function initOutbidNotice(): void {
     anchorPanel();
     startHeaderWatch();
     refreshHistoryPrices();
-    unread = 0;
-    markSeen();
+    bell.markSeen();
     renderBell();
   }
 
@@ -156,6 +157,7 @@ export function initOutbidNotice(): void {
 
   function renderBell(): void {
     if (!bellCount) return;
+    const { unread } = bell.snapshot();
     if (unread <= 0) {
       bellCount.style.display = 'none';
       return;
@@ -166,6 +168,7 @@ export function initOutbidNotice(): void {
 
   function renderPanel(): void {
     if (!bellPanel) return;
+    const { entries: history } = bell.snapshot();
     bellPanel.innerHTML = '';
     const head = document.createElement('div');
     head.className = 'font-display';
@@ -270,16 +273,19 @@ export function initOutbidNotice(): void {
     bellOpen = false;
   }
 
-  function syncBellVisibility(): void {
-    if (uid === null) {
-      // Чужую историю перекупов после выхода не светим следующему за экраном.
-      history.length = 0;
+  /** Смена сессии у ядра и у вида: гость не светит чужую историю следующему
+   *  за экраном; залогиненный получает свою метку просмотра. */
+  function syncBellVisibility(next: string | null): void {
+    uid = next;
+    bell.setUid(next);
+    if (next === null) {
       missed.length = 0;
-      unread = 0;
       removeBell();
       return;
     }
     ensureBell();
+    renderBell();
+    if (isOpen()) renderPanel();
   }
 
   /** Живые кнопки возврата: текст и staged-цена из снапшота каталога. */
@@ -299,66 +305,35 @@ export function initOutbidNotice(): void {
    *  (ADR 0012) — историю цен дочитываем одним запросом по slug'ам; ответ
    *  придёт событием каталога и обновит кнопки. */
   function refreshHistoryPrices(): void {
+    const { entries: history } = bell.snapshot();
     if (history.length === 0) return;
     void live.refreshLots(history.map((ev) => ev.slug));
   }
 
-  /**
-   * Добавить перекуп в колокол; `false` — тот же уже показан. Одно событие
-   * может прийти из двух диффов (окно витрины и «Мои приветы») почти
-   * одновременно; окно времени не блокирует настоящий повтор позже.
-   */
-  function pushHistory(ev: OutbidEvent): boolean {
-    const key = eventKey(ev);
-    const duplicate = history.some(
-      (entry) => eventKey(entry) === key && Math.abs(entry.at - ev.at) < 5000
-    );
-    if (duplicate) return false;
-    history.unshift(ev);
-    while (history.length > MAX_HISTORY) history.pop();
-    unread += 1;
-    renderBell();
-    return true;
-  }
-
-  function eventKey(ev: OutbidEvent): string {
-    return `${ev.slug}|${ev.price}|${ev.by}`;
-  }
-
   /** Оффлайн-догон: сделки, где меня перекупили без открытого канала
-   *  (закрыта вкладка). Best effort, дедуп по событию, свежие — первыми.
-   *  Метка просмотра уходит флором в запрос: уже виденное не возвращается,
-   *  поэтому непрочитанные — ровно пришедшие новее метки. */
+   *  (закрыта вкладка). Best effort; дедуп против истории и уже показанных
+   *  окошек (`missed`) делает ядро. Метка просмотра уходит флором в запрос:
+   *  уже виденное не возвращается, поэтому непрочитанные — ровно пришедшие
+   *  новее метки. */
   async function catchUpOffline(): Promise<void> {
     if (uid === null) return;
     try {
-      const seenAt = loadSeenAt();
+      const { seenAt } = bell.snapshot();
       const found = await fetchOutbidCatchup(uid, MAX_HISTORY, seenAt);
       if (found.length === 0) return;
-      const known = new Set(history.map(eventKey));
-      for (const m of missed) known.add(eventKey(m));
-      let added = 0;
-      for (const ev of found) {
-        if (known.has(eventKey(ev))) continue;
-        history.push(ev);
-        known.add(eventKey(ev));
-        if (ev.at > seenAt) added += 1;
-      }
-      history.sort((a, b) => b.at - a.at);
-      while (history.length > MAX_HISTORY) history.pop();
-      if (added > 0) {
-        unread += added;
-        renderBell();
-        if (isOpen()) renderPanel();
-        refreshHistoryPrices();
-      }
+      const added = bell.merge(found, missed.map(outbidEventKey));
+      if (added === 0) return;
+      renderBell();
+      if (isOpen()) renderPanel();
+      refreshHistoryPrices();
     } catch {
       // догон — best effort, лайв-канал работает и без него
     }
   }
 
   function onOutbid(ev: OutbidEvent): void {
-    if (!pushHistory(ev)) return;
+    if (bell.add(ev) === 'duplicate') return;
+    renderBell();
     playOutbidSound(interacted);
     if (document.hidden) {
       missed.push(ev);
@@ -402,8 +377,7 @@ export function initOutbidNotice(): void {
   // смена uid, перекуп, своя покупка, тик каталога и синк (догон).
   live.subscribe((change) => {
     if (change.kind === 'uid') {
-      uid = change.uid;
-      syncBellVisibility();
+      syncBellVisibility(change.uid);
       void catchUpOffline();
       return;
     }
@@ -431,13 +405,11 @@ export function initOutbidNotice(): void {
    *  и закрыть висящие окошки. */
   function removeBoughtFromHistory(id: string): void {
     if (id.length === 0) return;
-    const before = history.length;
-    for (let i = history.length - 1; i >= 0; i--) {
-      if (history[i].slug === id) history.splice(i, 1);
+    const removed = bell.removeBought(id);
+    if (removed.length > 0) {
+      renderBell();
+      if (isOpen()) renderPanel();
     }
-    unread = Math.max(0, unread - (before - history.length));
-    renderBell();
-    if (isOpen()) renderPanel();
     closeNotices(id);
   }
 }
