@@ -1,24 +1,30 @@
 ---
-// Окно «Правила биржи»: вся математика биржи в одном
-// месте — комиссия, рост цены, гамба, вход. Гамба-строки живые из БД
-// (public.gamba_payouts через fetchGambaPaytable), остальное — константы
-// правил (фолбэк гамбы — GAMBA_PAYTABLE из lib/gamba.ts).
+// Окно «Правила биржи»: все числа и строки математики биржи — из
+// единственного модуля показа lib/rules.ts (комиссия, рост, гамба, вход).
+// Гамба-строки живые из БД (public.gamba_payouts через fetchGambaPaytable),
+// остальное — константы правил (фолбэк гамбы — GAMBA_PAYTABLE из lib/gamba.ts).
 //
 // Использование: положить <RulesModal /> на страницу с hero и повесить
 // data-rules-button на кнопку открытия — скрипт ниже делегированный.
 // Цикл (Escape / клик по затемнению / фокус) — общий lib/modal.ts; кнопки
 // «Понятно» и крестик носят data-modal-close.
-import { GAMBA_DAILY_LIMIT, GAMBA_PAYTABLE } from '@/lib/gamba';
-import { commissionSplit, rewardLine, ROYALTY_PURCHASES } from '@/lib/prices';
+import { GAMBA_PAYTABLE } from '@/lib/gamba';
+import {
+  commissionLine,
+  commissionSplit,
+  dailyCycleLine,
+  gambaLine,
+  growthLine,
+  rewardLine,
+} from '@/lib/rules';
 
-// Цифры награды/комиссии — из зеркал lib/prices.ts (серверные ставки живут
-// в public.commission_rate()/public.royalty_rate() и в pay_submission_reward).
-const {
-  commissionPct: COMMISSION_PCT,
-  burnPct: BURN_PCT,
-  royaltyPct: ROYALTY_PCT,
-} = commissionSplit();
+// Строки собраны в rules.ts; заголовок берёт процент из того же сплита.
+const COMMISSION_PCT = commissionSplit().commissionPct;
+const COMMISSION_LINE = commissionLine();
 const REWARD_LINE = rewardLine();
+const GROWTH_LINE = growthLine();
+const GAMBA_LINE = gambaLine();
+const DAILY_LINE = dailyCycleLine();
 ---
 
 <div
@@ -48,12 +54,7 @@ const REWARD_LINE = rewardLine();
         <p class="font-display text-[10px] uppercase text-ember">
           Комиссия биржи {COMMISSION_PCT}%
         </p>
-        <p class="mt-1 text-mist">
-          Платит продавец из выручки (округление вверх, минимум 1): {COMMISSION_PCT}%. {BURN_PCT}%
-          сгорает, {ROYALTY_PCT}% уходит автору привета, принятого по заявке, за первые{' '}
-          {ROYALTY_PURCHASES} перекупа; у лотов без автора сгорает вся комиссия. Покупатель платит
-          ровно цену кнопки — без сюрпризов.
-        </p>
+        <p class="mt-1 text-mist">{COMMISSION_LINE}</p>
       </li>
       <li>
         <p class="font-display text-[10px] uppercase text-melon">Награда за принятый привет</p>
@@ -64,10 +65,7 @@ const REWARD_LINE = rewardLine();
       </li>
       <li>
         <p class="font-display text-[10px] uppercase text-stream">Рост цены</p>
-        <p class="mt-1 text-mist">
-          Первые 15 покупок лота поднимают цену на +10% (вверх, минимум +1), дальше — ровно на +1.
-          Разгоняй первым — топы не улетают.
-        </p>
+        <p class="mt-1 text-mist">{GROWTH_LINE}. Разгоняй первым — топы не улетают.</p>
       </li>
       <li>
         <p class="font-display text-[10px] uppercase text-blush">Владелец лота</p>
@@ -78,9 +76,7 @@ const REWARD_LINE = rewardLine();
         </p>
       </li>
       <li>
-        <p class="font-display text-[10px] uppercase text-pivko">
-          Гамба · ставка 100 · {GAMBA_DAILY_LIMIT} спинов в день
-        </p>
+        <p class="font-display text-[10px] uppercase text-pivko">Гамба · {GAMBA_LINE}</p>
         <ul data-rules-gamba class="mt-1 flex flex-col gap-1 text-mist">
           {GAMBA_PAYTABLE.map((row) => (
             <li class="border-2 border-milk/60 bg-void px-2 py-1">
@@ -91,10 +87,7 @@ const REWARD_LINE = rewardLine();
       </li>
       <li>
         <p class="font-display text-[10px] uppercase text-pivko">Ежедневный вход</p>
-        <p class="mt-1 text-mist">
-          Дни 1–3: 200 / 200 / 250. Дальше: 150 / 200 / 250 / 500 (7-й день), затем цикл заново.
-          Старт — 1000. Пропуск streak не сбрасывает.
-        </p>
+        <p class="mt-1 text-mist">{DAILY_LINE} Пропуск streak не сбрасывает.</p>
       </li>
     </ul>
     <button

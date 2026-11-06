@@ -8,7 +8,7 @@
  * уведомления молча.
  */
 
-import { commissionFor } from './prices';
+import { commissionFor } from './rules';
 import type { LiveOutbid } from './live';
 
 /** Событие перекупа — форма из ядра живых данных (один источник). */
@@ -16,7 +16,7 @@ export type OutbidEvent = LiveOutbid;
 
 /**
  * Строка продавца с раскрытой комиссией: сервер зачислил
- * цену минус 7% (display-mirror формулы из prices.ts), показываем
+ * цену минус 7% (display-mirror формулы из rules.ts), показываем
  * «получено N − комиссия», а не голую цену сделки.
  */
 export function sellerLine(ev: OutbidEvent): string {

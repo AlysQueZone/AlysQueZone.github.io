@@ -4,7 +4,7 @@
 // свёрнута. Запись — прямой INSERT в submissions под RLS (lib/submissions.ts),
 // автора/статус/связи ставит BEFORE-триггер. Гость может заполнить поля, но
 // вместо отправки видит вход через Twitch (нужен для награды и авторства).
-import { rewardLine } from '@/lib/prices';
+import { rewardLine } from '@/lib/rules';
 
 const INFO_LEAD = 'Предлагаемое видео должно быть по смыслу похоже на уже существующие приветы.';
 const NOTICE_CLASS = 'border-2 border-milk bg-void px-3 py-2 text-sm font-bold';

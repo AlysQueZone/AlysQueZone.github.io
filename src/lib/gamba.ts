@@ -18,11 +18,8 @@
 import { getSupabase } from './session';
 import { errorText, isNoAuthError, isOfflineError } from './errors';
 
-/** Фиксированная ставка Гамбы — display-mirror, source of truth — DB (c_stake в spin_gamba). */
-export const GAMBA_STAKE = 100;
-
-/** Дневной лимит спинов — display-mirror, source of truth — DB (c_daily_limit в spin_gamba). */
-export const GAMBA_DAILY_LIMIT = 20;
+// Ставка и дневной лимит для показа — lib/rules.ts; исход и лимиты держит
+// spin_gamba (c_stake / c_daily_limit).
 
 // Звуковые пулы гамбы — в lib/gamba-sounds.ts: источник правды — манифест
 // content/sounds.toml, рантайм — public.gamba_sounds (docs/adr/0011).

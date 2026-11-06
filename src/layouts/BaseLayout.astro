@@ -19,7 +19,14 @@ import DailyLogin from '@/components/DailyLogin.astro';
 import AuthButton from '@/components/AuthButton.astro';
 import { assertSupabaseConfigured } from '@/lib/session';
 import { GAMBA_EMOTE_URL } from '@/lib/emotes';
-import { commissionSplit, rewardLine, ROYALTY_PURCHASES } from '@/lib/prices';
+import {
+  commissionSplit,
+  dailyShortLine,
+  gambaLine,
+  growthLine,
+  rewardLine,
+  ROYALTY_PURCHASES,
+} from '@/lib/rules';
 
 interface Props {
   title?: string;
@@ -40,8 +47,8 @@ const MQ_SKELETON = Array.from(
     '<span class="skeleton-block skeleton-block-cream mr-3 inline-block h-2 w-40 align-middle"></span>'
 ).join('');
 
-// Правила для бегущей строки (когда сделок нет): те же ставки, что в окне
-// «Правила биржи», из зеркал lib/prices.ts — витрина не врёт про математику.
+// Правила для бегущей строки (когда сделок нет): те же числа и строки, что в
+// окне «Правила биржи», из lib/rules.ts — витрина не врёт про математику.
 // Сплит комиссии — только у приветов с автором (приняты по заявке); у лотов
 // без автора сгорает вся комиссия.
 const {
@@ -52,8 +59,8 @@ const {
 const MQ_RULES =
   `Комиссия биржи ${MQ_COMMISSION_PCT}% платит продавец: ${MQ_BURN_PCT}% сгорает + ` +
   `${MQ_ROYALTY_PCT}% автору привета по заявке за первые ${ROYALTY_PURCHASES} перекупа ` +
-  `(у лотов без автора сгорает всё) ★ привет по заявке — сразу твой лот ★ перекуп +10% ×15, ` +
-  `дальше +1 ★ награда за привет ${rewardLine()} ★ гамба до x10 · 20 спинов в день ★ вход 200/200/250 ★`;
+  `(у лотов без автора сгорает всё) ★ привет по заявке — сразу твой лот ★ ${growthLine()} ★ ` +
+  `награда за привет ${rewardLine()} ★ гамба до x10 · ${gambaLine()} ★ ${dailyShortLine()} ★`;
 
 // Билд-гейт: без PUBLIC_SUPABASE_* сайт нерабочий (витрина — проекция БД).
 assertSupabaseConfigured();

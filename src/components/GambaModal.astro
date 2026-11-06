@@ -16,7 +16,7 @@
 // Пулы в разметку печёт сборка (фолбэк из манифеста content/sounds.toml), а
 // при открытии окна клиент подменяет их списком из БД — lib/gamba-sounds.ts.
 import { GAMBA_EMOTE_URL } from '@/lib/emotes';
-import { GAMBA_DAILY_LIMIT } from '@/lib/gamba';
+import { GAMBA_DAILY_LIMIT, GAMBA_STAKE } from '@/lib/rules';
 import { encodePools, fallbackSoundPools } from '@/lib/gamba-sounds';
 /** Фолбэк пулов на момент билда — играет, пока БД не ответила. */
 const FALLBACK_POOLS = fallbackSoundPools();
@@ -75,7 +75,7 @@ const POOL_ATTRS = encodePools(FALLBACK_POOLS);
         type="button"
         class="btn-arcade btn-arcade-primary min-w-56 px-6 py-3 text-sm"
       >
-        Крутить за 100
+        Крутить за {GAMBA_STAKE}
         <img
           src={GAMBA_EMOTE_URL}
           alt=""
@@ -105,7 +105,6 @@ const POOL_ATTRS = encodePools(FALLBACK_POOLS);
   import { getSupabase, signInWithTwitch } from '@/lib/session';
   import { live } from '@/lib/live';
   import {
-    GAMBA_STAKE,
     mapGambaError,
     newGambaAttemptKey,
     spinGambaWithRetry,
@@ -129,6 +128,7 @@ const POOL_ATTRS = encodePools(FALLBACK_POOLS);
     type GambaCeremonyEffect,
   } from '@/lib/gamba-ceremony';
   import { createModal } from '@/lib/modal';
+  import { GAMBA_STAKE } from '@/lib/rules';
 
   /** Токены палитры (DESIGN.md) — canvas их не видит,
       поэтому читаем значения из :root один раз. */
@@ -154,7 +154,7 @@ const POOL_ATTRS = encodePools(FALLBACK_POOLS);
   const RESULT_TEXT: Record<GambaOutcome, string> = {
     // legacy 'miss' (эпохи F–H): новых таких спинов сервер не выдаёт (таблица I
     // без мимо), ключ оставлен ради типа и истории.
-    miss: 'МИМО! −100 Пивкойнов 🍺',
+    miss: `МИМО! −${GAMBA_STAKE} Пивкойнов 🍺`,
     return: 'ВОЗВРАТ! При своих — крути ещё',
     // 'small' — штатный исход таблицы H (мелкий выигрыш +50), свой сегмент есть.
     small: '+50 Пивкойнов',
@@ -169,7 +169,7 @@ const POOL_ATTRS = encodePools(FALLBACK_POOLS);
   const result = document.getElementById('gamba-result');
   const spinBtn = document.getElementById('gamba-spin');
 
-  const GATE_TEXT = 'На ставку не хватает — нужно 100 Пивкойнов 🍺';
+  const GATE_TEXT = `На ставку не хватает — нужно ${GAMBA_STAKE} Пивкойнов 🍺`;
   const GUEST_TEXT = 'Гамба только для своих — войди через Twitch, и пойжем вместе 🍺';
   const RATE_TEXT = 'Не жми так жоско — дай колесу отдышаться пару секунд 🙂';
   const limitN = modal?.dataset.limit ?? '20';
