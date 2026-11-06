@@ -217,7 +217,8 @@ submission-reward *args:
 db-up:
     #!/usr/bin/env bash
     set -euo pipefail
-    out=$(./node_modules/.bin/supabase start) || { printf '%s\n' "$out" >&2; exit 1; }
+    # Без явного json CLI в терминале человека печатает таблицу, а не JSON-сводку, и разбор ниже падает.
+    out=$(./node_modules/.bin/supabase start --output-format json) || { printf '%s\n' "$out" >&2; exit 1; }
     json=$(printf '%s\n' "$out" | grep -o '^{.*}$' | tail -1)
     printf '%s' "$json" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(("Локальная БД: " + d["API_URL"]) if d.get("API_URL") else d.get("message", "Supabase запущен"))'
     ./node_modules/.bin/supabase migration up --local
