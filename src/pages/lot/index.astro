@@ -132,18 +132,12 @@ const base = import.meta.env.BASE_URL;
 <script>
   // Страница лота: slug — из query (`?id=`), состояние — срез снапшота живых
   // данных на один этот лот (lib/live.ts), история — страницами из БД
-  // (lib/purchases-read.ts), а вся её механика (курсор, слияние, относительное
-  // время) — чистое ядро (lib/trade-history.ts). Здесь только разметка и
-  // перерисовка.
+  // (lib/purchases-read.ts), автомат пагинации — lib/history-pager.ts, а
+  // курсор, слияние и относительное время — чистое ядро
+  // (lib/trade-history.ts). Здесь только разметка и перерисовка.
   import { fetchSharedHistory } from '@/lib/purchases-read';
-  import {
-    HISTORY_PAGE_SIZE,
-    appendHistory,
-    formatRelativeTime,
-    historyCursor,
-    mergeHistory,
-    type HistoryEntry,
-  } from '@/lib/trade-history';
+  import { createHistoryPager } from '@/lib/history-pager';
+  import { HISTORY_PAGE_SIZE, formatRelativeTime, type HistoryEntry } from '@/lib/trade-history';
   import { live, type LotState } from '@/lib/live';
   import { fillLot } from '@/lib/lot-view';
 
@@ -173,13 +167,15 @@ const base = import.meta.env.BASE_URL;
 
   /** `lastState` — для автора, «Твой» и перекраски по балансу. */
   let lastState: LotState | null = null;
-  /** Показанные записи истории: новые сверху; слияние и курсор — ядро. */
-  let shown: HistoryEntry[] = [];
-  /** Была ли страница в последней порции — без счётчиков: полная страница = есть ещё. */
-  let more = false;
-  let historyLoaded = false;
-  let refreshing = false;
-  let loadingMore = false;
+  /**
+   * История Лота: страницы, курсор и слияние — пейджер; «полная страница =
+   * есть ещё» — правило этого адаптера, а не поверхности. `fetchSharedHistory`
+   * не отличает ошибку от пустой истории, поэтому `ok` всегда true.
+   */
+  const historyPager = createHistoryPager<HistoryEntry>(async (cursor) => {
+    const page = await fetchSharedHistory(slug, HISTORY_PAGE_SIZE, cursor);
+    return { ok: true, entries: page, hasMore: page.length === HISTORY_PAGE_SIZE };
+  });
 
   function toggle(el: Element | null, show: boolean): void {
     if (el instanceof HTMLElement) el.classList.toggle('hidden', !show);
@@ -214,9 +210,7 @@ const base = import.meta.env.BASE_URL;
   }
 
   function resetHistory(): void {
-    shown = [];
-    more = false;
-    historyLoaded = false;
+    historyPager.reset();
   }
 
   function fillDetail(st: LotState): void {
@@ -286,75 +280,56 @@ const base = import.meta.env.BASE_URL;
 
   function renderHistory(): void {
     if (!list) return;
+    const state = historyPager.state();
     toggle(historySkeleton, false);
     const uid = live.uid();
     const author = lastState?.suggested_by_login ?? null;
-    list.replaceChildren(...shown.map((entry) => entryRow(entry, uid, author)));
-    toggle(listWrap, shown.length > 0);
-    toggle(emptyNote, shown.length === 0);
-    toggle(orderHint, shown.length > 0);
-    toggle(moreWrap, more && shown.length > 0);
-  }
-
-  /** Первая страница: на старте — с нуля, по событию каталога — поверх показанного. */
-  async function loadFirstPage(merge: boolean): Promise<void> {
-    const page = await fetchSharedHistory(slug, HISTORY_PAGE_SIZE);
-    more = page.length === HISTORY_PAGE_SIZE;
-    if (merge) {
-      const before = shown.length;
-      shown = mergeHistory(shown, page);
-      if (shown.length > before) announce('Новый перекуп в истории');
-    } else {
-      shown = page;
-    }
-    historyLoaded = true;
-    renderHistory();
+    list.replaceChildren(...state.entries.map((entry) => entryRow(entry, uid, author)));
+    toggle(listWrap, state.entries.length > 0);
+    toggle(emptyNote, state.loaded && state.entries.length === 0);
+    toggle(orderHint, state.entries.length > 0);
+    toggle(moreWrap, state.hasMore && state.entries.length > 0);
   }
 
   /** Следующая страница — курсором по показанным, вниз (список не прыгает). */
   async function loadMore(): Promise<void> {
-    if (loadingMore || !more || !historyLoaded) return;
-    loadingMore = true;
+    const state = historyPager.state();
+    if (!state.hasMore || state.loadingFirst || state.loadingMore) return;
     if (moreBtn instanceof HTMLButtonElement) moreBtn.disabled = true;
-    try {
-      const page = await fetchSharedHistory(slug, HISTORY_PAGE_SIZE, historyCursor(shown));
-      more = page.length === HISTORY_PAGE_SIZE;
-      shown = appendHistory(shown, page);
-      renderHistory();
-      if (page.length > 0) announce('История обновлена');
-    } finally {
-      loadingMore = false;
-      if (moreBtn instanceof HTMLButtonElement) moreBtn.disabled = false;
-    }
+    const result = await historyPager.loadMore();
+    if (moreBtn instanceof HTMLButtonElement) moreBtn.disabled = false;
+    if (result.stale) return;
+    renderHistory();
+    if (result.added > 0) announce('История обновлена');
   }
 
   /** Полная перерисовка деталей из снапшота + история (первая или свежая). */
   async function syncDetail(): Promise<void> {
-    if (refreshing) return;
-    refreshing = true;
-    try {
-      if (slug.length === 0) {
-        showMissing();
-        return;
-      }
-      const st = live.lot(slug);
-      // Ответа БД ещё не было — не гадаем: держим скелетон.
-      if (!st && !live.catalogKnown()) return;
-      // Снапшот без ответа БД — не выдаём за «лота нет».
-      if (!st && !live.catalogOk()) {
-        showError();
-        return;
-      }
-      if (!st) {
-        showMissing();
-        return;
-      }
-      const merge = historyLoaded;
-      fillDetail(st);
-      await loadFirstPage(merge);
-    } finally {
-      refreshing = false;
+    if (slug.length === 0) {
+      showMissing();
+      return;
     }
+    const st = live.lot(slug);
+    // Ответа БД ещё не было — не гадаем: держим скелетон.
+    if (!st && !live.catalogKnown()) return;
+    // Снапшот без ответа БД — не выдаём за «лота нет».
+    if (!st && !live.catalogOk()) {
+      showError();
+      return;
+    }
+    if (!st) {
+      showMissing();
+      return;
+    }
+    const state = historyPager.state();
+    // Первая страница уже показана или ещё грузится — событие каталога
+    // доливает её поверх; иначе это первая загрузка с нуля.
+    const merge = state.loaded || state.loadingFirst;
+    fillDetail(st);
+    const result = await historyPager.loadFirst({ merge });
+    if (result.stale) return;
+    if (merge && result.added > 0) announce('Новый перекуп в истории');
+    renderHistory();
   }
 
   moreBtn?.addEventListener('click', () => void loadMore());
@@ -365,7 +340,7 @@ const base = import.meta.env.BASE_URL;
       void syncDetail();
     }
     // Пометки «ТВОЙ» зависят от сессии; скелетон ещё не вопрос — молчим.
-    if (change.kind === 'uid' && historyLoaded) renderHistory();
+    if (change.kind === 'uid' && historyPager.state().loaded) renderHistory();
     if (change.kind === 'balance' && lastState) {
       fillLot(viewRoot, lastState, { balance: change.balance });
     }

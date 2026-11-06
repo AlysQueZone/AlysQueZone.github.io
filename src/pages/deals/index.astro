@@ -123,19 +123,19 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 </BaseLayout>
 
 <script>
-  // Страница рисует срез лога: запрос — lib/purchases-read.ts, отбор и деление на дни —
-  // lib/trade-history.ts. Здесь состояния, фильтр «Все / Мои» и его URL, разметка
-  // и перерисовка; uid и сессию знает только live.ts (docs/adr/0003).
+  // Страница рисует срез лога: запрос — lib/purchases-read.ts, автомат
+  // пагинации — lib/history-pager.ts, отбор и деление на дни —
+  // lib/trade-history.ts. Здесь состояния страницы, фильтр «Все / Мои» и его
+  // URL, разметка и перерисовка; uid и сессию знает только live.ts
+  // (docs/adr/0003).
   import { fetchDealLog } from '@/lib/purchases-read';
+  import { createHistoryPager } from '@/lib/history-pager';
   import { live } from '@/lib/live';
   import { videoSources } from '@/lib/lot-video';
   import {
-    appendHistory,
     DEAL_PAGE_SIZE,
     formatRelativeTime,
     groupDealDays,
-    historyCursor,
-    mergeHistory,
     type DealDay,
     type DealEntry,
   } from '@/lib/trade-history';
@@ -154,17 +154,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
   const pill = document.querySelector('[data-log-new]');
   const filterButtons = document.querySelectorAll('[data-log-mine]');
 
-  /** Показанные записи: новые сверху; дни считает ядро при каждой перерисовке. */
-  let entries: DealEntry[] = [];
-  /** Свежие сделки, придержанные, пока пользователь прокручен ниже верха лога. */
-  let pending: DealEntry[] = [];
-  let loaded = false;
-  let loadingFirst = false;
-  let loadingMore = false;
-  let refreshing = false;
-  /** Событие пришло во время чтения: один повтор после ответа, без параллели. */
-  let refreshQueued = false;
-  let hasMore = false;
+  /** Наблюдатель автоподгрузки живёт у поверхности: пейджер о скролле не знает. */
   let observer: IntersectionObserver | null = null;
 
   /** «Мои покупки» (`?mine=1`); состояние фильтра живёт в URL. */
@@ -173,11 +163,6 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
   let uidReady = false;
   /** Последний uid из снапшота — смена перезагружает «Мои покупки». */
   let seenUid: string | null = null;
-  /**
-   * Поколение списка: смена фильтра или uid отменяет ответы прошлых запросов.
-   * Иначе медленный «Все» перезаписал бы уже показанные «Мои».
-   */
-  let generation = 0;
 
   function toggle(el: Element | null, show: boolean): void {
     if (el instanceof HTMLElement) el.classList.toggle('hidden', !show);
@@ -191,6 +176,15 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
   function buyerUid(): string | null {
     return mine ? live.uid() : null;
   }
+
+  /**
+   * Лог сделок: страницы, `hasMore`, поколение и отложенный refresh — в
+   * пейджере. Транспортный `hasMore` (`cap + 1`) приходит готовым из
+   * `fetchDealLog`, поэтому адаптер — просто чтение с текущим фильтром.
+   */
+  const pager = createHistoryPager<DealEntry>((cursor) =>
+    fetchDealLog(DEAL_PAGE_SIZE, cursor, buyerUid())
+  );
 
   function syncFilterUi(): void {
     for (const node of filterButtons) {
@@ -212,15 +206,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 
   /** Сброс списка при смене фильтра или uid: курсор, плашка и ответы прошлых запросов. */
   function resetList(): void {
-    generation += 1;
-    loadingFirst = false;
-    loadingMore = false;
-    refreshing = false;
-    refreshQueued = false;
-    loaded = false;
-    entries = [];
-    pending = [];
-    hasMore = false;
+    pager.reset();
     observer?.disconnect();
     observer = null;
     if (moreButton instanceof HTMLButtonElement) moreButton.disabled = false;
@@ -432,17 +418,18 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 
   function render(): void {
     if (!body) return;
+    const state = pager.state();
     toggle(skeleton, false);
     toggle(error, false);
     toggle(guest, false);
     body.replaceChildren();
-    const shown = entries.length > 0;
+    const shown = state.entries.length > 0;
     toggle(body, shown);
-    toggle(empty, loaded && !shown);
-    toggle(more, shown && hasMore);
+    toggle(empty, state.loaded && !shown);
+    toggle(more, shown && state.hasMore);
     if (shown) {
       const wrap = el('div', 'flex flex-col gap-5');
-      for (const day of groupDealDays(entries)) wrap.append(daySection(day));
+      for (const day of groupDealDays(state.entries)) wrap.append(daySection(day));
       body.append(wrap);
     }
     syncObserver();
@@ -460,6 +447,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 
   function renderPill(): void {
     if (!(pill instanceof HTMLElement)) return;
+    const pending = pager.state().pending;
     if (pending.length === 0) {
       pill.classList.add('hidden');
       return;
@@ -476,7 +464,9 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
   function syncObserver(): void {
     observer?.disconnect();
     observer = null;
-    if (!hasMore || loadingFirst || !more || !('IntersectionObserver' in window)) return;
+    const state = pager.state();
+    if (!state.hasMore || state.loadingFirst || state.loadingMore || !more) return;
+    if (!('IntersectionObserver' in window)) return;
     observer = new IntersectionObserver(
       (records) => {
         if (records.some((record) => record.isIntersecting)) void loadMore();
@@ -489,7 +479,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
   /** Верх лога виден, если его начало не уехало под липкую шапку. */
   function logTopVisible(): boolean {
     // Пустой лог показывать нечему — первая же сделка сразу встаёт на место.
-    if (entries.length === 0 || !(body instanceof HTMLElement)) return true;
+    if (pager.state().entries.length === 0 || !(body instanceof HTMLElement)) return true;
     const header = document.querySelector('header');
     const sticky = header instanceof HTMLElement ? header.offsetHeight : 0;
     return body.getBoundingClientRect().top >= sticky;
@@ -497,19 +487,12 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 
   /** Первая страница: скелетон → записи, пусто или ошибка. */
   async function load(): Promise<void> {
-    if (loadingFirst) return;
+    if (pager.state().loadingFirst) return;
     // «Мои» без входа — подсказка, а не запрос без фильтра (он показал бы чужие).
     if (mine && !live.uid()) {
       showGuest();
       return;
     }
-    const token = generation;
-    loadingFirst = true;
-    loaded = false;
-    entries = [];
-    pending = [];
-    hasMore = false;
-    renderPill();
     toggle(error, false);
     toggle(empty, false);
     toggle(guest, false);
@@ -517,64 +500,45 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
     toggle(more, false);
     toggle(skeleton, true);
     announce('Загружаю лог сделок…');
-    const page = await fetchDealLog(DEAL_PAGE_SIZE, null, buyerUid());
-    // Пока читали, фильтр или сессия сменились — ответ устарел, состоянием владеет новый сброс.
-    if (token !== generation) return;
-    loadingFirst = false;
-    if (!page.ok) {
+    const result = await pager.loadFirst();
+    // Пока читали, фильтр или сессия сменились — ответ устарел, состоянием
+    // владеет новый сброс.
+    if (result.stale) return;
+    if (result.failed) {
       showError();
       return;
     }
-    entries = page.entries;
-    hasMore = page.hasMore;
-    loaded = true;
+    const state = pager.state();
     render();
     announce(
-      entries.length === 0
+      state.entries.length === 0
         ? 'Сделок пока нет'
-        : hasMore
-          ? `Загружено ${dealsLabel(entries.length)}`
-          : `Лог дочитан — всего ${dealsLabel(entries.length)}`
+        : state.hasMore
+          ? `Загружено ${dealsLabel(state.entries.length)}`
+          : `Лог дочитан — всего ${dealsLabel(state.entries.length)}`
     );
-    if (refreshQueued) {
-      refreshQueued = false;
-      void refresh();
-    }
   }
 
   /** Следующая (более старая) страница по курсору показанного. */
   async function loadMore(): Promise<void> {
-    if (!hasMore || loadingFirst || loadingMore) return;
-    const cursor = historyCursor(entries);
-    if (!cursor) {
-      hasMore = false;
-      render();
-      return;
-    }
-    const token = generation;
-    loadingMore = true;
+    const state = pager.state();
+    if (!state.hasMore || state.loadingFirst || state.loadingMore) return;
     if (moreButton instanceof HTMLButtonElement) moreButton.disabled = true;
-    const page = await fetchDealLog(DEAL_PAGE_SIZE, cursor, buyerUid());
-    if (token !== generation) return;
-    loadingMore = false;
+    const result = await pager.loadMore();
     if (moreButton instanceof HTMLButtonElement) moreButton.disabled = false;
-    if (!page.ok) {
+    if (result.stale) return;
+    if (result.moreFailed) {
       // Автоподгрузку не перевооружаем: следующее пересечение/клик — новый шанс,
       // без немедленного цикла запросов на упавшей БД.
       announce('Не получилось подгрузить — попробуй ещё');
       return;
     }
-    const next = appendHistory(entries, page.entries);
-    const grew = next.length > entries.length;
-    entries = next;
-    // hasMore — по сырому ответу транспорта; grew защищает от вечного цикла,
-    // если страница целиком состоит из уже показанных id (курсор не сдвинется).
-    hasMore = page.hasMore && grew;
+    const next = pager.state();
     render();
     announce(
-      hasMore
-        ? `Показано ${dealsLabel(entries.length)}`
-        : `Лог дочитан — всего ${dealsLabel(entries.length)}`
+      next.hasMore
+        ? `Показано ${dealsLabel(next.entries.length)}`
+        : `Лог дочитан — всего ${dealsLabel(next.entries.length)}`
     );
   }
 
@@ -586,35 +550,23 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
    */
   async function refresh(): Promise<void> {
     if (mine && !live.uid()) return;
-    if (!loaded || refreshing) {
-      refreshQueued = true;
+    const state = pager.state();
+    // Первой страницы ещё нет и она не грузится — её загрузит `load`, а не
+    // живое обновление; иначе событие встанет в отложенную очередь пейджера.
+    if (!state.loaded && !state.loadingFirst) {
+      void load();
       return;
     }
-    const token = generation;
-    refreshing = true;
-    const page = await fetchDealLog(DEAL_PAGE_SIZE, null, buyerUid());
-    if (token !== generation) return;
-    refreshing = false;
-    if (page.ok) {
-      const known = new Set([...entries, ...pending].map((entry) => entry.id));
-      const fresh = page.entries.filter((entry) => !known.has(entry.id));
-      if (fresh.length > 0) {
-        if (logTopVisible()) {
-          entries = mergeHistory(entries, [...fresh, ...pending]);
-          pending = [];
-          renderPill();
-          render();
-        } else {
-          pending = mergeHistory(pending, fresh);
-          renderPill();
-        }
-        announce(`${newDealsLabel(fresh.length)}: в логе`);
-      }
+    const defer = !logTopVisible();
+    const result = await pager.refreshFirst({ defer });
+    if (result.stale || result.failed || result.added === 0) return;
+    if (defer) {
+      renderPill();
+    } else {
+      renderPill();
+      render();
     }
-    if (refreshQueued) {
-      refreshQueued = false;
-      void refresh();
-    }
+    announce(`${newDealsLabel(result.added)}: в логе`);
   }
 
   /** Переключить фильтр: URL, оформление и список начинаются заново. */
@@ -648,7 +600,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
       resetList();
       if (uid) void load();
       else showGuest();
-    } else if (loaded) {
+    } else if (pager.state().loaded) {
       render();
     }
   }
@@ -671,10 +623,8 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
   }
 
   pill?.addEventListener('click', () => {
-    if (pending.length === 0) return;
-    const count = pending.length;
-    entries = mergeHistory(entries, pending);
-    pending = [];
+    const count = pager.showPending();
+    if (count === 0) return;
     renderPill();
     render();
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
