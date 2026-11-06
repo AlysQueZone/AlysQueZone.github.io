@@ -1,0 +1,1 @@
+function e(e,t){let n=new Set,r=t.filter(e=>!Number.isFinite(e.price)||n.has(e.slug)?!1:(n.add(e.slug),!0)),i=new Set(r.map(e=>e.slug)),a=new Set(e);return{remove:e.filter(e=>!i.has(e)),keep:e.filter(e=>i.has(e)),add:r.filter(e=>!a.has(e.slug))}}function t(e,t,n){return e?n>0?`ok`:t?`empty`:`failed`:`loading`}export{e as n,t};

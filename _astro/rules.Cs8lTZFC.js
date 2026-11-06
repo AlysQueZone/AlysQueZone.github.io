@@ -1,0 +1,1 @@
+function e(e){return`https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/sounds/${e}`}function t(e){return!Number.isFinite(e)||e<=0?0:Math.max(1,Math.ceil(e*7/100))}export{e as n,t};
