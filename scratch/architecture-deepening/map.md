@@ -22,10 +22,11 @@
 <!-- one line per resolved ticket: [title](issues/NN-...md): gist; spec: [specs/NN-...md](specs/NN-...md) -->
 
 - [Маркиза — убрать четвёртую проекцию purchases](issues/01-marquee-deal-log.md): маркиза читает `fetchDealLog` и одну чистую `dealLogLine(entries)`, поведение не меняет; спека: [specs/01-marquee-deal-log.md](specs/01-marquee-deal-log.md).
+- [supabase.ts — разделить роли](issues/02-supabase-roles.md): четыре транспортных модуля, кодек курсора в `trade-history`, `pending-buy` без Supabase; спека: [specs/02-supabase-roles.md](specs/02-supabase-roles.md).
 
 ## Not yet specified
 
-- Малые швы, которые при гриллинге окажутся самостоятельными: раскладка кадра привязана к «Сетке карточек», session tri-state — к «supabase.ts»; если выйдут за их рамки — graduates в отдельные тикеты.
+- Малые швы, которые при гриллинге окажутся самостоятельными: раскладка кадра привязана к «Сетке карточек»; session tri-state после тикета 02 передан в «live-store»; если выйдут за их рамки — graduates в отдельные тикеты.
 - Последствия ADR-решений: если «Сетка карточек» переоткроет ADR-0009, может понадобиться отдельный тикет на обновление ADR и доков; решится при гриллинге.
 - Разбиение «live-store» на несколько спек: если гриллинг покажет, что одна сессия не тянет, карта получит дочерние тикеты; сейчас не предсказываем.
 - Форма execution-фазы (ветки, integration branch, параллельность) зависит от спек; возможно, отдельная карта после этой.

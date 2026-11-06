@@ -1,7 +1,7 @@
 # 02: supabase.ts — разделить роли
 
 Type: grilling
-Status: open
+Status: resolved
 Blocked by: —
 
 ## Question
@@ -28,3 +28,14 @@ Blocked by: —
 ## Gates
 
 `just test`, `just check`.
+
+## Answer
+
+Спека: [specs/02-supabase-roles.md](../specs/02-supabase-roles.md).
+
+- Четыре модуля: `session` (клиент, вход/выход, retry, `displayLogin`, гейт), `pending-buy` (навигация без Supabase), `purchases-read` (три чтения), `purchase-write` (`buyLotShared`). uid-снапшот остаётся у `live`.
+- `historyCursorFilter` живёт в `trade-history` рядом с `HistoryCursor`; оба чтения с курсором используют её, литерал keyset-фильтра больше не дублируется.
+- Все текущие импорты обновляются сразу, `supabase.ts` удаляется; барреля не остаётся. Витрина берёт `peekPendingBuy` из `pending-buy` и перестаёт тянуть Supabase.
+- Session tri-state (`unknown | guest | user`) в карточку не входит: это отдельный шов, передан в тикет «live-store — три внутренних владельца».
+- ADR impact — `amend`: первая фраза ADR-0003 уточняется, что разовые чтения и запись идут через `purchases-read` / `purchase-write`, а `live` владеет снапшотом и событиями.
+- Спека исполнима одной сессией: кодек и тесты, четыре модуля, сплошная миграция импортов, ADR, гейты `just test` / `just check` / `preview` и запись в `CHANGELOG.md` в группе `### Внутри`.
