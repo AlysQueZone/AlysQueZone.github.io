@@ -130,10 +130,10 @@ assertSupabaseConfigured();
           <AuthButton />
         </div>
       </div>
-      <!-- Бегущая строка-лог: живой хвост ~10 последних сделок
-        из purchases через realtime-подписку. До первого ответа — скелетон;
-        сделок нет/БД недоступна — честная строка живых правил (те же цифры,
-        что в окне «Правила биржи»). Подмена идёт под fade, см. скрипт. -->
+      <!-- Бегущая строка-лог: живой хвост последних сделок из общей страницы
+        лога (`fetchDealLog`) через realtime-подписку. До первого ответа —
+        скелетон; сделок нет/БД недоступна — честная строка живых правил (те же
+        цифры, что в окне «Правила биржи»). Подмена идёт под fade, см. скрипт. -->
       <!-- Вся полоса — вход в «Лог сделок»: по движущейся строке трудно
            целиться в мелкую кнопку. Внутренняя лента скрыта от скринридера,
            доступное имя даёт ссылка; движение замирает на hover и focus. -->
@@ -204,16 +204,18 @@ assertSupabaseConfigured();
       });
     </script>
     <script>
-      import { getSupabase } from '@/lib/supabase';
+      import { fetchDealLog } from '@/lib/supabase';
+      import { dealLogLine, MARQUEE_DEAL_LIMIT } from '@/lib/trade-history';
       import { live } from '@/lib/live';
       import { initOutbidNotice } from '@/lib/outbid-notice';
       import { initSubmissionNotice } from '@/lib/submission-notice';
       initOutbidNotice();
       initSubmissionNotice();
-      // Бегущая строка-лог: последние ~10 сделок из
-      // purchases (публичный SELECT) через realtime-подписку на INSERT.
-      // В разметке — скелетон; лог (или правила, если сделок нет) приходит
-      // подменой через fade, чтобы смена ширины дорожки не давала рывка.
+      // Бегущая строка: первая страница лога через тот же транспорт, что у
+      // страницы «Лог сделок» (`fetchDealLog`), текст полосы собирает чистая
+      // `dealLogLine`. В разметке — скелетон; лог (или правила, если сделок
+      // нет) приходит подменой через fade, чтобы смена ширины дорожки не
+      // давала рывка.
       const dealTrack = document.querySelector('[data-deal-log-track]');
       const dealA = document.querySelector('[data-deal-log-a]');
       const dealB = document.querySelector('[data-deal-log-b]');
@@ -291,45 +293,15 @@ assertSupabaseConfigured();
         if (!(dealTrack instanceof HTMLElement) || refreshingDeals) return;
         refreshingDeals = true;
         try {
-          let line = '';
-          const sb = getSupabase();
-          if (sb) {
-            try {
-              const { data, error } = await sb
-                .from('purchases')
-                .select('price_paid,buyer_login,created_at,lots(slug,title)')
-                .order('created_at', { ascending: false })
-                .order('id', { ascending: false })
-                .limit(10);
-              if (!error && Array.isArray(data)) {
-                line = (data as unknown as Record<string, unknown>[])
-                  .flatMap((row) => {
-                    const price = Number(row['price_paid']);
-                    const by = row['buyer_login'];
-                    const lot = row['lots'] as unknown as Record<string, unknown> | null;
-                    const title = lot && typeof lot['title'] === 'string' ? lot['title'] : null;
-                    if (!Number.isFinite(price) || typeof by !== 'string' || !title) return [];
-                    return [`${by} забрал «${title}» за ${price} 🍺`];
-                  })
-                  .join(' ★ ');
-              }
-            } catch {
-              // лог — best effort, падаем в правила
-            }
-          }
-          // Пустой лог — честный пустой стейт: живые правила биржи.
-          swapTrack(line || RULES_TEXT);
+          const page = await fetchDealLog(MARQUEE_DEAL_LIMIT);
+          // Пустой лог и ошибка чтения — одинаково правила биржи.
+          swapTrack(dealLogLine(page.entries) || RULES_TEXT);
         } finally {
           refreshingDeals = false;
         }
       }
 
-      if (getSupabase()) {
-        void refreshDealLog();
-      } else {
-        // Без ключей БД нет: сразу правила, скелетон не оставляем.
-        swapTrack(RULES_TEXT);
-      }
+      void refreshDealLog();
       // Скелетон тоже должен идти с той же скоростью, что и контент.
       applyTrackSpeed();
       // Ширина дорожки зависит от Press Start 2P: до загрузки шрифта замер врёт.

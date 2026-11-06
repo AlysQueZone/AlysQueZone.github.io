@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest';
 import {
   appendHistory,
   dealEntries,
+  dealLogLine,
   formatRelativeTime,
   groupDealDays,
   historyCursor,
@@ -522,6 +523,40 @@ describe('dealEntries', () => {
 
   it('пустой вход — пустой лог', () => {
     expect(dealEntries([])).toEqual([]);
+  });
+});
+
+describe('dealLogLine', () => {
+  it('одна запись — покупатель, лот и цена одной строкой', () => {
+    expect(dealLogLine([deal({ buyer: 'foxindique', title: 'Привет', price: 880 })])).toBe(
+      'foxindique забрал «Привет» за 880 🍺'
+    );
+  });
+
+  it('несколько записей склеиваются через « ★ » в порядке входа', () => {
+    const line = dealLogLine([
+      deal({ id: 2, buyer: 'new', title: 'Новый' }),
+      deal({ id: 1, buyer: 'old', title: 'Старый' }),
+    ]);
+    expect(line).toBe('new забрал «Новый» за 880 🍺 ★ old забрал «Старый» за 880 🍺');
+    expect(line.startsWith('★')).toBe(false);
+    expect(line.endsWith('★')).toBe(false);
+  });
+
+  it('пустой список — пустая строка (поверхность подставит правила)', () => {
+    expect(dealLogLine([])).toBe('');
+  });
+
+  it('цена — сырое число, без локализованных разделителей', () => {
+    expect(dealLogLine([deal({ price: 1234 })])).toContain('за 1234 🍺');
+  });
+
+  it('битая строка отбрасывается ядром, валидная остаётся', () => {
+    const entries = dealEntries([
+      purchase({ id: 1, buyer_login: 'foxindique', lots: lot({ title: 'Живой' }) }),
+      purchase({ id: 2, buyer_login: null }),
+    ]);
+    expect(dealLogLine(entries)).toBe('foxindique забрал «Живой» за 880 🍺');
   });
 });
 
