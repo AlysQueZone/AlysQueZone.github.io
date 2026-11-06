@@ -120,8 +120,15 @@ def process(key, base, key_service, workdir, apply):
     except urllib.error.URLError as exc:
         print("%s: скачать не вышло: %s" % (key, exc.reason))
         return "error"
+    except Exception as exc:  # noqa: BLE001 — сеть/диск: причина важнее трассировки
+        print("%s: скачать не вышло: %s" % (key, exc))
+        return "error"
 
-    measured = lot_add.measure_loudness(local)
+    try:
+        measured = lot_add.measure_loudness(local)
+    except Exception as exc:  # noqa: BLE001 — ffmpeg/кодек: причина важнее трассировки
+        print("%s: замер не удался: %s" % (key, exc))
+        return "error"
     if measured is None:
         print("%s: звука нет или замер не удался — пропускаю" % key)
         return "skip"
@@ -149,7 +156,11 @@ def process(key, base, key_service, workdir, apply):
     except lot_add.LotError as exc:
         print("%s: %s" % (key, exc))
         return "error"
-    after = lot_add.measure_loudness(out)
+    try:
+        after = lot_add.measure_loudness(out)
+    except Exception as exc:  # noqa: BLE001 — ffmpeg/кодек: причина важнее трассировки
+        print("%s: замер результата не удался: %s" % (key, exc))
+        return "error"
     if after is None:
         print("%s: замер результата не удался — не заливаю" % key)
         return "error"

@@ -41,6 +41,13 @@ describe('commissionFor', () => {
     expect(commissionFor(1)).toBe(1);
   });
 
+  it('кратные 7% не уезжают из-за float: как ceil(price * 7 / 100) в SQL', () => {
+    expect(commissionFor(100)).toBe(7);
+    expect(commissionFor(200)).toBe(14);
+    expect(commissionFor(300)).toBe(21);
+    expect(commissionFor(800)).toBe(56);
+  });
+
   it('ноль, отрицательное и не-число — без комиссии', () => {
     expect(commissionFor(0)).toBe(0);
     expect(commissionFor(-5)).toBe(0);

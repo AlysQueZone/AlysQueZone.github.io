@@ -41,9 +41,15 @@ export const GROWTH_STEP_PCT = 10;
 /** Сколько первых покупок роста — только для текста показа (ADR-0007). */
 export const GROWTH_PURCHASES = 15;
 
+/**
+ * Комиссия — зеркало SQL `ceil(price * 7 / 100)` (`public.commission_rate()`).
+ * Считаем целыми процентами: `100 * 0.07` в JS даёт 7.000000000000001, и
+ * `Math.ceil` показывает на 1 Пивкойн больше, чем списывает БД.
+ */
 export function commissionFor(pricePaid: number): number {
   if (!Number.isFinite(pricePaid) || pricePaid <= 0) return 0;
-  return Math.max(1, Math.ceil(pricePaid * COMMISSION_RATE));
+  const pct = Math.round(COMMISSION_RATE * 100);
+  return Math.max(1, Math.ceil((pricePaid * pct) / 100));
 }
 
 /** Проценты комиссии для показа: комиссия, роялти автору и остаток, что сгорает. */
@@ -91,7 +97,7 @@ export function dailyCycleLine(): string {
   const [first, second, third, ...rest] = DAILY_REWARDS;
   return (
     `Дни 1–3: ${first} / ${second} / ${third}. ` +
-    `Дальше: ${rest.join(' / ')} (7-й день), затем цикл заново. ${startBalanceLine()}.`
+    `Дальше: ${rest.join(' / ')} (7-й день), затем цикл заново. ${startBalanceLine()}`
   );
 }
 
