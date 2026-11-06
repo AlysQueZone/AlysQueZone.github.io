@@ -1,7 +1,7 @@
 # 04: Покупка — чистое ядро фаз и ошибок
 
 Type: grilling
-Status: open
+Status: resolved
 Blocked by: 02
 
 ## Question
@@ -22,7 +22,7 @@ Blocked by: 02
 
 ## Recommended answers
 
-> Выбрано по указанию сессии; спека не написана, статус тикета не меняется.
+> Решения, лёгшие в основу спеки: [specs/04-buy-flow.md](../specs/04-buy-flow.md).
 
 1. **Ядро.** Новый чистый `buy-core.ts`: фазы `idle | guest | pause | limit | busy | confirm`, события `intent | refreshed | tick | result | close`, инъекция `now`. Ядро решает переходы, паузу/лимит/гостя/занятость и классификацию ошибок; компонент — разметка, тексты, notice, confetti/видео, таймер, сеть (`buyLot`), live-подписки, сессия и `pending-buy`.
 2. **`mapBuyError`.** Переезжает в ядро вместе с `BuyErrorKind`/`BuyResult`: чистая таблица «ошибка → kind + retryAfterSec», без DOM. Тексты «kind → фаза/строка» остаются в компоненте; таблица «ошибка → фаза» — в ядре.
@@ -39,3 +39,14 @@ Blocked by: 02
 ## Gates
 
 `just test`, `just check`; для визуальной проверки — `just preview` и клик по сборке.
+
+## Answer
+
+Спека: [specs/04-buy-flow.md](../specs/04-buy-flow.md).
+
+- Новый чистый `buy-core`: фазы `idle/guest/pause/limit/busy/confirm`, события `intent/refreshed/tick/result/close`, инъекция часов.
+- `mapBuyError`, `BuyErrorKind` и `BuyResult` переезжают в ядро; `buyLot` остаётся сетевым, тексты и **Всплывающие уведомления** — у **Окна**.
+- **Пауза** считается чистой функцией от `boughtAt` и `now`; таймер и чтение **Истории перепродаж** остаются у компонента.
+- `buy-intent` остаётся единственным владельцем намерения (ADR-0004); `pending-buy` — вне ядра **Покупки**.
+- Тесты — таблицы исходов, **Паузы** и `mapBuyError` без DOM.
+- ADR impact — `none`: ADR-0004 не переоткрывается.

@@ -1,7 +1,7 @@
 # 06: Церемония Гамбы — чистое ядро и кодек пулов
 
 Type: grilling
-Status: open
+Status: resolved
 Blocked by: —
 
 ## Question
@@ -22,7 +22,7 @@ Blocked by: —
 
 ## Recommended answers
 
-> Выбрано по указанию сессии; спека не написана, статус тикета не меняется.
+> Решения, лёгшие в основу спеки: [specs/06-gamba-ceremony.md](../specs/06-gamba-ceremony.md).
 
 1. **Ядро церемонии.** Новый чистый `gamba-ceremony.ts`: стадии `idle | requesting | spinning | revealed | aborted`, `SPIN_MS = 4200`, события `start | result | finish | abort | reset`; исходы включая legacy `miss`, для пула/стадии `miss → lose`; `outcomePool`: `return|miss → lose`, `small|big → win`, `jackpot → jackpot`. Компонент владеет rAF, canvas, звуком, таймерами и сетью; ядро — переходами и эффектами.
 2. **Abort / release.** Ядро держит `balanceHeld` и выдаёт эффекты `holdBalance` на старте и `releaseBalance` ровно один раз на терминальном переходе (`revealed` / `aborted` / ошибка); повторный release — no-op; `result` после abort игнорируется; закрытие окна в `requesting` / `spinning` → `aborted`.
@@ -39,3 +39,14 @@ Blocked by: —
 ## Gates
 
 `just test`, `just check`; для визуальной проверки — `just preview` и клик по сборке.
+
+## Answer
+
+Спека: [specs/06-gamba-ceremony.md](../specs/06-gamba-ceremony.md).
+
+- Новый чистый `gamba-ceremony`: стадии `idle/requesting/spinning/revealed/aborted`, исходы, `outcomePool`, `WHEEL_PATTERN`, `targetSegment`; canvas, rAF и звук остаются адаптеру.
+- Инвариант «release ровно один раз» живёт в ядре: `holdBalance` на старте, `releaseBalance` на терминальном переходе; `result` после abort игнорируется.
+- `gamba-sounds` получает кодек `SoundPools ↔ data-атрибут`; `POOL_NAMES` — единственный источник имён, round-trip покрыт тестом.
+- `setPools` пишет через кодек, неполный список БД даёт фолбэк сборки; крутку это не блокирует.
+- Legacy `miss` остаётся в типе, но **Церемония** и **Пул звуков** нормализуют его в `lose`.
+- ADR impact — `none`: ADR-0011/0003 не переоткрываются.

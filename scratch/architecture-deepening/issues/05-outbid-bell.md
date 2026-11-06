@@ -1,7 +1,7 @@
 # 05: Колокольчик — чистое состояние
 
 Type: grilling
-Status: open
+Status: resolved
 Blocked by: —
 
 ## Question
@@ -22,7 +22,7 @@ Blocked by: —
 
 ## Recommended answers
 
-> Выбрано по указанию сессии; спека не написана, статус тикета не меняется.
+> Решения, лёгшие в основу спеки: [specs/05-outbid-bell.md](../specs/05-outbid-bell.md).
 
 1. **Шов.** Новый чистый `outbid-bell.ts` владеет историей, `unread`, `seenAt`, дедупом, слиянием догона, удалением по покупке и сбросом при смене uid; вход — `OutbidEvent`, хранилище и часы инъектируются. `outbid-notice.ts` становится тонким адаптером: DOM колокола/панели, `popover`, Escape, `ResizeObserver`, live-подписка, `fetchOutbidCatchup`, звук, `notice.ts`, очередь `missed`. `outbid-event` / `outbid-notices` / `outbid-sound` / `notice` / `popover` / `modal` не меняют роли — ADR-0005.
 2. **localStorage.** Ядро не знает `window`: адаптер `{readSeen(uid), writeSeen(uid, ts)}`; замена хранилища — одна правка. Перенос состояния из localStorage — TODO, вне карточки.
@@ -39,3 +39,14 @@ Blocked by: —
 ## Gates
 
 `just test`, `just check`; для визуальной проверки — `just preview` и клик по сборке.
+
+## Answer
+
+Спека: [specs/05-outbid-bell.md](../specs/05-outbid-bell.md).
+
+- Новый чистый `outbid-bell` владеет историей **Перекупов**, `unread`, `seenAt`, дедупом, догоном и удалением по **Покупке**; хранилище и часы инъектируются.
+- `outbid-notice` остаётся тонким адаптером: DOM **Колокольчика**, **Поповер**, Escape, звук, `notice.ts`, очередь `missed`.
+- Дедуп живого события — окно 5 с по ключу `slug|price|by`; догон дедупит по ключу без окна, сортирует и режет до 10.
+- `removeBought` убирает записи **Лота** и пересчитывает `unread`; `markSeen` пишет метку через адаптер.
+- Тесты — fake clock/storage: дедуп, лимит, догон, `unread`, выкуп, смена uid.
+- ADR impact — `none`: ADR-0005/0003 не переоткрываются.

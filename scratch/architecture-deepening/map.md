@@ -23,10 +23,17 @@
 
 - [Маркиза — убрать четвёртую проекцию purchases](issues/01-marquee-deal-log.md): маркиза читает `fetchDealLog` и одну чистую `dealLogLine(entries)`, поведение не меняет; спека: [specs/01-marquee-deal-log.md](specs/01-marquee-deal-log.md).
 - [supabase.ts — разделить роли](issues/02-supabase-roles.md): четыре транспортных модуля, кодек курсора в `trade-history`, `pending-buy` без Supabase; спека: [specs/02-supabase-roles.md](specs/02-supabase-roles.md).
+- [Пейджер истории — один контроллер для /lot/ и /deals/](issues/03-history-pager.md): безголовый `history-pager`, поверхности — адаптеры; спека: [specs/03-history-pager.md](specs/03-history-pager.md).
+- [Покупка — чистое ядро фаз и ошибок](issues/04-buy-flow.md): `buy-core` с фазами и `mapBuyError`, компонент — DOM и сеть; спека: [specs/04-buy-flow.md](specs/04-buy-flow.md).
+- [Колокольчик — чистое состояние](issues/05-outbid-bell.md): `outbid-bell` с историей/`unread`/догоном, адаптер — DOM; спека: [specs/05-outbid-bell.md](specs/05-outbid-bell.md).
+- [Церемония Гамбы — чистое ядро и кодек пулов](issues/06-gamba-ceremony.md): `gamba-ceremony` + кодек в `gamba-sounds`; спека: [specs/06-gamba-ceremony.md](specs/06-gamba-ceremony.md).
+- [Числа правил — один модуль показа](issues/07-rules-numbers.md): `rules.ts` вместо `prices.ts`, SQL — источник истины; спека: [specs/07-rules-numbers.md](specs/07-rules-numbers.md).
+- [Сетка карточек — общий план набора и заметки](issues/08-lot-grid.md): чистый `planGrid`, ADR-0009 сохраняется; спека: [specs/08-lot-grid.md](specs/08-lot-grid.md).
+- [live-store — три внутренних владельца](issues/09-live-store-cores.md): три владельца за фасадом, `mine` — селектор, тесты по владельцам; спека: [specs/09-live-store-cores.md](specs/09-live-store-cores.md).
 
 ## Not yet specified
 
-- Вопросы тикетов 03–09 закрыты рекомендованными ответами в их разделах `## Recommended answers`; спеки по ним ещё не написаны. Новых туманов нет: раскладка кадра остаётся вне «Сетки карточек», ADR-0009 не переоткрывается, «live-store» идёт одной спекой с task graph.
+- Нет: все девять тикетов сведены в спеки `specs/01`–`specs/09`. Следующая фаза — исполнение спек; карта заканчивается на спеках.
 - Форма execution-фазы (ветки, integration branch, параллельность) зависит от спек; возможно, отдельная карта после этой.
 
 ## Out of scope

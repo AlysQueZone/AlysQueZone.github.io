@@ -1,7 +1,7 @@
 # 08: Сетка карточек — общий план набора и заметки
 
 Type: grilling
-Status: open
+Status: resolved
 Blocked by: —
 
 ## Question
@@ -22,7 +22,7 @@ Blocked by: —
 
 ## Recommended answers
 
-> Выбрано по указанию сессии; спека не написана, статус тикета не меняется.
+> Решения, лёгшие в основу спеки: [specs/08-lot-grid.md](../specs/08-lot-grid.md).
 
 1. **ADR-0009.** Сохранить, не supersede: ADR запретил модулю владеть reconcile **DOM** (создание/удаление/сортировка), а чистый план набора — не это. Новый `lot-grid.ts` — чистая функция плана; поверхности по-прежнему владеют DOM.
 2. **Два режима.** `planGrid(currentSlugs, nextStates) => {remove, keep, add}`; `add` — в порядке `next`. Режим — не параметр плана, а размещение у поверхности: витрина вставляет `add` через `insertSorted` по цене, главная — в порядке выборки/append. Никаких `mode`-веток в ядре.
@@ -40,3 +40,12 @@ Blocked by: —
 ## Gates
 
 `just test`, `just check`; для визуальной проверки — `just preview` и клик по сборке.
+
+## Answer
+
+Спека: [specs/08-lot-grid.md](../specs/08-lot-grid.md).
+
+- Новый чистый `lot-grid`: `planGrid` считает `add/remove/keep`, `gridNote` — `loading/ok/empty/failed`; DOM остаётся поверхностям.
+- Витрина вставляет `add` по цене, главная — в порядке своей выборки; `rendered`, `clearSkeletons`, тексты и `insertSorted` остаются локальными.
+- Расхождение «главная не добирает новые» воспроизводится тестом плана и чинится переходом главной на `planGrid`.
+- ADR impact — `none`: ADR-0009 не переоткрывается, потому что план не владеет DOM-reconcile; ADR-0012 сохраняется.

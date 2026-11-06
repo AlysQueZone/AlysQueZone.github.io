@@ -1,7 +1,7 @@
 # 07: Числа правил — один модуль показа
 
 Type: grilling
-Status: open
+Status: resolved
 Blocked by: 01
 
 ## Question
@@ -21,7 +21,7 @@ Blocked by: 01
 
 ## Recommended answers
 
-> Выбрано по указанию сессии; спека не написана, статус тикета не меняется.
+> Решения, лёгшие в основу спеки: [specs/07-rules-numbers.md](../specs/07-rules-numbers.md).
 
 1. **Модуль.** Новый `rules.ts` — единственный модуль показа; `prices.ts` растворяется (импорты `outbid-event`, `RulesModal`, `BaseLayout`, `SuggestGreeting` обновляются), барреля не остаётся. Имя `prices.ts` больше не соответствует роли.
 2. **Числа и SQL.** В `rules.ts`: `DAILY_REWARDS = [200, 200, 250, 150, 200, 250, 500]`, `GAMBA_STAKE = 100`, `GAMBA_DAILY_LIMIT = 20`, `START_BALANCE = 1000`, комиссия/роялти/бонус; рядом комментарии-указатели на SQL (`claim_daily`, `spin_gamba`, `seed_opening`, `commission_rate`, `royalty_rate`, `pay_submission_reward`). Это display-mirror: источник истины — SQL, рантайм-конфиг не вводим; `economy.md` дополняется «меняешь SQL — правь rules.ts».
@@ -37,3 +37,13 @@ Blocked by: 01
 ## Gates
 
 `just test`, `just check`; для визуальной проверки — `just preview` и клик по сборке.
+
+## Answer
+
+Спека: [specs/07-rules-numbers.md](../specs/07-rules-numbers.md).
+
+- Новый `rules.ts` — единственный модуль чисел и строк **Правил биржи**; `prices.ts` растворяется, барреля не остаётся.
+- Ежедневный цикл, ставка/лимит **Гамбы**, старт, комиссия, роялти и бонус живут константами; строки собираются из них.
+- Источник истины — SQL; `rules.ts` — display-mirror с указателями на `claim_daily`, `spin_gamba`, `commission_rate`, `royalty_rate`, `pay_submission_reward` и `seed_opening`.
+- Рост цены входит только текстом `growthLine()`, без клиентской формулы.
+- ADR impact — `amend` ADR-0007: текст показа живёт в `rules.ts`, формула — только `public.next_lot_price`; `economy.md` обновляется.

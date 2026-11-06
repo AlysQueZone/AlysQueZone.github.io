@@ -1,7 +1,7 @@
 # 03: Пейджер истории — один контроллер для /lot/ и /deals/
 
 Type: grilling
-Status: open
+Status: resolved
 Blocked by: —
 
 ## Question
@@ -21,7 +21,7 @@ Blocked by: —
 
 ## Recommended answers
 
-> Выбрано по указанию сессии; спека не написана, статус тикета не меняется.
+> Решения, лёгшие в основу спеки: [specs/03-history-pager.md](../specs/03-history-pager.md).
 
 1. **Пейджер.** Новый безголовый `history-pager.ts`: вход — `fetchPage(cursor) => {ok, entries, hasMore}`, выход — состояние `entries / pending / loaded / hasMore / loadingFirst / loadingMore / failed / moreFailed` и методы `loadFirst({merge})`, `refreshFirst({defer})`, `loadMore()`, `showPending()`, `reset()`, `retry()`. Пейджер владеет поколением (старые ответы отбрасываются) и одним отложенным повтором. Странице остаются DOM, тексты, кнопка, `IntersectionObserver`, URL/фильтр/сессия и решение «показывать новые сразу или в плашку».
 2. **Порядок и различия.** Сначала `/lot/`, затем `/deals/`. Различия — только адаптеры и параметры: `fetchPage` (`fetchSharedHistory` / `fetchDealLog`), правило `hasMore` (полная страница у истории лота; `page.hasMore` у лога), `merge` при событии каталога, `defer` по видимости верха, `showPending`, тексты ошибок. Отдельных веток в пейджере нет.
@@ -37,3 +37,13 @@ Blocked by: —
 ## Gates
 
 `just test`, `just check`; для визуальной проверки — `just preview` и клик по сборке.
+
+## Answer
+
+Спека: [specs/03-history-pager.md](../specs/03-history-pager.md).
+
+- Один безголовый `history-pager` владеет первыми страницами, дозагрузкой, `hasMore`, ошибками, поколением и отложенным повтором; `/lot/` и `/deals/` дают только `fetchPage` и отрисовку.
+- Различия поверхностей остаются в адаптерах: полная страница у **Истории перепродаж**, транспортный `hasMore` у **Лога сделок**, `defer` и плашка новых только у лога.
+- `toggle()` и `announce()` остаются у поверхностей; пейджер возвращает факты, не тексты.
+- Тесты — fake-fetch без DOM: конец, пустая страница, ошибка и повтор, дубли, старое поколение, отложенный refresh.
+- ADR impact — `none`: ADR-0012 не переоткрывается, ADR-0009 не задет.
