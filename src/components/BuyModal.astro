@@ -14,6 +14,8 @@
 // шапку, витрину, страницу лота и колокол обновляют его события.
 // Цикл окна (Escape / клик по затемнению / фокус) — общий lib/modal.ts:
 // показ и живые проекции — в onOpen, снятие состояния — в onClose.
+// Решения фаз и ошибок — в чистом lib/buy-core.ts; здесь разметка, тексты,
+// таймер, сеть, live-подписки и pending-buy.
 import { ALYSQUE_CLAP_DARK } from '@/lib/emotes';
 import { s3Sound } from '@/lib/media';
 
@@ -85,6 +87,12 @@ const clapSound = s3Sound('clap.mp3');
     readBuyIntent,
     type BuyIntent,
   } from '@/lib/buy-intent';
+  import {
+    createBuyCore,
+    pauseRemainingSec,
+    type BuyEffect,
+    type BuyErrorKind,
+  } from '@/lib/buy-core';
   import { showSpotNotice } from '@/lib/notice';
   import { getSupabase, signInWithTwitch } from '@/lib/session';
   import {
@@ -102,18 +110,9 @@ const clapSound = s3Sound('clap.mp3');
   const yesBtn = document.getElementById('buy-modal-yes');
   const noBtn = document.getElementById('buy-modal-no');
 
-  let pending: BuyIntent | null = null;
+  // Вся фазовая логика — в чистом ядре; здесь только его состояние и эффекты.
+  const core = createBuyCore({ now: () => Date.now() });
   let pauseTimer: number | undefined;
-  /** Сколько секунд паузы осталось на кнопке (0 — кнопка свободна). */
-  let pauseLeft = 0;
-  /** Кап окна сработал: кнопка показывает лимит до закрытия модалки. */
-  let limitHit = false;
-  /** Баланс — зеркало серверного гейта; `busy` — транзитное «идёт покупка». */
-  let balance: number | null = null;
-  let busy = false;
-  /** Гость: модалка открыта не для покупки, а для входа через Twitch.
-   *  CTA — «▶ Войти через Twitch», цена показана справочно, без редиректа. */
-  let guest = false;
 
   // display-mirror, source of truth — DB (c_cooldown/c_max_per_window/c_window в enforce_purchase_rules).
   const PAUSE_SEC = 30;
@@ -124,27 +123,26 @@ const clapSound = s3Sound('clap.mp3');
   // содержимого и живые проекции, а на закрытии — снятие своего состояния.
   const buyModal = createModal(modal, {
     onOpen() {
-      if (!pending) return;
-      if (modalTitle) modalTitle.textContent = pending.title;
-      if (modalText) modalText.textContent = modalTextFor(pending.price, pending.owner);
-      restoreBuyButton();
-      applyGuestUi();
+      const intent = core.state().intent;
+      if (!intent) return;
+      if (modalTitle) modalTitle.textContent = intent.title;
+      render();
       // Баланс — зеркало серверного гейта: явная свежесть перед решением.
       void (async () => {
-        balance = await live.refreshBalance();
-        renderBuyButton();
+        applyEffects(core.dispatch({ type: 'refreshed', balance: await live.refreshBalance() }));
+        render();
       })();
       // Живые проекции: пауза (моя последняя покупка этого лота) + цена (N
       // из снапшота; сюда же придёт событие явной свежести).
-      const lotId = pending.slug;
+      const lotId = intent.slug;
       void live.refreshLot(lotId);
       void refreshPauseProjection(lotId);
     },
     onClose() {
-      pending = null;
-      guest = false;
-      restoreBuyButton();
-      applyGuestUi();
+      window.clearInterval(pauseTimer);
+      pauseTimer = undefined;
+      applyEffects(core.dispatch({ type: 'close' }));
+      render();
     },
   });
 
@@ -153,7 +151,7 @@ const clapSound = s3Sound('clap.mp3');
   }
 
   /** Текст окна: у гостя — «Цена: …» справочно, у своих — приглашение потратить. */
-  function modalTextFor(price: number | null, owner: string): string {
+  function modalTextFor(price: number | null, owner: string, guest: boolean): string {
     const n = formatStaged(price);
     return guest
       ? `Цена: ${n} Пивкойнов. Владелец: ${owner}`
@@ -161,21 +159,13 @@ const clapSound = s3Sound('clap.mp3');
   }
 
   /** Оформление гостевого режима: твичевая CTA + пояснение про вход. */
-  function applyGuestUi(): void {
+  function applyGuestUi(guest: boolean): void {
     if (yesBtn instanceof HTMLButtonElement) {
       yesBtn.classList.toggle('btn-arcade-primary', !guest);
       yesBtn.classList.toggle('bg-twitch', guest);
       yesBtn.classList.toggle('text-white', guest);
     }
     noteEl?.classList.toggle('hidden', !guest);
-  }
-
-  /** Переключить уже открытую модалку в гостевой режим (нет сессии/кончилась). */
-  function enterGuestMode(): void {
-    guest = true;
-    if (modalText && pending) modalText.textContent = modalTextFor(pending.price, pending.owner);
-    restoreBuyButton();
-    applyGuestUi();
   }
 
   function pauseLabel(left: number): string {
@@ -200,21 +190,17 @@ const clapSound = s3Sound('clap.mp3');
    *  колокол обновятся его событиями.
    *  Итог — фактически уплаченная серверная цена + confetti + видео лота
    *  в уведомлении (без video_url — clap с S3). */
-  function celebrate(entry: {
-    id: string;
-    title: string;
-    price: number;
-    owner: string;
-    video: string | null;
-  }): void {
-    buyModal?.close();
+  function celebrate(paid: number): void {
+    const intent = core.state().intent;
+    if (!intent) return;
     boom();
-    const text = `ЗАБРАЛ! Привет твой: ${entry.title} — ушло ${entry.price} Пивкойнов`;
-    if (entry.video) {
+    const amount = paid > 0 ? paid : (intent.price ?? 0);
+    const text = `ЗАБРАЛ! Привет твой: ${intent.title} — ушло ${amount} Пивкойнов`;
+    if (intent.video) {
       showSpotNotice({
         text,
         tone: 'ok',
-        video: { src: entry.video, onError: playClapFallback },
+        video: { src: intent.video, onError: playClapFallback },
         dismissOnOutside: true,
       });
     } else {
@@ -227,246 +213,57 @@ const clapSound = s3Sound('clap.mp3');
     }
   }
 
-  /** Единая точка правды для кнопки: транзит/лимит/пауза/нехватка/цена. */
-  function renderBuyButton(): void {
+  /** Единая точка правды для кнопки: гость/транзит/лимит/пауза/нехватка/цена. */
+  function render(): void {
+    const st = core.state();
+    const intent = st.intent;
+    const guest = st.phase === 'guest';
+    if (modalText && intent)
+      modalText.textContent = modalTextFor(intent.price, intent.owner, guest);
+    applyGuestUi(guest);
     if (!(yesBtn instanceof HTMLButtonElement)) return;
-    // Гость: кнопка — вход через Twitch, гейты цены/паузы не применяются.
-    if (guest) {
+    if (noBtn instanceof HTMLButtonElement) noBtn.disabled = st.phase === 'busy';
+    if (st.phase === 'guest') {
       yesBtn.disabled = false;
       yesBtn.textContent = '▶ Войти через Twitch';
       return;
     }
-    // Транзитные состояния владеют кнопкой: метку ставит вызвавший.
-    if (busy) return;
-    if (limitHit) {
+    if (st.phase === 'busy') {
+      yesBtn.disabled = true;
+      yesBtn.textContent = 'Ждём сервер…';
+      return;
+    }
+    if (st.phase === 'limit') {
       yesBtn.disabled = true;
       yesBtn.textContent = LIMIT_LABEL;
       return;
     }
-    if (pauseLeft > 0) {
+    if (st.phase === 'pause') {
       yesBtn.disabled = true;
-      yesBtn.textContent = pauseLabel(pauseLeft);
+      yesBtn.textContent = pauseLabel(st.pauseLeft);
       return;
     }
     // Общее правило доступности (lib/buy-intent.ts): не хватает — кнопка
     // гаснет; N неизвестна — не гасим, сравнить не с чем (решает сервер).
-    const availability = pending ? buyAvailability(pending, balance) : 'available';
+    const availability = intent ? buyAvailability(intent, st.balance) : 'available';
     yesBtn.disabled = availability === 'short';
     yesBtn.textContent =
       availability === 'short'
         ? 'Не хватает Пивкойнов'
-        : pending
-          ? buyLabel(pending.price)
+        : intent
+          ? buyLabel(intent.price)
           : 'Забрать';
   }
 
-  function setBusy(value: boolean): void {
-    busy = value;
-    if (yesBtn instanceof HTMLButtonElement) yesBtn.disabled = value;
-    if (noBtn instanceof HTMLButtonElement) noBtn.disabled = value;
-    renderBuyButton();
-  }
-
-  /** Возвращает кнопку в свободное состояние (цена pending, без таймера). */
-  function restoreBuyButton(): void {
-    window.clearInterval(pauseTimer);
-    pauseLeft = 0;
-    limitHit = false;
-    setBusy(false);
-  }
-
-  /** Пауза видна честно: живой отсчёт на кнопке + «Подожди N с» в уведомлении. */
-  function startPause(sec: number): void {
-    if (!(yesBtn instanceof HTMLButtonElement)) return;
-    window.clearInterval(pauseTimer);
-    limitHit = false;
-    busy = false;
-    let left = sec > 0 ? sec : PAUSE_SEC;
-    pauseLeft = left;
-    renderBuyButton();
-    showSpotNotice({
-      text: `Подожди ${left} с — этот лот можно забрать повторно через ${left} с.`,
-      tone: 'bad',
-    });
-    pauseTimer = window.setInterval(() => {
-      left -= 1;
-      pauseLeft = left;
-      if (!(yesBtn instanceof HTMLButtonElement)) {
-        window.clearInterval(pauseTimer);
-        return;
-      }
-      if (left <= 0) {
-        restoreBuyButton();
-        // Пауза отпустила — цена могла уйти: подтянуть живую N из БД.
-        const id = pending?.slug;
-        if (id) void refreshPriceProjection(id);
-      } else {
-        renderBuyButton();
-      }
-    }, 1000);
-  }
-
-  /** Кап окна: кнопка показывает лимит до закрытия модалки. */
-  function showLimit(): void {
-    if (!(yesBtn instanceof HTMLButtonElement)) return;
-    window.clearInterval(pauseTimer);
-    pauseLeft = 0;
-    limitHit = true;
-    busy = false;
-    renderBuyButton();
-  }
-
-  /**
-   * Проекция паузы из shared-истории: моя последняя покупка ЭТОГО лота.
-   * Чужой выкуп сюда не попадает (фильтр по buyer_uid), так что таймер не трогает.
-   * Страница истории — новые первыми (одна страница, а не вся история): пауза
-   * короткая, поэтому моя последняя покупка почти всегда в первой же странице,
-   * и первая моя строка — она. Дальше виденного сервер остаётся правдой в
-   * последней инстанции (см. startPause в обработчике).
-   */
-  async function refreshPauseProjection(lotId: string): Promise<void> {
-    if (!pending || pending.slug !== lotId || limitHit || pauseLeft > 0) return;
-    try {
-      const uid = live.uid();
-      if (!uid || !pending || pending.slug !== lotId) return;
-      const history = await fetchSharedHistory(lotId);
-      for (const entry of history) {
-        if (entry.buyer_uid !== uid) continue;
-        const boughtAt = Date.parse(entry.created_at);
-        if (!Number.isFinite(boughtAt)) return;
-        const remaining = Math.ceil(PAUSE_SEC - (Date.now() - boughtAt) / 1000);
-        if (remaining > 0 && pending && pending.slug === lotId && pauseLeft <= 0 && !limitHit) {
-          startPause(remaining);
-        }
-        return;
-      }
-    } catch {
-      // проекция — best effort, правда придёт с сервера
-    }
-  }
-
-  /**
-   * Проекция цены из снапшота живых данных: явная свежесть лота перед решением
-   * (лот перекупили при открытой модалке — новая N видна до нажатия, кнопка
-   * обновится событием каталога). Пауза/лимит владеют кнопкой — их не затираем;
-   * когда отпустят, цена подтянется (см. конец startPause).
-   */
-  function refreshPriceProjection(lotId: string): void {
-    if (!pending || pending.slug !== lotId || limitHit || pauseLeft > 0) return;
-    void live.refreshLot(lotId);
-  }
-
-  document.addEventListener('click', async (e) => {
-    const target = e.target as HTMLElement | null;
-    const btn = target?.closest?.('[data-buy-intent]');
-    if (!(btn instanceof HTMLElement)) return;
-    if (btn instanceof HTMLButtonElement && btn.disabled) return;
-    const intent = readBuyIntent(btn);
-    if (!intent) return;
-    pending = intent;
-    // Разметка модалки статична; без неё открывать нечего (гард прежнего цикла).
-    if (!(modal && modalText && modalTitle)) return;
-    // Без сессии — не уводим принудительно: открываем ту же модалку в гостевом
-    // режиме, где CTA — вход через Twitch. Лот запоминается внутри неё.
-    const sb = getSupabase();
-    if (sb) {
-      const { data } = await sb.auth.getSession();
-      if (!data.session) {
-        guest = true;
-        buyModal?.open(btn);
-        return;
-      }
-    }
-    guest = false;
-    buyModal?.open(btn);
-  });
-
-  yesBtn?.addEventListener('click', async () => {
-    if (!pending) return;
-    const { slug: id, title, owner, video } = pending;
-    const price = pending.price;
-    // Гостевой режим: кнопка — вход через Twitch. Запоминаем лот, чтобы после
-    // возврата модалка открылась снова уже для подтверждения покупки.
-    if (guest) {
-      stashPendingBuy(id);
-      await signInWithTwitch(returnUrlForLot(id));
-      return;
-    }
-    // Гейт «хватит/не хватит» — серверный: BEFORE ответит
-    // `insufficient funds`, покажем честно. Без настроенного хранилища
-    // покупать нечего — честная ошибка, деньги целы.
-    if (!getSupabase()) {
-      showSpotNotice({
-        text: 'Хранилище не настроено — покупка не записана, Пивкойны целы.',
-        tone: 'bad',
-      });
-      return;
-    }
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      showSpotNotice({
-        text: 'Офлайн: покупка не записана, Пивкойны целы. Вернись с сетью.',
-        tone: 'bad',
-      });
-      return;
-    }
-    // Сессия могла кончиться после открытия модалки — в логин с возвратом к Лоту.
-    const sb = getSupabase();
-    if (!sb) return;
-    const { data } = await sb.auth.getSession();
-    if (!data.session) {
-      // Сессия кончилась при открытой модалке — переключаем её в гостевой
-      // режим (вход по кнопке), без принудительного редиректа.
-      enterGuestMode();
-      return;
-    }
-    // Перекуп за одним швом (buyLot из lib/lots.ts): свежая N, INSERT,
-    // маппинг ошибок — внутри; здесь только switch по итогу.
-    // Итог — фактически уплаченная серверная цена.
-    setBusy(true);
-    if (yesBtn instanceof HTMLButtonElement) yesBtn.textContent = 'Ждём сервер…';
-    let result: Awaited<ReturnType<typeof buyLot>>;
-    try {
-      result = await buyLot(id);
-    } catch {
-      restoreBuyButton();
-      showSpotNotice({
-        text: 'Не записалось в общее хранилище — Пивкойны целы, попробуй ещё.',
-        tone: 'bad',
-      });
-      return;
-    }
-    if (result.status === 'ok') {
-      const paid = result.paid > 0 ? result.paid : (price ?? 0);
-      celebrate({ id, title, price: paid, owner, video });
-      return;
-    }
-    if (result.kind === 'cooldown') {
-      startPause(result.retryAfterSec ?? PAUSE_SEC);
-      return;
-    }
-    if (result.kind === 'rate-limit') {
-      showLimit();
-      showSpotNotice({
-        text: 'Лимит: 10 покупок за 10 минут — приходи позже, Пивкойны целы.',
-        tone: 'bad',
-      });
-      return;
-    }
-    restoreBuyButton();
-    if (result.kind === 'insufficient-funds') {
-      buyModal?.close();
-      showSpotNotice({
-        text: 'Не хватает Пивкойнов — пойжем жоско в гамбу или забери Ежедневный вход, а этот привет подождёт.',
-        tone: 'bad',
-      });
-      return;
-    }
-    if (result.kind === 'unauthenticated') {
-      // Сервер не увидел сессию — та же гостевая модалка, вход по кнопке.
-      enterGuestMode();
-      return;
-    }
-    switch (result.kind) {
+  /** Тексты «вид ошибки → строка»: ядро отдаёт вид, копирайт остаётся здесь. */
+  function showBuyNotice(kind: BuyErrorKind): void {
+    switch (kind) {
+      case 'insufficient-funds':
+        showSpotNotice({
+          text: 'Не хватает Пивкойнов — пойжем жоско в гамбу или забери Ежедневный вход, а этот привет подождёт.',
+          tone: 'bad',
+        });
+        break;
       case 'own-lot':
         showSpotNotice({ text: 'Этот привет уже твой — перекупать нечего.', tone: 'bad' });
         break;
@@ -495,31 +292,210 @@ const clapSound = s3Sound('clap.mp3');
         });
         break;
     }
+  }
+
+  /** Пауза видна честно: живой отсчёт на кнопке + «Подожди N с» в уведомлении. */
+  function startPause(seconds: number): void {
+    window.clearInterval(pauseTimer);
+    render();
+    showSpotNotice({
+      text: `Подожди ${seconds} с — этот лот можно забрать повторно через ${seconds} с.`,
+      tone: 'bad',
+    });
+    pauseTimer = window.setInterval(() => {
+      applyEffects(core.dispatch({ type: 'tick' }));
+      if (core.state().phase !== 'pause') {
+        window.clearInterval(pauseTimer);
+        pauseTimer = undefined;
+      }
+      render();
+    }, 1000);
+  }
+
+  /** Кап окна: кнопка показывает лимит до закрытия модалки. */
+  function showLimit(): void {
+    window.clearInterval(pauseTimer);
+    pauseTimer = undefined;
+    render();
+    showSpotNotice({
+      text: 'Лимит: 10 покупок за 10 минут — приходи позже, Пивкойны целы.',
+      tone: 'bad',
+    });
+  }
+
+  /** Эффекты ядра — единственное место, где состояние превращается в DOM/сеть. */
+  function applyEffects(effects: readonly BuyEffect[]): void {
+    for (const effect of effects) {
+      switch (effect.type) {
+        case 'celebrate':
+          celebrate(effect.paid);
+          break;
+        case 'close':
+          buyModal?.close();
+          break;
+        case 'pauseTimer':
+          startPause(effect.seconds);
+          break;
+        case 'limit':
+          showLimit();
+          break;
+        case 'notice':
+          showBuyNotice(effect.kind);
+          break;
+        case 'refreshPrice':
+          void live.refreshLot(effect.slug);
+          break;
+      }
+    }
+  }
+
+  /**
+   * Проекция паузы из shared-истории: моя последняя покупка ЭТОГО лота.
+   * Чужой выкуп сюда не попадает (фильтр по buyer_uid), так что таймер не трогает.
+   * Страница истории — новые первыми (одна страница, а не вся история): пауза
+   * короткая, поэтому моя последняя покупка почти всегда в первой же странице,
+   * и первая моя строка — она. Дальше виденного сервер остаётся правдой в
+   * последней инстанции (см. pauseTimer в applyEffects).
+   */
+  async function refreshPauseProjection(lotId: string): Promise<void> {
+    const st = core.state();
+    if (!st.intent || st.intent.slug !== lotId) return;
+    if (st.phase === 'limit' || st.phase === 'pause' || st.phase === 'busy') return;
+    try {
+      const uid = live.uid();
+      if (!uid) return;
+      const history = await fetchSharedHistory(lotId);
+      for (const entry of history) {
+        if (entry.buyer_uid !== uid) continue;
+        const current = core.state();
+        if (!current.intent || current.intent.slug !== lotId) return;
+        if (current.phase === 'limit' || current.phase === 'pause' || current.phase === 'busy') {
+          return;
+        }
+        const remaining = pauseRemainingSec(Date.parse(entry.created_at), Date.now(), PAUSE_SEC);
+        if (remaining > 0) {
+          applyEffects(core.dispatch({ type: 'pause', seconds: remaining }));
+        }
+        return;
+      }
+    } catch {
+      // проекция — best effort, правда придёт с сервера
+    }
+  }
+
+  document.addEventListener('click', async (e) => {
+    const target = e.target as HTMLElement | null;
+    const btn = target?.closest?.('[data-buy-intent]');
+    if (!(btn instanceof HTMLElement)) return;
+    if (btn instanceof HTMLButtonElement && btn.disabled) return;
+    const intent = readBuyIntent(btn);
+    if (!intent) return;
+    // Разметка модалки статична; без неё открывать нечего (гард прежнего цикла).
+    if (!(modal && modalText && modalTitle)) return;
+    // Без сессии — не уводим принудительно: открываем ту же модалку в гостевом
+    // режиме, где CTA — вход через Twitch. Лот запоминается внутри неё.
+    let guest = false;
+    const sb = getSupabase();
+    if (sb) {
+      const { data } = await sb.auth.getSession();
+      guest = !data.session;
+    }
+    applyEffects(core.dispatch({ type: 'intent', intent, guest }));
+    buyModal?.open(btn);
+  });
+
+  yesBtn?.addEventListener('click', async () => {
+    const intent = core.state().intent;
+    if (!intent) return;
+    // Гостевой режим: кнопка — вход через Twitch. Запоминаем лот, чтобы после
+    // возврата модалка открылась снова уже для подтверждения покупки.
+    if (core.state().phase === 'guest') {
+      stashPendingBuy(intent.slug);
+      await signInWithTwitch(returnUrlForLot(intent.slug));
+      return;
+    }
+    // Гейт «хватит/не хватит» — серверный: BEFORE ответит
+    // `insufficient funds`, покажем честно. Без настроенного хранилища
+    // покупать нечего — честная ошибка, деньги целы.
+    if (!getSupabase()) {
+      showSpotNotice({
+        text: 'Хранилище не настроено — покупка не записана, Пивкойны целы.',
+        tone: 'bad',
+      });
+      return;
+    }
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      showSpotNotice({
+        text: 'Офлайн: покупка не записана, Пивкойны целы. Вернись с сетью.',
+        tone: 'bad',
+      });
+      return;
+    }
+    // Сессия могла кончиться после открытия модалки — в гостевой режим, без
+    // принудительного редиректа.
+    const sb = getSupabase();
+    if (!sb) return;
+    const { data } = await sb.auth.getSession();
+    if (!data.session) {
+      applyEffects(
+        core.dispatch({
+          type: 'result',
+          result: { status: 'blocked', kind: 'unauthenticated', raw: 'no session' },
+        })
+      );
+      render();
+      return;
+    }
+    // Перекуп за одним швом (buyLot из lib/lots.ts): свежая N, INSERT,
+    // маппинг ошибок — внутри. Здесь только транзит и передача итога в ядро.
+    applyEffects(core.dispatch({ type: 'busy' }));
+    render();
+    let result: Awaited<ReturnType<typeof buyLot>>;
+    try {
+      result = await buyLot(intent.slug);
+    } catch {
+      applyEffects(
+        core.dispatch({
+          type: 'result',
+          result: { status: 'blocked', kind: 'write-error', raw: 'supabase not configured' },
+        })
+      );
+      render();
+      return;
+    }
+    applyEffects(core.dispatch({ type: 'result', result }));
+    render();
   });
 
   // Снапшот живых данных: свежий баланс для гейта и проекции открытого лота
   // (цена/владелец) — по событию каталога, без отдельного канала.
   live.subscribe((change) => {
     if (change.kind === 'balance') {
-      balance = change.balance;
-      renderBuyButton();
+      applyEffects(core.dispatch({ type: 'refreshed', balance: change.balance }));
+      render();
       return;
     }
     // Сессия доехала позже (возврат из логина): пауза могла не спроецироваться.
-    if (change.kind === 'uid' && pending) {
-      void refreshPauseProjection(pending.slug);
+    const st = core.state();
+    if (!st.intent) return;
+    if (change.kind === 'uid') {
+      void refreshPauseProjection(st.intent.slug);
       return;
     }
-    if (change.kind === 'catalog' && pending && change.changed.has(pending.slug)) {
-      const st = live.lot(pending.slug);
-      if (!st) return;
-      if (st.owner_login) pending.owner = st.owner_login;
+    if (change.kind === 'catalog' && change.changed.has(st.intent.slug)) {
+      const lot = live.lot(st.intent.slug);
+      if (!lot) return;
       // N неизвестна (вью отсутствует) — намерение несёт price: null: честный
       // «…» и никакого сравнения с балансом; итог всё равно посчитает сервер.
-      pending.price = st.nextPrice;
-      if (modalText) modalText.textContent = modalTextFor(pending.price, pending.owner);
-      renderBuyButton();
-      void refreshPauseProjection(pending.slug);
+      applyEffects(
+        core.dispatch({
+          type: 'refreshed',
+          price: lot.nextPrice,
+          owner: lot.owner_login ?? undefined,
+        })
+      );
+      render();
+      void refreshPauseProjection(st.intent.slug);
     }
   });
 
@@ -560,7 +536,7 @@ const clapSound = s3Sound('clap.mp3');
     // в макете, поэтому открываем её по свежим данным лота, без кнопки-якоря.
     const st = await live.refreshLot(id);
     if (!st) return;
-    pending = {
+    const restored: BuyIntent = {
       slug: st.slug,
       title: st.title,
       price: st.nextPrice,
@@ -568,6 +544,7 @@ const clapSound = s3Sound('clap.mp3');
       video: st.video_url,
     };
     clearPendingBuy();
+    applyEffects(core.dispatch({ type: 'intent', intent: restored, guest: false }));
     buyModal?.open(null);
   })();
 </script>
