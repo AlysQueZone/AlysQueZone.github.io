@@ -88,6 +88,7 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
   import { live, type LotState } from '@/lib/live';
   import { fillLot, lotUrl } from '@/lib/lot-view';
   import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
+  import { gridNote, planGrid } from '@/lib/lot-grid';
   import { peekPendingBuy } from '@/lib/pending-buy';
 
   const GUEST_TEXT = 'Войди через Twitch — тут будут твои приветы';
@@ -202,35 +203,36 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
   }
 
   /** Заполнить карточку состоянием Лота: слоты и раскладку кадра ведёт
-   *  общий lib/lot-view.ts (fillLot); здесь — только ключ reconcile. */
+   *  общий lib/lot-view.ts (fillLot); здесь — только ключ `data-lot-card`
+   *  для сортировки вставки. */
   function fillCard(card: HTMLElement, st: LotState): void {
     card.dataset.lotCard = st.slug;
     fillLot(card, st, { balance: myBalance });
   }
 
-  // slug → узел карточки: reconcile набора (создать/снести/обновить).
+  // slug → узел карточки: состав сетки решает `planGrid`, DOM — здесь.
   const rendered = new Map<string, HTMLElement>();
 
-  function reconcile(states: readonly LotState[]): void {
+  /** План `planGrid` → DOM: снять `remove`, перезаполнить `keep`, вставить `add`. */
+  function applyGrid(states: readonly LotState[]): void {
     const grid = document.querySelector('[data-lot-grid]');
     const tpl = document.querySelector('[data-lot-card-template]');
     if (!(grid instanceof HTMLElement) || !(tpl instanceof HTMLTemplateElement)) return;
 
-    const bySlug = new Map(states.map((st) => [st.slug, st]));
-    for (const [slug, el] of [...rendered]) {
-      if (!bySlug.has(slug)) {
-        el.remove();
-        rendered.delete(slug);
-      }
+    const plan = planGrid([...rendered.keys()], states);
+    for (const slug of plan.remove) {
+      rendered.get(slug)?.remove();
+      rendered.delete(slug);
     }
 
-    for (const st of states) {
-      if (!Number.isFinite(st.price)) continue;
-      const card = rendered.get(st.slug);
-      if (card) {
-        fillCard(card, st);
-        continue;
-      }
+    const bySlug = new Map(states.map((st) => [st.slug, st]));
+    for (const slug of plan.keep) {
+      const card = rendered.get(slug);
+      const st = bySlug.get(slug);
+      if (card && st) fillCard(card, st);
+    }
+
+    for (const st of plan.add) {
       const fresh = tpl.content.firstElementChild;
       if (!(fresh instanceof HTMLElement)) return;
       const created = fresh.cloneNode(true) as HTMLElement;
@@ -326,13 +328,14 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
     const uid = live.uid();
     myBalance = live.balance();
     renderMyGreetings(uid);
-    // Ответа БД ещё не было — скелетоны честнее «пусто» и «не загрузилось».
-    if (live.catalogKnown()) {
-      const states = live.catalogWindow();
-      reconcile(states);
-      const empty = states.length === 0;
+
+    const known = live.catalogKnown();
+    const states = known ? live.catalogWindow() : [];
+    const note = gridNote(known, live.catalogOk(), states.length);
+    if (known) {
+      applyGrid(states);
       // Пусто ≠ не загрузилось: заметка честная, последнее хорошее не трём.
-      const gridMsg = !live.catalogOk() && empty ? FAIL_TEXT : empty ? GRID_EMPTY_TEXT : null;
+      const gridMsg = note === 'failed' ? FAIL_TEXT : note === 'empty' ? GRID_EMPTY_TEXT : null;
       setGridNote(gridMsg);
       setStatus(gridMsg ?? '');
       clearSkeletons();

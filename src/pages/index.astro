@@ -122,6 +122,7 @@ const base = import.meta.env.BASE_URL;
   // (BuyModal). Одно представление Лота на всех поверхностях (docs/adr/0009).
   import { live, type LotState } from '@/lib/live';
   import { fillLot } from '@/lib/lot-view';
+  import { gridNote, planGrid } from '@/lib/lot-grid';
 
   const slot = document.querySelector('[data-random-lots]');
   const tpl = document.querySelector('[data-lot-card-template]');
@@ -134,10 +135,8 @@ const base = import.meta.env.BASE_URL;
 
   /** Баланс — зеркало гейта: не хватает — кнопки карточек гаснут. */
   let myBalance: number | null = null;
-  /** Показанные карточки — для перекраски без нового выбора. */
-  let rendered = new Map<string, HTMLElement>();
-  /** Первая непустая выборка уже нарисована: дальше не пересобираем. */
-  let painted = false;
+  /** Показанные карточки: состав сетки решает `planGrid`, DOM — здесь. */
+  const rendered = new Map<string, HTMLElement>();
 
   function setNote(text: string | null): void {
     if (!(note instanceof HTMLElement)) return;
@@ -155,56 +154,69 @@ const base = import.meta.env.BASE_URL;
     slot?.querySelectorAll('[data-lot-skeleton]').forEach((el) => el.remove());
   }
 
-  /** Перекрасить уже показанные карточки из снапшота; исчезнувшие — убрать. */
-  function refill(): void {
+  /** Перекрасить показанные карточки из снапшота: набор не трогаем. */
+  function repaint(): void {
     const states = live.catalog();
-    for (const [slug, card] of [...rendered]) {
+    for (const [slug, card] of rendered) {
       const st = states.get(slug);
-      if (!st) {
-        card.remove();
-        rendered.delete(slug);
-        continue;
-      }
-      fillLot(card, st, { balance: myBalance });
+      if (st) fillLot(card, st, { balance: myBalance });
     }
   }
 
-  /** Нарисовать выборку карточками LotCard: порядок — как отдала БД. */
-  function paintCards(states: readonly LotState[]): void {
+  /**
+   * План `planGrid` → DOM: снять `remove`, перезаполнить `keep`, дописать `add`.
+   * Первая непустая выборка заменяет скелетоны разом, в порядке БД; дальше
+   * только дописываем, чтобы показанные карточки не прыгали.
+   */
+  function applyGrid(states: readonly LotState[]): void {
     if (!(slot instanceof HTMLElement) || !(tpl instanceof HTMLTemplateElement)) return;
-    const cards: HTMLElement[] = [];
-    rendered = new Map();
-    for (const st of states) {
+
+    const plan = planGrid([...rendered.keys()], states);
+    for (const slug of plan.remove) {
+      rendered.get(slug)?.remove();
+      rendered.delete(slug);
+    }
+
+    const bySlug = new Map(states.map((st) => [st.slug, st]));
+    for (const slug of plan.keep) {
+      const card = rendered.get(slug);
+      const st = bySlug.get(slug);
+      if (card && st) fillLot(card, st, { balance: myBalance });
+    }
+
+    const added: HTMLElement[] = [];
+    for (const st of plan.add) {
       const fresh = tpl.content.firstElementChild;
       if (!(fresh instanceof HTMLElement)) break;
       const card = fresh.cloneNode(true) as HTMLElement;
       fillLot(card, st, { balance: myBalance });
       rendered.set(st.slug, card);
-      cards.push(card);
+      added.push(card);
     }
-    slot.replaceChildren(...cards);
+    if (added.length === 0) return;
+    if (rendered.size === added.length) slot.replaceChildren(...added);
+    else slot.append(...added);
   }
 
-  /** Отрисовка из снапшота: первая непустая выборка — карточки, дальше перекраска. */
+  /** Отрисовка из снапшота: состав сетки — план, порядок — выборки. */
   function render(): void {
     if (!(slot instanceof HTMLElement)) return;
-    // Ответа БД ещё не было — скелетоны честнее «пусто/не загрузилось».
-    if (!live.catalogKnown()) return;
-    const states = live.catalogWindow();
+    const known = live.catalogKnown();
+    const states = known ? live.catalogWindow() : [];
     myBalance = live.balance();
-    if (!painted && states.length > 0) {
-      paintCards(states);
-      painted = true;
-    } else if (painted) {
-      refill();
+    if (known) {
+      applyGrid(states);
+      clearSkeletons();
     }
-    clearSkeletons();
+    const state = gridNote(known, live.catalogOk(), rendered.size);
+    // Ответа БД ещё не было — скелетоны честнее «пусто/не загрузилось».
+    if (state === 'loading') return;
     const msg =
-      rendered.size > 0
-        ? null
-        : live.catalogOk()
-          ? 'Пока пусто — зайди на биржу'
-          : 'Приветы не загрузились — проверь связь';
+      state === 'empty'
+        ? 'Пока пусто — зайди на биржу'
+        : state === 'failed'
+          ? 'Приветы не загрузились — проверь связь'
+          : null;
     setNote(msg);
     setStatus(msg ?? '');
   }
@@ -213,7 +225,7 @@ const base = import.meta.env.BASE_URL;
     if (change.kind === 'catalog') render();
     if (change.kind === 'balance') {
       myBalance = change.balance;
-      refill();
+      repaint();
     }
   });
 </script>
