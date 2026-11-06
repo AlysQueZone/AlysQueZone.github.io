@@ -21,6 +21,8 @@
 
 <!-- one line per resolved ticket: [title](issues/NN-...md): gist; spec: [specs/NN-...md](specs/NN-...md) -->
 
+- [Маркиза — убрать четвёртую проекцию purchases](issues/01-marquee-deal-log.md): маркиза читает `fetchDealLog` и одну чистую `dealLogLine(entries)`, поведение не меняет; спека: [specs/01-marquee-deal-log.md](specs/01-marquee-deal-log.md).
+
 ## Not yet specified
 
 - Малые швы, которые при гриллинге окажутся самостоятельными: раскладка кадра привязана к «Сетке карточек», session tri-state — к «supabase.ts»; если выйдут за их рамки — graduates в отдельные тикеты.

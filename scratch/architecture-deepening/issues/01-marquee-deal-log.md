@@ -1,7 +1,7 @@
 # 01: Маркиза — убрать четвёртую проекцию purchases
 
 Type: grilling
-Status: open
+Status: resolved
 Blocked by: —
 
 ## Question
@@ -25,3 +25,13 @@ Blocked by: —
 ## Gates
 
 `just test`, `just check`; для визуальной проверки — `just preview` и клик по сборке.
+
+## Answer
+
+Спека: [specs/01-marquee-deal-log.md](../specs/01-marquee-deal-log.md).
+
+- Маркиза читает первую страницу через `fetchDealLog(MARQUEE_DEAL_LIMIT)`, а текст полосы собирает одна чистая `dealLogLine(entries)` в `trade-history`; `BaseLayout` оставляет анимацию, ширину и fade.
+- Пустой лог и ошибка чтения по-прежнему показывают правила; цена остаётся сырым числом; `10` становится именованной константой, не общим `DEAL_PAGE_SIZE`.
+- Строка без `title` теперь показывается со `slug`, как в «Логе сделок»; на здоровой БД это недостижимо (`title not null`) и является осознанным сужением защиты от битого join.
+- ADR impact — `none`; наблюдение о буквальной формулировке ADR-0003 передано в тикет «supabase.ts — разделить роли».
+- Спека исполнима одной сессией: тесты чистой функции, гейты `just test` / `just check` / `preview`, запись в `CHANGELOG.md` в группе `### Внутри`.
