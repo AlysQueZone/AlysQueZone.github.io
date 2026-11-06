@@ -10,6 +10,9 @@ set quiet
 # Читать корневой .env в переменные окружения рецептов (нужно db-vault для
 # TELEGRAM_*; SECRET/DSN-строки python-скрипты и так читают из .env сами).
 set dotenv-load
+# Аргументы рецепта — в "$@", без ручного квотирования: *args с пробелами
+# (--title "…") иначе разваливается на слова в {{ args }}.
+set positional-arguments
 
 # -----------------------------------------------------------------------------
 # Variables
@@ -149,13 +152,13 @@ lots-seed:
 # Рекомендуемый title карточки: ник из имени файла по реестру ников
 # Пример: just lots-title privets/Onghanntto.mp4
 lots-title *args:
-    python3 scripts/lots_title.py {{ args }}
+    python3 scripts/lots_title.py "$@"
 
 # Пример: just lot-add privets/Onghanntto.mp4 --title "Привет Onghanntto"
 # Хотлинк: just lot-add --link https://cdn.example/clip.webm --slug lot-meme-x --title "…"
 # Новый лот: тройка -> Storage -> карточка -> сид -> синк одной командой
 lot-add *args:
-    python3 scripts/lot_add.py {{ args }}
+    python3 scripts/lot_add.py "$@"
 
 # -------------------------------------
 # Контент звуков гамбы
@@ -163,7 +166,7 @@ lot-add *args:
 
 # Синк content/sounds.toml в прод: манифест = таблица (лишнее сносится), без деплоя
 sounds-sync *args:
-    python3 scripts/sounds_sync.py sync {{ args }}
+    python3 scripts/sounds_sync.py sync "$@"
 
 # Пересобрать supabase/seed-sounds.sql и src/lib/gamba-sounds.gen.ts из манифеста
 sounds-gen:
@@ -173,34 +176,34 @@ sounds-gen:
 # Пример: just sound-add privets/ya_lublu_pivo.mp4 --pool win
 # Пример: just sound-add https://cdn.example/clip.webm --pool spin --name gamba-spin-rgg
 sound-add *args:
-    python3 scripts/sounds_sync.py add {{ args }}
+    python3 scripts/sounds_sync.py add "$@"
 
 # Синк ников чатерсов из чата VOD в content/chatters.toml
 # Пример: just chatters-sync --vod 2864275043
 chatters-sync *args:
-    python3 scripts/chatters_sync.py {{ args }}
+    python3 scripts/chatters_sync.py "$@"
 
 # Найти автора привета по характерной фразе из чата VOD: печатает ник и канон.
 # Пример: just chatters-find --vod 2888034815 --until 1800 "надеюсь меня не переедут"
 chatters-find *args:
-    python3 scripts/chatters_find.py {{ args }}
+    python3 scripts/chatters_find.py "$@"
 
 # Приём заявки на привет: id -> скачивание -> медиа -> карточка -> синк -> лот.
 # Безопасный первый заход: just submission 12 --check (скачает и покажет, стоп).
 # Полный проход: just submission 12; --force — осознанный обход дубль-гейта.
 submission *args:
-    python3 scripts/submission.py {{ args }}
+    python3 scripts/submission.py "$@"
 
 # Отказ по заявке без выплаты: rejected (по умолчанию) или duplicate.
 # Пример: just submission-reject 12 --status duplicate
 submission-reject *args:
-    python3 scripts/submission.py reject {{ args }}
+    python3 scripts/submission.py reject "$@"
 
 # Повторная выплата награды по уже принятой заявке: путь восстановления,
 # если выплата упала после приёма. Идемпотентно (сервер не платит дважды).
 # Пример: just submission-reward 12
 submission-reward *args:
-    python3 scripts/submission.py reward {{ args }}
+    python3 scripts/submission.py reward "$@"
 
 # -------------------------------------
 # Локальная разработка (Supabase + фронт)
