@@ -9,7 +9,7 @@
  * события — в чистом ядре src/lib/live-store.ts.
  *
  * Поверхности читают снапшот синхронно (`live.uid()`, `live.balance()`,
- * `live.catalog()`, `live.lot(slug)`, …) и подписываются на изменения
+ * `live.catalogMap()`, `live.lot(slug)`, …) и подписываются на изменения
  * (`live.subscribe`); денежные гейты (гамба, покупка) просят явную свежесть
  * (`live.refreshBalance()`, `live.refreshLot(slug)`). Каталог читается срезом
  * страницы: витрина `/lots/` включает страницы (`live.useCatalogPages`),
@@ -40,9 +40,9 @@ export type { LiveChange, LiveOutbid, LotState } from './live-store';
 export { normalizeNextPrice } from './live-store';
 
 // ---------------------------------------------------------------------------
-// Читатели Supabase: каталог + «мой» флаг за один запрос к вью
-// `lots_with_next_price` (N считает БД тем же выражением, что и BEFORE-триггер,
-// клиент формулы не знает и не хранит).
+// Читатели Supabase: строки каталога из вью `lots_with_next_price` (N считает
+// БД тем же выражением, что и BEFORE-триггер; клиент формулы не знает и не
+// хранит), «мой» флаг — селектор поверхности, не поле строки.
 // ---------------------------------------------------------------------------
 
 type LotRow = Record<string, unknown>;
@@ -52,11 +52,10 @@ function str(row: LotRow, key: string): string | null {
   return typeof value === 'string' ? value : null;
 }
 
-function toLotState(row: LotRow, uid: string | null): LotState | null {
+function toLotState(row: LotRow): LotState | null {
   const slug = row['slug'];
   const price = Number(row['price']);
   if (typeof slug !== 'string' || !Number.isFinite(price)) return null;
-  const owner_uid = str(row, 'owner_uid');
   return {
     slug,
     title: str(row, 'title') ?? slug,
@@ -64,28 +63,27 @@ function toLotState(row: LotRow, uid: string | null): LotState | null {
     price,
     nextPrice: normalizeNextPrice(row['next_price']),
     owner_login: str(row, 'owner_login'),
-    owner_uid,
+    owner_uid: str(row, 'owner_uid'),
     suggested_by_login: str(row, 'suggested_by_login'),
-    mine: uid !== null && owner_uid !== null && owner_uid === uid,
   };
 }
 
-function fillCatalog(rows: unknown, uid: string | null): Map<string, LotState> {
+function fillCatalog(rows: unknown): Map<string, LotState> {
   const map = new Map<string, LotState>();
   if (!Array.isArray(rows)) return map;
   for (const row of rows as LotRow[]) {
-    const state = toLotState(row, uid);
+    const state = toLotState(row);
     if (state) map.set(state.slug, state);
   }
   return map;
 }
 
 /** Строки страницы в порядке БД (цена, slug): курсор и окно держатся за него. */
-function fillCatalogList(rows: unknown, uid: string | null): LotState[] {
+function fillCatalogList(rows: unknown): LotState[] {
   if (!Array.isArray(rows)) return [];
   const list: LotState[] = [];
   for (const row of rows as LotRow[]) {
-    const state = toLotState(row, uid);
+    const state = toLotState(row);
     if (state) list.push(state);
   }
   return list;
@@ -169,7 +167,7 @@ function supabaseReaders(): LiveReaders {
      * Ошибка или ненастроенное хранилище → `ok: false` («не загрузилось» ≠
      * «пусто»).
      */
-    async readRandomLots(uid: string | null, limit: number): Promise<CatalogListRead> {
+    async readRandomLots(limit: number): Promise<CatalogListRead> {
       const sb = getSupabase();
       if (!sb) return { ok: false, states: [] };
       const cap = Math.max(1, Math.floor(limit));
@@ -178,7 +176,7 @@ function supabaseReaders(): LiveReaders {
           sb.from(RANDOM_VIEW).select(VIEW_COLUMNS).limit(cap)
         );
         if (error || !Array.isArray(data)) return { ok: false, states: [] };
-        return { ok: true, states: fillCatalogList(data, uid) };
+        return { ok: true, states: fillCatalogList(data) };
       } catch {
         return { ok: false, states: [] };
       }
@@ -190,11 +188,7 @@ function supabaseReaders(): LiveReaders {
      * держит границу страниц на месте (offset бы сдвинулся живой вставкой).
      * Строк берём на одну больше — по ней честно знаем «есть ещё».
      */
-    async readCatalogPage(
-      uid: string | null,
-      cursor: CatalogCursor | null,
-      limit: number
-    ): Promise<CatalogPageRead> {
+    async readCatalogPage(cursor: CatalogCursor | null, limit: number): Promise<CatalogPageRead> {
       const sb = getSupabase();
       if (!sb) return { ok: false, states: [], hasMore: false };
       const cap = Math.max(1, Math.floor(limit));
@@ -213,7 +207,7 @@ function supabaseReaders(): LiveReaders {
         return query;
       });
       if (!read.ok) return { ok: false, states: [], hasMore: false };
-      const list = fillCatalogList(read.rows, uid);
+      const list = fillCatalogList(read.rows);
       return { ok: true, states: list.slice(0, cap), hasMore: list.length > cap };
     },
 
@@ -221,7 +215,7 @@ function supabaseReaders(): LiveReaders {
      * Загруженное окно по slug: освежить цены/владельцев и узнать удалённые
      * (строка не вернулась). Списки длинные — режем на пачки по `SLUGS_CHUNK`.
      */
-    async readCatalogBySlugs(uid: string | null, slugs: readonly string[]): Promise<CatalogRead> {
+    async readCatalogBySlugs(slugs: readonly string[]): Promise<CatalogRead> {
       const states = new Map<string, LotState>();
       const sb = getSupabase();
       if (!sb) return { ok: false, states };
@@ -232,7 +226,7 @@ function supabaseReaders(): LiveReaders {
           sb.from(table).select(columns).in('slug', chunk)
         );
         if (!read.ok) return { ok: false, states: new Map() };
-        for (const [slug, state] of fillCatalog(read.rows, uid)) states.set(slug, state);
+        for (const [slug, state] of fillCatalog(read.rows)) states.set(slug, state);
       }
       return { ok: true, states };
     },
@@ -252,14 +246,14 @@ function supabaseReaders(): LiveReaders {
           .order('price', { ascending: true })
           .order('slug', { ascending: true })
       );
-      return { ok: read.ok, states: fillCatalog(read.rows, uid) };
+      return { ok: read.ok, states: fillCatalog(read.rows) };
     },
 
     /**
      * Один Лот (проекция модалки, свежая N перед записью). `maybeSingle` вместо
      * `single`: отсутствие строки — это null без ошибки, а не PostgREST 406.
      */
-    async readLot(slug: string, uid: string | null): Promise<LotStateRead> {
+    async readLot(slug: string): Promise<LotStateRead> {
       const sb = getSupabase();
       if (!sb) return { ok: false, state: null };
       try {
@@ -267,7 +261,7 @@ function supabaseReaders(): LiveReaders {
           sb.from(VIEW).select(VIEW_COLUMNS).eq('slug', slug).maybeSingle()
         );
         if (!fromView.error && fromView.data) {
-          return { ok: true, state: toLotState(fromView.data as unknown as LotRow, uid) };
+          return { ok: true, state: toLotState(fromView.data as unknown as LotRow) };
         }
       } catch {
         // вью нет — фолбэк ниже
@@ -277,7 +271,7 @@ function supabaseReaders(): LiveReaders {
           sb.from('lots').select(TABLE_COLUMNS).eq('slug', slug).maybeSingle()
         );
         if (!fromTable.error && fromTable.data) {
-          return { ok: true, state: toLotState(fromTable.data as unknown as LotRow, uid) };
+          return { ok: true, state: toLotState(fromTable.data as unknown as LotRow) };
         }
         if (!fromTable.error) return { ok: true, state: null };
         return { ok: false, state: null };
@@ -335,6 +329,19 @@ function balanceFromPayload(payload: LivePayload): number | null {
   return normalizeBalance(row['balance']);
 }
 
+/** Доменный факт тика `lots`: вставка несёт slug новорождённого Лота. */
+function insertedSlugFrom(payload: LivePayload): string | null {
+  if (payload.eventType !== 'INSERT') return null;
+  const slug = (payload.new ?? {})['slug'];
+  return typeof slug === 'string' && slug.length > 0 ? slug : null;
+}
+
+/** Доменный факт сделки: продавец из строки `purchases`, если он есть. */
+function sellerUidFrom(payload: LivePayload): string | null {
+  const seller = (payload.new ?? {})['seller_uid'];
+  return typeof seller === 'string' ? seller : null;
+}
+
 let wired = false;
 
 /** Поднять модуль: каналы, слушатели сессии и триггеры. Повторный вызов — noop. */
@@ -361,14 +368,15 @@ function ensureWired(): void {
   });
 
   // Тик лотов — каталог и цены (вью в Realtime-публикацию не входит, поэтому
-  // по событию перечитываем); payload нужен окну витрины для новых лотов.
+  // по событию перечитываем); доменный факт вставки — окну витрины.
   registry.subscribe({ table: 'lots', event: '*' }, (payload) => {
-    void store.reportLotsTick(payload);
+    const slug = insertedSlugFrom(payload);
+    void store.reportLotsTick({ insertedSlugs: slug === null ? [] : [slug] });
   });
-  registry.subscribe(
-    { table: 'purchases', event: 'INSERT' },
-    (payload) => void store.reportDeal(payload)
-  );
+  registry.subscribe({ table: 'purchases', event: 'INSERT' }, (payload) => {
+    const sellerUid = sellerUidFrom(payload);
+    void store.reportDeal(sellerUid === null ? {} : { sellerUid });
+  });
 
   // Триггеры перезапроса — у модуля: возврат на вкладку и фокус — один синк.
   if (typeof document !== 'undefined') {
@@ -407,7 +415,7 @@ export const live = {
   },
   balance: (): number | null => store.balance(),
   balanceKnown: (): boolean => store.balanceKnown(),
-  catalog: (): ReadonlyMap<string, LotState> => store.catalog(),
+  catalogMap: (): ReadonlyMap<string, LotState> => store.catalogMap(),
   catalogWindow: (): readonly LotState[] => store.catalogWindow(),
   catalogHasMore: (): boolean => store.catalogHasMore(),
   lot: (slug: string): LotState | null => store.lot(slug),

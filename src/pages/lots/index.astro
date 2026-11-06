@@ -207,7 +207,7 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
    *  для сортировки вставки. */
   function fillCard(card: HTMLElement, st: LotState): void {
     card.dataset.lotCard = st.slug;
-    fillLot(card, st, { balance: myBalance });
+    fillLot(card, st, { balance: myBalance, uid: live.uid() });
   }
 
   // slug → узел карточки: состав сетки решает `planGrid`, DOM — здесь.

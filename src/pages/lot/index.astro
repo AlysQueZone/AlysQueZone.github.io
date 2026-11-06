@@ -223,7 +223,7 @@ const base = import.meta.env.BASE_URL;
     // Слоты Лота (заголовок с эмоутами, видео с раскладкой кадра, бейджи,
     // кнопка) — общий lib/lot-view.ts; раскладку страницы (колонки, широкая
     // полоса) читает global.css по data-media-orientation.
-    fillLot(viewRoot, st, { balance: live.balance() });
+    fillLot(viewRoot, st, { balance: live.balance(), uid: live.uid() });
     // Автор привета — только в подробностях лота, в списках подписи нет.
     const author = st.suggested_by_login;
     toggle(authorEl, Boolean(author));
@@ -340,9 +340,13 @@ const base = import.meta.env.BASE_URL;
       void syncDetail();
     }
     // Пометки «ТВОЙ» зависят от сессии; скелетон ещё не вопрос — молчим.
-    if (change.kind === 'uid' && historyPager.state().loaded) renderHistory();
+    if (change.kind === 'uid') {
+      // «Твой» на карточке и в истории — селектор от uid, не флаг снапшота.
+      if (lastState) fillDetail(lastState);
+      if (historyPager.state().loaded) renderHistory();
+    }
     if (change.kind === 'balance' && lastState) {
-      fillLot(viewRoot, lastState, { balance: change.balance });
+      fillLot(viewRoot, lastState, { balance: change.balance, uid: live.uid() });
     }
   });
 

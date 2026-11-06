@@ -156,10 +156,10 @@ const base = import.meta.env.BASE_URL;
 
   /** Перекрасить показанные карточки из снапшота: набор не трогаем. */
   function repaint(): void {
-    const states = live.catalog();
+    const states = live.catalogMap();
     for (const [slug, card] of rendered) {
       const st = states.get(slug);
-      if (st) fillLot(card, st, { balance: myBalance });
+      if (st) fillLot(card, st, { balance: myBalance, uid: live.uid() });
     }
   }
 
@@ -181,7 +181,7 @@ const base = import.meta.env.BASE_URL;
     for (const slug of plan.keep) {
       const card = rendered.get(slug);
       const st = bySlug.get(slug);
-      if (card && st) fillLot(card, st, { balance: myBalance });
+      if (card && st) fillLot(card, st, { balance: myBalance, uid: live.uid() });
     }
 
     const added: HTMLElement[] = [];
@@ -189,7 +189,7 @@ const base = import.meta.env.BASE_URL;
       const fresh = tpl.content.firstElementChild;
       if (!(fresh instanceof HTMLElement)) break;
       const card = fresh.cloneNode(true) as HTMLElement;
-      fillLot(card, st, { balance: myBalance });
+      fillLot(card, st, { balance: myBalance, uid: live.uid() });
       rendered.set(st.slug, card);
       added.push(card);
     }
@@ -222,7 +222,8 @@ const base = import.meta.env.BASE_URL;
   }
 
   live.subscribe((change) => {
-    if (change.kind === 'catalog') render();
+    // Смена uid перекрашивает «Твой» без перечитывания каталога: флаг — селектор.
+    if (change.kind === 'catalog' || change.kind === 'uid') render();
     if (change.kind === 'balance') {
       myBalance = change.balance;
       repaint();

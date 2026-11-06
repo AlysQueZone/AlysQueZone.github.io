@@ -20,7 +20,6 @@ function lot(slug: string, price = 100, overrides: Partial<LotState> = {}): LotS
     owner_login: null,
     owner_uid: null,
     suggested_by_login: null,
-    mine: false,
     ...overrides,
   };
 }

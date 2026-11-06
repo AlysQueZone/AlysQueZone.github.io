@@ -17,16 +17,23 @@
 import { setTitleEmotes } from './emotes';
 import { fillVideo, initLotVideos, type MediaOrientation } from './lot-video';
 import { buyAvailability, formatStaged, writeBuyIntent } from './buy-intent';
-import type { LotState } from './live';
+import type { LotState } from './live-store-model';
 
 /** Адрес страницы Лота — один на все поверхности (`?id=` — slug). */
 export function lotUrl(slug: string): string {
   return `${import.meta.env.BASE_URL}lot/?id=${encodeURIComponent(slug)}`;
 }
 
+/** «Мой ли Лот»: единственное правило владения, флаг не хранится в состоянии. */
+export function isMine(st: LotState, uid: string | null): boolean {
+  return uid !== null && st.owner_uid === uid;
+}
+
 export interface LotViewOptions {
   /** Баланс — зеркало серверного гейта: не хватает — кнопка гаснет. */
   balance?: number | null;
+  /** uid текущей сессии: «Твой» и «Твой привет» считаются при отрисовке. */
+  uid?: string | null;
 }
 
 /**
@@ -36,6 +43,9 @@ export interface LotViewOptions {
  */
 export function fillLot(root: Element | null, st: LotState, opts: LotViewOptions = {}): void {
   if (!(root instanceof HTMLElement)) return;
+  // Флаг считается один раз на отрисовку: uid — часть представления, а не
+  // поле снапшота.
+  const mine = isMine(st, opts.uid ?? null);
 
   const link = root.querySelector('[data-lot-link]');
   if (link instanceof HTMLAnchorElement) link.href = lotUrl(st.slug);
@@ -55,8 +65,8 @@ export function fillLot(root: Element | null, st: LotState, opts: LotViewOptions
     }
   }
 
-  fillOwnerBadges(root, st);
-  fillBuyButton(root.querySelector('[data-buy-intent]'), st, opts.balance ?? null);
+  fillOwnerBadges(root, st, mine);
+  fillBuyButton(root.querySelector('[data-buy-intent]'), st, opts.balance ?? null, mine);
   // «Смотреть» — часть представления: поверхность не помнит второй шаг
   // (initLotVideos идемпотентен и не трогает уже навешенный клик).
   initLotVideos(root);
@@ -109,10 +119,10 @@ function removeSquareBlur(frame: HTMLElement): void {
  * Заполнить бейджи владельца над кадром — один контракт разметки на карточку
  * витрины и страницу Лота (`LotBadges`: data-owner-badge / data-free-badge /
  * data-mine-badge). Владелец — тёмный бейдж с короной, у свободного Лота
- * показан светлый «свободен»; «Твой» — по флагу mine. Отдельной строки с
+ * показан светлый «свободен»; «Твой» — по селектору isMine. Отдельной строки с
  * владельцем нет: как на витрине, так и в подробностях.
  */
-function fillOwnerBadges(root: ParentNode | null, st: LotState): void {
+function fillOwnerBadges(root: ParentNode | null, st: LotState, mine: boolean): void {
   if (!root) return;
   const owned = Boolean(st.owner_login);
   const owner = root.querySelector('[data-owner-badge]');
@@ -122,8 +132,8 @@ function fillOwnerBadges(root: ParentNode | null, st: LotState): void {
   }
   const free = root.querySelector('[data-free-badge]');
   if (free instanceof HTMLElement) free.classList.toggle('hidden', owned);
-  const mine = root.querySelector('[data-mine-badge]');
-  if (mine instanceof HTMLElement) mine.classList.toggle('hidden', !st.mine);
+  const mineBadge = root.querySelector('[data-mine-badge]');
+  if (mineBadge instanceof HTMLElement) mineBadge.classList.toggle('hidden', !mine);
 }
 
 /**
@@ -136,7 +146,12 @@ function fillOwnerBadges(root: ParentNode | null, st: LotState): void {
  * покупка невозможна), N неизвестна — «…» (намерение несёт price: null,
  * сервер посчитает сам).
  */
-function fillBuyButton(btn: Element | null, st: LotState, balance: number | null = null): void {
+function fillBuyButton(
+  btn: Element | null,
+  st: LotState,
+  balance: number | null = null,
+  mine = false
+): void {
   if (!(btn instanceof HTMLButtonElement)) return;
   const intent = {
     slug: st.slug,
@@ -149,9 +164,9 @@ function fillBuyButton(btn: Element | null, st: LotState, balance: number | null
   // Свой лот купить нельзя (перекуп у себя бессмыслен) — кнопка гаснет.
   // N неизвестна — не гасим по балансу: сравнить не с чем, решает сервер.
   const availability = buyAvailability(intent, balance);
-  const off = st.mine || availability === 'short';
+  const off = mine || availability === 'short';
   btn.disabled = off;
-  btn.textContent = st.mine
+  btn.textContent = mine
     ? 'Твой привет'
     : availability === 'short'
       ? `Не хватает · ${formatStaged(st.nextPrice)} 🍺`
