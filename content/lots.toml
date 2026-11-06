@@ -246,3 +246,9 @@ slug = "lot-sub-melkij-strateg-2"
 title = "Привет офлайн чатыку"
 price = 800
 video_url = "https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-sub-melkij-strateg-2.webm"
+
+[[lots]]
+slug = "lot-privet-bla-bla-remololpro"
+title = "Здраствуй бла-бла, aka remololpro"
+price = 800
+video_url = "https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-bla-bla-remololpro.webm"
