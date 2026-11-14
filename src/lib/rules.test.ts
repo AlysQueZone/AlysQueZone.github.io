@@ -14,10 +14,12 @@ import {
   commissionLine,
   commissionSplit,
   dailyCycleLine,
+  dailyMaxLine,
   dailyShortLine,
   gambaLine,
   growthLine,
   rewardLine,
+  startBalanceButtonLine,
   startBalanceLine,
 } from './rules';
 
@@ -90,8 +92,13 @@ describe('строки правил', () => {
     expect(line).not.toContain(String(DAILY_REWARDS[3]));
   });
 
-  it('startBalanceLine и gambaLine собираются из констант', () => {
+  it('dailyMaxLine — максимум цикла', () => {
+    expect(dailyMaxLine()).toBe(`Ежедневный вход: до ${Math.max(...DAILY_REWARDS)}`);
+  });
+
+  it('startBalanceLine, startBalanceButtonLine и gambaLine собираются из констант', () => {
     expect(startBalanceLine()).toBe(`Старт — ${START_BALANCE}`);
+    expect(startBalanceButtonLine()).toBe(`+${START_BALANCE} на старте`);
     expect(gambaLine()).toBe(`ставка ${GAMBA_STAKE} · ${GAMBA_DAILY_LIMIT} спинов в день`);
   });
 });

@@ -7,7 +7,8 @@
  * `public.royalty_rate()` (условие первых перекупов — `apply_purchase`),
  * бонус заявки — `public.pay_submission_reward()`, ежедневный вход —
  * `public.claim_daily()` (ставки из `daily_entry_boost`), гамба —
- * `public.spin_gamba` (`c_stake` / `c_daily_limit`), старт — `seed_opening`.
+ * `public.spin_gamba` (`c_stake` / `c_daily_limit`), старт —
+ * `public.start_balance()` (миграция `20261114120000_start_balance_3500.sql`).
  *
  * Рост цены здесь — только текст показа (`growthLine`); формула и вычисление
  * живут в `public.next_lot_price`, клиентской формулы нет (docs/adr/0007).
@@ -23,11 +24,14 @@ export const ROYALTY_PURCHASES = 3;
 /** Разовый бонус за принятый привет — зеркало public.pay_submission_reward(). */
 export const SUBMISSION_BONUS = 500;
 
-/** Стартовый баланс счёта — зеркало seed_opening. */
-export const START_BALANCE = 1000;
+/** Стартовый баланс счёта — зеркало public.start_balance(). */
+export const START_BALANCE = 3500;
 
 /** Награды ежедневного входа по дням цикла — зеркало claim_daily(). */
 export const DAILY_REWARDS = [200, 200, 250, 150, 200, 250, 500] as const;
+
+/** Максимум цикла — для витринной строки «до N». */
+const DAILY_MAX = Math.max(...DAILY_REWARDS);
 
 /** Фиксированная ставка Гамбы — зеркало c_stake в spin_gamba. */
 export const GAMBA_STAKE = 100;
@@ -97,13 +101,18 @@ export function dailyCycleLine(): string {
   const [first, second, third, ...rest] = DAILY_REWARDS;
   return (
     `Дни 1–3: ${first} / ${second} / ${third}. ` +
-    `Дальше: ${rest.join(' / ')} (7-й день), затем цикл заново. ${startBalanceLine()}`
+    `Дальше: ${rest.join(' / ')} (7-й день), затем цикл заново. ${startBalanceLine()}.`
   );
 }
 
 /** Компактная строка ежедневного входа для бегущей строки. */
 export function dailyShortLine(): string {
   return `вход ${DAILY_REWARDS.slice(0, 3).join(' / ')}…`;
+}
+
+/** Полная строка кнопки ежедневного входа для главной. */
+export function dailyMaxLine(): string {
+  return `Ежедневный вход: до ${DAILY_MAX}`;
 }
 
 /** Строка ставки и лимита Гамбы для окна и витрины. */
@@ -114,4 +123,9 @@ export function gambaLine(): string {
 /** Стартовый баланс для показа. */
 export function startBalanceLine(): string {
   return `Старт — ${START_BALANCE}`;
+}
+
+/** Короткая CTA-строка старта для кнопки на главной. */
+export function startBalanceButtonLine(): string {
+  return `+${START_BALANCE} на старте`;
 }

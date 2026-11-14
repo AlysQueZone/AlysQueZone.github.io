@@ -2,6 +2,8 @@
 
 Status: ready-for-agent
 
+> Историческая спека: актуальный канон чисел — `docs/agents/economy.md` (старт 3500).
+
 Тикет: [07-rules-numbers](../issues/07-rules-numbers.md)
 Ревью: [review.md](../review.md), карточка «Числа правил разбросаны по пяти файлам».
 

@@ -5,6 +5,7 @@ import LotCard from '@/components/LotCard.astro';
 import LotCardSkeleton from '@/components/LotCardSkeleton.astro';
 import BrandHeadline from '@/components/BrandHeadline.astro';
 import { ALYSQUE_WAUW } from '@/lib/emotes';
+import { dailyMaxLine, startBalanceButtonLine, startBalanceLine } from '@/lib/rules';
 
 const base = import.meta.env.BASE_URL;
 // Случайные приветы — 4 лота из случайной выборки БД (вью `random_lots`,
@@ -28,10 +29,10 @@ const base = import.meta.env.BASE_URL;
             ▶ К бирже
           </a>
           <button type="button" data-rules-button class="btn-arcade btn-arcade-ghost px-6 py-3">
-            +1000 на старте
+            {startBalanceButtonLine()}
           </button>
           <button type="button" data-rules-button class="btn-arcade btn-arcade-ghost px-6 py-3">
-            Ежедневный вход: до 500🍺
+            {dailyMaxLine()}🍺
           </button>
           <button type="button" data-rules-button class="btn-arcade btn-arcade-ghost px-6 py-3">
             📜 Правила биржи
@@ -71,7 +72,7 @@ const base = import.meta.env.BASE_URL;
       <li class="card-pixel p-5">
         <p class="font-display text-[10px] text-ember">02</p>
         <p class="mt-2 font-black uppercase">Жмёшь «купить за Пивкойны»</p>
-        <p class="mt-1 text-sm text-mist">Баланс в шапке, старт — 1000 Пивкойнов.</p>
+        <p class="mt-1 text-sm text-mist">Баланс в шапке. {startBalanceLine()} Пивкойнов.</p>
       </li>
       <li class="card-pixel p-5">
         <p class="font-display text-[10px] text-pivko">03</p>
