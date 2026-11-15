@@ -57,7 +57,7 @@
 - Supabase-схема / RLS / миграции / отладка → `docs/agents/supabase.md`.
 - Стандарты кода / стиль / импорты / рендер / тесты / SQL-гайд / `just` → `CODING_STANDARDS.md`.
 - Цвета / токены / типографика / компоненты → `DESIGN.md`.
-- Современная веб-платформа (`<dialog>`, popover, anchor positioning, container queries, view transitions, Baseline-фолбэки) → скилл `modern-web-guidance` (чужой: `npx skills add GoogleChrome/modern-web-guidance`, в гите нет); канон остаётся за ADR и `CODING_STANDARDS.md`.
+- Современная веб-платформа (`<dialog>`, popover, CWV, Baseline) → гайды скилла `modern-web-guidance` (паттерн и фолбэк); канон — ADR и `CODING_STANDARDS.md`.
 - Гамба-звуки / комиссия / рост цены / награда за привет / владение лотом → `docs/agents/economy.md`.
 - Новый звук колеса (`just sound-add`, манифест `content/sounds.toml`) → скилл `alysque-sound`.
 - Эмоуты / чат VOD / мемы / пасты / стата → `docs/agents/twitch-sources.md`.
