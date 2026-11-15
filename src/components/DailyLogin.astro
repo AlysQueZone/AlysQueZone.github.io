@@ -69,7 +69,7 @@
     daily.open();
     // Canvas — внутрь окна: top layer рисует его выше ::backdrop; в body
     // confetti оказалось бы под затемнением.
-    if (withConfetti && dailyDialog instanceof HTMLElement) boom(dailyDialog);
+    if (withConfetti && dailyDialog) boom(dailyDialog);
   }
 
   let busy = false;

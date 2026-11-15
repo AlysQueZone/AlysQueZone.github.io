@@ -116,8 +116,8 @@ const clapSound = s3Sound('clap.mp3');
   // display-mirror, source of truth — DB (см. выше).
   const LIMIT_LABEL = 'Лимит: 10 покупок за 10 минут';
 
-  // Цикл окна — общий модуль (Escape, клик-вне, фокус); здесь только показ
-  // содержимого и живые проекции, а на закрытии — снятие своего состояния.
+  // Цикл окна — общий lib/modal.ts поверх нативного `<dialog>`; здесь только
+  // показ содержимого и живые проекции, а на закрытии — снятие состояния.
   const buyModal = createModal(modal, {
     onOpen() {
       const intent = core.state().intent;
@@ -320,7 +320,10 @@ const clapSound = s3Sound('clap.mp3');
     });
   }
 
-  /** Эффекты ядра — единственное место, где состояние превращается в DOM/сеть. */
+  /** Эффекты ядра — единственное место, где состояние превращается в DOM/сеть.
+   *  Порядок `celebrate` → `close` важен: confetti и плашка живут в body под
+   *  `::backdrop`; `close` снимает окно синхронно, до кадра. После close ядро
+   *  теряет intent, поэтому сначала celebrate, потом close. */
   function applyEffects(effects: readonly BuyEffect[]): void {
     for (const effect of effects) {
       switch (effect.type) {
@@ -387,7 +390,7 @@ const clapSound = s3Sound('clap.mp3');
     if (btn instanceof HTMLButtonElement && btn.disabled) return;
     const intent = readBuyIntent(btn);
     if (!intent) return;
-    // Разметка окна статична; без неё открывать нечего (гард прежнего цикла).
+    // Разметка окна статична; без неё открывать нечего.
     if (!(modal && modalText && modalTitle)) return;
     // Без сессии — не уводим принудительно: открываем то же окно в гостевом
     // режиме, где CTA — вход через Twitch. Лот запоминается внутри неё.

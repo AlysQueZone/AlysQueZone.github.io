@@ -351,7 +351,7 @@ export function initOutbidNotice(): void {
 
   // Escape — свой, как у всплывающих уведомлений (docs/adr/0005): окна
   // обслуживает нативный `<dialog>`, и клавишу ему уступаем. Проверка
-  // `dialog[open]` в capture видит открытое окно до его close request;
+  // `dialog:modal` в capture видит открытое окно до его close request;
   // фокус из панели возвращаем на колокол.
   document.addEventListener(
     'keydown',

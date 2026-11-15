@@ -33,9 +33,12 @@ export interface ModalHandle {
 const supportsClosedBy =
   typeof HTMLDialogElement !== 'undefined' && 'closedBy' in HTMLDialogElement.prototype;
 
+/** Все окна модальные: `:modal` точнее `[open]` и совпадает с showModal(). */
+const OPEN_MODAL = 'dialog:modal';
+
 /** Открыто ли хоть одно окно: поверхности со своим Escape (колокол) уступают клавишу. */
 export function hasOpenModal(): boolean {
-  return typeof document !== 'undefined' && document.querySelector('dialog[open]') !== null;
+  return typeof document !== 'undefined' && document.querySelector(OPEN_MODAL) !== null;
 }
 
 if (typeof document !== 'undefined') {
@@ -46,9 +49,9 @@ if (typeof document !== 'undefined') {
     'keydown',
     (e) => {
       if (e.key !== 'Escape' || e.defaultPrevented) return;
-      if (document.querySelectorAll('dialog[open]').length < 2) return;
+      if (document.querySelectorAll(OPEN_MODAL).length < 2) return;
       const active = document.activeElement;
-      const top = active instanceof Element ? active.closest('dialog[open]') : null;
+      const top = active instanceof Element ? active.closest(OPEN_MODAL) : null;
       if (!(top instanceof HTMLDialogElement)) return;
       e.preventDefault();
       top.close();
@@ -78,14 +81,16 @@ export function createModal(root: Element | null, hooks: ModalHooks = {}): Modal
   }
   const dialog = root;
   /** Открывали ли окно: `onClose` должен сработать ровно один раз. */
-  let shown = false;
+  let openedByUs = false;
   /** Куда вернуть фокус: явный opener или активный элемент в момент открытия. */
   let back: HTMLElement | null = null;
 
-  function finish(): void {
+  function settleClosed(): void {
     // Поздний `close` после переоткрытия: окно уже снова открыто — не трогаем.
-    if (dialog.open || !shown) return;
-    shown = false;
+    if (dialog.open || !openedByUs) return;
+    openedByUs = false;
+    // Явный opener перекрывает нативный возврат: Safari не фокусирует кнопку
+    // кликом, поэтому нативный возврат ушёл бы в body.
     back?.focus();
     back = null;
     hooks.onClose?.();
@@ -94,7 +99,7 @@ export function createModal(root: Element | null, hooks: ModalHooks = {}): Modal
   function close(): void {
     if (!dialog.open) return;
     dialog.close();
-    finish();
+    settleClosed();
   }
 
   function openWindow(opener: HTMLElement | null = null): void {
@@ -102,8 +107,10 @@ export function createModal(root: Element | null, hooks: ModalHooks = {}): Modal
     // Открыватель — до showModal: фокус уже уедет в окно.
     back =
       opener ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+    // `returnValue` не используется (форм нет), но между открытиями он не должен течь.
+    dialog.returnValue = '';
     dialog.showModal();
-    shown = true;
+    openedByUs = true;
     hooks.onOpen?.();
   }
 
@@ -136,8 +143,8 @@ export function createModal(root: Element | null, hooks: ModalHooks = {}): Modal
 
   // Нативный Escape/back-жест и `closedby` закрывают окно мимо `close()`:
   // хук снимает состояние и здесь. Поздний `close` после переоткрытия
-  // отсекает `finish()`.
-  dialog.addEventListener('close', finish);
+  // отсекает `settleClosed()`.
+  dialog.addEventListener('close', settleClosed);
 
   return handle;
 }
