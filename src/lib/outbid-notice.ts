@@ -349,10 +349,10 @@ export function initOutbidNotice(): void {
     for (const ev of fresh) showOutbidNotice(ev);
   });
 
-  // Escape — свой, как у всплывающих уведомлений (docs/adr/0005): окна-диалоги
-  // обслуживает стек modal.ts. Слушаем в capture: стек висит на bubble и снимает
-  // верхнее окно раньше — иначе hasOpenModal() к нашей очереди уже пуст, и одно
-  // нажатие закрыло бы и окно, и панель. Фокус из панели возвращаем на колокол.
+  // Escape — свой, как у всплывающих уведомлений (docs/adr/0005): окна
+  // обслуживает нативный `<dialog>`, и клавишу ему уступаем. Проверка
+  // `dialog:modal` в capture видит открытое окно до его close request;
+  // фокус из панели возвращаем на колокол.
   document.addEventListener(
     'keydown',
     (e) => {

@@ -1,4 +1,9 @@
-/** Лёгкое confetti без зависимостей: взрыв в брендовых цветах канала. */
+/**
+ * Лёгкое confetti без зависимостей: взрыв в брендовых цветах канала.
+ *
+ * `host` — куда положить canvas: окно в top layer (ежедневный вход) или
+ * body. В body canvas оказался бы под `::backdrop` открытого окна.
+ */
 
 const COLORS = ['#F5C518', '#FF9E2C', '#FF4D6D', '#C2187B', '#3ECF6E', '#FFFFFF'];
 
@@ -13,14 +18,14 @@ interface Particle {
   vr: number;
 }
 
-export function boom(count = 120): void {
+export function boom(host: HTMLElement | null = null, count = 120): void {
   if (typeof document === 'undefined') return;
   const canvas = document.createElement('canvas');
   canvas.style.cssText =
     'position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:60';
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
-  document.body.appendChild(canvas);
+  (host ?? document.body).appendChild(canvas);
   const ctx = canvas.getContext('2d');
   if (!ctx) {
     canvas.remove();

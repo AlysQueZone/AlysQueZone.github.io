@@ -1,19 +1,19 @@
 ---
 // Общий компонент покупки:
-// модалка «Потратить N Пивкойнов?» + confetti + уведомления в тоне канала.
+// окно «Потратить N Пивкойнов?» + confetti + уведомления в тоне канала.
 //
 // Живёт в BaseLayout, а не на отдельной странице: кнопки возврата из колокола
-// (перекуп) видны на любой странице, включая /deals/, и должны открывать ту же
-// модалку. Кнопки покупки носят намерение в слоте data-buy-intent
+// (перекуп) видны на любой странице, включая /deals/, и должны открывать то же
+// окно. Кнопки покупки носят намерение в слоте data-buy-intent
 // (lib/buy-intent.ts, writeBuyIntent: slug/title/price/owner/video); клик по
-// кнопке с намерением сам откроет модалку — скрипт ниже делегированный.
+// кнопке с намерением сам откроет окно — скрипт ниже делегированный.
 // При покупке играет видео лота со звуком (видимо, в уведомлении); без video_url — clap с S3.
-// Гость (нет сессии): модалка открывается в гостевом режиме — CTA «Войти через
-// Twitch», без принудительного редиректа; после входа модалка вернётся к лоту.
+// Гость (нет сессии): окно открывается в гостевом режиме — CTA «Войти через
+// Twitch», без принудительного редиректа; после входа окно вернётся к лоту.
 // После покупки buyLot объявляет её модулю живых данных (lib/live.ts):
 // шапку, витрину, страницу лота и колокол обновляют его события.
-// Цикл окна (Escape / клик по затемнению / фокус) — общий lib/modal.ts:
-// показ и живые проекции — в onOpen, снятие состояния — в onClose.
+// Цикл окна — общий lib/modal.ts поверх нативного `<dialog>`: показ и живые
+// проекции — в onOpen, снятие состояния — в onClose.
 // Решения фаз и ошибок — в чистом lib/buy-core.ts; здесь разметка, тексты,
 // таймер, сеть, live-подписки и pending-buy.
 import { ALYSQUE_CLAP_DARK } from '@/lib/emotes';
@@ -23,52 +23,49 @@ import { s3Sound } from '@/lib/media';
 const clapSound = s3Sound('clap.mp3');
 ---
 
-<div
+<dialog
   id="buy-modal"
   data-clap-sound={clapSound}
-  class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4"
-  role="dialog"
-  aria-modal="true"
+  closedby="any"
   aria-labelledby="buy-modal-title"
-  tabindex="-1"
+  class="modal-dialog card-pixel max-w-sm p-5"
 >
-  <div class="card-pixel w-full max-w-sm p-5">
-    <div class="flex items-center gap-3">
-      <img
-        src={ALYSQUE_CLAP_DARK}
-        alt="alysqueCLAP"
-        width="56"
-        height="56"
-        loading="lazy"
-        class="h-14 w-14 shrink-0 border-2 border-milk object-contain"
-      />
-      <h3 id="buy-modal-title" class="font-display text-[11px] leading-relaxed uppercase">
-        Купить привет?
-      </h3>
-    </div>
-    <p id="buy-modal-text" class="mt-2 text-sm font-bold text-mist"></p>
-    <p id="buy-note" class="mt-2 hidden text-xs font-bold text-mist">
-      🔒 Войди через Twitch, чтобы забрать привет — вернёмся к нему после входа.
-    </p>
-    <div class="mt-4 flex flex-wrap gap-3">
-      <button
-        id="buy-modal-yes"
-        type="button"
-        class="btn-arcade btn-arcade-primary px-4 py-3 text-sm"
-      >
-        Да, забираю
-      </button>
-      <button
-        id="buy-modal-no"
-        type="button"
-        data-modal-close
-        class="btn-arcade btn-arcade-ghost px-4 py-3 text-sm text-mist"
-      >
-        Не, пойду на стрим
-      </button>
-    </div>
+  <div class="flex items-center gap-3">
+    <img
+      src={ALYSQUE_CLAP_DARK}
+      alt="alysqueCLAP"
+      width="56"
+      height="56"
+      loading="lazy"
+      class="h-14 w-14 shrink-0 border-2 border-milk object-contain"
+    />
+    <h3 id="buy-modal-title" class="font-display text-[11px] leading-relaxed uppercase">
+      Купить привет?
+    </h3>
   </div>
-</div>
+  <p id="buy-modal-text" class="mt-2 text-sm font-bold text-mist"></p>
+  <p id="buy-note" class="mt-2 hidden text-xs font-bold text-mist">
+    🔒 Войди через Twitch, чтобы забрать привет — вернёмся к нему после входа.
+  </p>
+  <div class="mt-4 flex flex-wrap gap-3">
+    <button
+      id="buy-modal-yes"
+      type="button"
+      autofocus
+      class="btn-arcade btn-arcade-primary px-4 py-3 text-sm"
+    >
+      Да, забираю
+    </button>
+    <button
+      id="buy-modal-no"
+      type="button"
+      data-modal-close
+      class="btn-arcade btn-arcade-ghost px-4 py-3 text-sm text-mist"
+    >
+      Не, пойду на стрим
+    </button>
+  </div>
+</dialog>
 
 <script>
   // Денег в клиенте нет: гейт «хватит/не хватит» — серверный (`insufficient
@@ -119,8 +116,8 @@ const clapSound = s3Sound('clap.mp3');
   // display-mirror, source of truth — DB (см. выше).
   const LIMIT_LABEL = 'Лимит: 10 покупок за 10 минут';
 
-  // Цикл окна — общий модуль (Escape, клик-вне, фокус); здесь только показ
-  // содержимого и живые проекции, а на закрытии — снятие своего состояния.
+  // Цикл окна — общий lib/modal.ts поверх нативного `<dialog>`; здесь только
+  // показ содержимого и живые проекции, а на закрытии — снятие состояния.
   const buyModal = createModal(modal, {
     onOpen() {
       const intent = core.state().intent;
@@ -312,7 +309,7 @@ const clapSound = s3Sound('clap.mp3');
     }, 1000);
   }
 
-  /** Кап окна: кнопка показывает лимит до закрытия модалки. */
+  /** Кап окна: кнопка показывает лимит до закрытия окна. */
   function showLimit(): void {
     window.clearInterval(pauseTimer);
     pauseTimer = undefined;
@@ -323,7 +320,10 @@ const clapSound = s3Sound('clap.mp3');
     });
   }
 
-  /** Эффекты ядра — единственное место, где состояние превращается в DOM/сеть. */
+  /** Эффекты ядра — единственное место, где состояние превращается в DOM/сеть.
+   *  Порядок `celebrate` → `close` важен: confetti и плашка живут в body под
+   *  `::backdrop`; `close` снимает окно синхронно, до кадра. После close ядро
+   *  теряет intent, поэтому сначала celebrate, потом close. */
   function applyEffects(effects: readonly BuyEffect[]): void {
     for (const effect of effects) {
       switch (effect.type) {
@@ -390,9 +390,9 @@ const clapSound = s3Sound('clap.mp3');
     if (btn instanceof HTMLButtonElement && btn.disabled) return;
     const intent = readBuyIntent(btn);
     if (!intent) return;
-    // Разметка модалки статична; без неё открывать нечего (гард прежнего цикла).
+    // Разметка окна статична; без неё открывать нечего.
     if (!(modal && modalText && modalTitle)) return;
-    // Без сессии — не уводим принудительно: открываем ту же модалку в гостевом
+    // Без сессии — не уводим принудительно: открываем то же окно в гостевом
     // режиме, где CTA — вход через Twitch. Лот запоминается внутри неё.
     let guest = false;
     const sb = getSupabase();
@@ -408,7 +408,7 @@ const clapSound = s3Sound('clap.mp3');
     const intent = core.state().intent;
     if (!intent) return;
     // Гостевой режим: кнопка — вход через Twitch. Запоминаем лот, чтобы после
-    // возврата модалка открылась снова уже для подтверждения покупки.
+    // возврата окно открылось снова уже для подтверждения покупки.
     if (core.state().phase === 'guest') {
       stashPendingBuy(intent.slug);
       await signInWithTwitch(returnUrlForLot(intent.slug));
@@ -431,7 +431,7 @@ const clapSound = s3Sound('clap.mp3');
       });
       return;
     }
-    // Сессия могла кончиться после открытия модалки — в гостевой режим, без
+    // Сессия могла кончиться после открытия окна — в гостевой режим, без
     // принудительного редиректа.
     const sb = getSupabase();
     if (!sb) return;
@@ -517,8 +517,8 @@ const clapSound = s3Sound('clap.mp3');
     });
   }
 
-  // Возврат из логина: Чатерс залогинен — переоткрыть модалку того
-  // же Лота. Лот не стираем, пока модалка не открылась, — иначе возврат теряется.
+  // Возврат из логина: Чатерс залогинен — переоткрыть окно того
+  // же Лота. Лот не стираем, пока окно не открылось, — иначе возврат теряется.
   void (async () => {
     const sb = getSupabase();
     if (!sb) return;
@@ -532,7 +532,7 @@ const clapSound = s3Sound('clap.mp3');
       btn.click();
       return;
     }
-    // Карточки на странице может не быть вовсе (/deals/, 404): модалка живёт
+    // Карточки на странице может не быть вовсе (/deals/, 404): окно живёт
     // в макете, поэтому открываем её по свежим данным лота, без кнопки-якоря.
     const st = await live.refreshLot(id);
     if (!st) return;

@@ -6,8 +6,9 @@
 //
 // Использование: положить <RulesModal /> на страницу с hero и повесить
 // data-rules-button на кнопку открытия — скрипт ниже делегированный.
-// Цикл (Escape / клик по затемнению / фокус) — общий lib/modal.ts; кнопки
-// «Понятно» и крестик носят data-modal-close.
+// Цикл окна — общий lib/modal.ts поверх нативного `<dialog>`: top layer,
+// Escape, удержание фокуса и клик-вне даёт браузер; кнопки «Понятно» и
+// крестик носят data-modal-close.
 import { GAMBA_PAYTABLE } from '@/lib/gamba';
 import {
   commissionLine,
@@ -27,78 +28,74 @@ const GAMBA_LINE = gambaLine();
 const DAILY_LINE = dailyCycleLine();
 ---
 
-<div
+<!-- 85vh ниже общего потолка `.modal-dialog`: правила не растягиваются на весь экран. -->
+<dialog
   id="rules-modal"
-  class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4"
-  role="dialog"
-  aria-modal="true"
+  closedby="any"
   aria-labelledby="rules-title"
-  tabindex="-1"
+  class="modal-dialog card-pixel max-h-[85vh] max-w-md p-5 text-left"
 >
-  <div class="card-pixel max-h-[85vh] w-full max-w-md overflow-y-auto p-5 text-left">
-    <div class="flex items-start justify-between gap-3">
-      <h3 id="rules-title" class="font-display text-[11px] leading-relaxed uppercase">
-        Правила биржи
-      </h3>
-      <button
-        type="button"
-        data-modal-close
-        aria-label="Закрыть правила"
-        class="btn-arcade btn-arcade-ghost min-w-11 shrink-0 px-3 py-1 text-sm"
-      >
-        ✕
-      </button>
-    </div>
-    <ul class="mt-4 flex flex-col gap-4 text-sm font-bold">
-      <li>
-        <p class="font-display text-[10px] uppercase text-ember">
-          Комиссия биржи {COMMISSION_PCT}%
-        </p>
-        <p class="mt-1 text-mist">{COMMISSION_LINE}</p>
-      </li>
-      <li>
-        <p class="font-display text-[10px] uppercase text-melon">Награда за принятый привет</p>
-        <p class="mt-1 text-mist">
-          Прислал привет, который взяли на биржу, — {REWARD_LINE}. Бонус приходит один раз при
-          принятии.
-        </p>
-      </li>
-      <li>
-        <p class="font-display text-[10px] uppercase text-stream">Рост цены</p>
-        <p class="mt-1 text-mist">{GROWTH_LINE}. Разгоняй первым — топы не улетают.</p>
-      </li>
-      <li>
-        <p class="font-display text-[10px] uppercase text-blush">Владелец лота</p>
-        <p class="mt-1 text-mist">
-          Лот, принятый по заявке, сразу принадлежит автору привета. Лот без владельца (от админа)
-          забирает первый покупатель. Дальше лот перекупают: выручку получает предыдущий владелец,
-          минус комиссия.
-        </p>
-      </li>
-      <li>
-        <p class="font-display text-[10px] uppercase text-pivko">Гамба · {GAMBA_LINE}</p>
-        <ul data-rules-gamba class="mt-1 flex flex-col gap-1 text-mist">
-          {GAMBA_PAYTABLE.map((row) => (
-            <li class="border-2 border-milk/60 bg-void px-2 py-1">
-              {row.label} — {row.chance}
-            </li>
-          ))}
-        </ul>
-      </li>
-      <li>
-        <p class="font-display text-[10px] uppercase text-pivko">Ежедневный вход</p>
-        <p class="mt-1 text-mist">{DAILY_LINE} Пропуск streak не сбрасывает.</p>
-      </li>
-    </ul>
+  <div class="flex items-start justify-between gap-3">
+    <h3 id="rules-title" class="font-display text-[11px] leading-relaxed uppercase">
+      Правила биржи
+    </h3>
     <button
       type="button"
       data-modal-close
-      class="btn-arcade btn-arcade-primary mt-5 w-full px-4 py-3 text-sm"
+      autofocus
+      aria-label="Закрыть правила"
+      class="btn-arcade btn-arcade-ghost min-w-11 shrink-0 px-3 py-1 text-sm"
     >
-      Понятно
+      ✕
     </button>
   </div>
-</div>
+  <ul class="mt-4 flex flex-col gap-4 text-sm font-bold">
+    <li>
+      <p class="font-display text-[10px] uppercase text-ember">Комиссия биржи {COMMISSION_PCT}%</p>
+      <p class="mt-1 text-mist">{COMMISSION_LINE}</p>
+    </li>
+    <li>
+      <p class="font-display text-[10px] uppercase text-melon">Награда за принятый привет</p>
+      <p class="mt-1 text-mist">
+        Прислал привет, который взяли на биржу, — {REWARD_LINE}. Бонус приходит один раз при
+        принятии.
+      </p>
+    </li>
+    <li>
+      <p class="font-display text-[10px] uppercase text-stream">Рост цены</p>
+      <p class="mt-1 text-mist">{GROWTH_LINE}. Разгоняй первым — топы не улетают.</p>
+    </li>
+    <li>
+      <p class="font-display text-[10px] uppercase text-blush">Владелец лота</p>
+      <p class="mt-1 text-mist">
+        Лот, принятый по заявке, сразу принадлежит автору привета. Лот без владельца (от админа)
+        забирает первый покупатель. Дальше лот перекупают: выручку получает предыдущий владелец,
+        минус комиссия.
+      </p>
+    </li>
+    <li>
+      <p class="font-display text-[10px] uppercase text-pivko">Гамба · {GAMBA_LINE}</p>
+      <ul data-rules-gamba class="mt-1 flex flex-col gap-1 text-mist">
+        {GAMBA_PAYTABLE.map((row) => (
+          <li class="border-2 border-milk/60 bg-void px-2 py-1">
+            {row.label} — {row.chance}
+          </li>
+        ))}
+      </ul>
+    </li>
+    <li>
+      <p class="font-display text-[10px] uppercase text-pivko">Ежедневный вход</p>
+      <p class="mt-1 text-mist">{DAILY_LINE} Пропуск streak не сбрасывает.</p>
+    </li>
+  </ul>
+  <button
+    type="button"
+    data-modal-close
+    class="btn-arcade btn-arcade-primary mt-5 w-full px-4 py-3 text-sm"
+  >
+    Понятно
+  </button>
+</dialog>
 
 <script>
   import { fetchGambaPaytable, type GambaPayRow } from '@/lib/gamba';
