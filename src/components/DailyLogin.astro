@@ -4,15 +4,45 @@
 // вызывает claim_daily (см. src/lib/daily.ts) — один раз в день: сначала
 // сверка со статусом/датой последнего клейма, лишних вызовов нет. Факт
 // выдачи показывает окно ежедневного входа «+N, день M (из 7)» с confetti:
-// кнопка «Ок» + крестик + клик вне + Escape, без автотаймера; цикл окна —
-// общий lib/modal.ts (окно строится динамически и живёт до закрытия).
-// Гость без сессии ничего не получает и не видит. Серверный claim_daily
-// не меняется.
+// кнопка «Ок» + крестик + клик вне + Escape, без автотаймера. Окно — статичный
+// `<dialog>`; цикл — общий lib/modal.ts, confetti монтируется внутрь окна,
+// чтобы top layer не прятал его под ::backdrop. Гость без сессии ничего не
+// получает и не видит. Серверный claim_daily не меняется.
 //
 // Использование: положить <DailyLogin /> в шапку (видимого места не занимает).
 ---
 
 <div id="daily-notice-root" aria-live="polite"></div>
+
+<dialog
+  id="daily-modal"
+  closedby="any"
+  aria-labelledby="daily-title"
+  class="modal-dialog card-pixel max-w-sm p-5 text-center"
+>
+  <div class="flex items-start justify-between gap-3">
+    <h3 id="daily-title" class="font-display text-[11px] leading-relaxed uppercase">
+      Ежедневный вход
+    </h3>
+    <button
+      type="button"
+      data-modal-close
+      aria-label="Закрыть"
+      class="btn-arcade btn-arcade-ghost min-w-11 shrink-0 px-3 py-1 text-sm"
+    >
+      ✕
+    </button>
+  </div>
+  <p id="daily-text" class="mt-3 text-lg font-black break-words whitespace-normal"></p>
+  <button
+    type="button"
+    data-modal-close
+    autofocus
+    class="btn-arcade btn-arcade-primary mt-4 px-8 py-2 text-sm"
+  >
+    Ок
+  </button>
+</dialog>
 
 <script>
   import { getSupabase } from '@/lib/session';
@@ -26,65 +56,20 @@
     todayUtcDate,
   } from '@/lib/daily';
   import { boom } from '@/lib/confetti';
-  import { createModal, type ModalHandle } from '@/lib/modal';
+  import { createModal } from '@/lib/modal';
   import { errorText } from '@/lib/errors';
 
-  /** Живое окно входа: прежнее закрываем через цикл, а не сносом узла, —
-   *  иначе запись осталась бы в стеке модуля и перехватывала Escape/Tab. */
-  let dailyModal: ModalHandle | null = null;
+  const dailyDialog = document.getElementById('daily-modal');
+  const dailyText = document.getElementById('daily-text');
+  const daily = createModal(dailyDialog);
 
   function showDailyWindow(text: string, withConfetti: boolean): void {
-    dailyModal?.close();
-    // Оверлей кладём в body: <DailyLogin /> живёт в шапке с backdrop-blur,
-    // а он ломает fixed-позиционирование потомков (окно прилипало к верху).
-    const overlay = document.createElement('div');
-    overlay.dataset.dailyNotice = '1';
-    overlay.setAttribute('role', 'dialog');
-    overlay.setAttribute('aria-modal', 'true');
-    overlay.setAttribute('aria-label', 'Ежедневный вход');
-    overlay.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4';
-    const box = document.createElement('div');
-    box.className = 'card-pixel w-full max-w-sm p-5 text-center';
-    const headRow = document.createElement('div');
-    headRow.className = 'flex items-start justify-between gap-3';
-    const title = document.createElement('h3');
-    title.className = 'font-display text-[11px] leading-relaxed uppercase';
-    title.textContent = 'Ежедневный вход';
-    const cross = document.createElement('button');
-    cross.type = 'button';
-    cross.setAttribute('aria-label', 'Закрыть');
-    cross.className = 'btn-arcade btn-arcade-ghost min-w-11 shrink-0 px-3 py-1 text-sm';
-    cross.textContent = '✕';
-    cross.setAttribute('data-modal-close', '');
-    headRow.append(title, cross);
-    const body = document.createElement('p');
-    body.className = 'mt-3 text-lg font-black break-words whitespace-normal';
-    body.textContent = text;
-    const ok = document.createElement('button');
-    ok.type = 'button';
-    ok.className = 'btn-arcade btn-arcade-primary mt-4 px-8 py-2 text-sm';
-    ok.textContent = 'Ок';
-    ok.setAttribute('data-modal-close', '');
-    box.append(headRow, body, ok);
-    overlay.appendChild(box);
-    document.body.appendChild(overlay);
-    // Окно живёт до закрытия: Escape, клик-вне и ловушка фокуса — общий
-    // lib/modal.ts; после закрытия узел убираем. Слушатели модуля висят на
-    // самом оверлее, поэтому клик, которым открыли окно, его не закроет —
-    // отложка на тик не нужна.
-    const daily = createModal(overlay, {
-      onOpen() {
-        // Фокус — на главное действие, а не на крестик.
-        ok.focus();
-      },
-      onClose() {
-        overlay.remove();
-        dailyModal = null;
-      },
-    });
-    dailyModal = daily;
-    if (withConfetti) boom();
-    daily?.open();
+    if (dailyText) dailyText.textContent = text;
+    if (!daily) return;
+    daily.open();
+    // Canvas — внутрь окна: top layer рисует его выше ::backdrop; в body
+    // confetti оказалось бы под затемнением.
+    if (withConfetti && dailyDialog instanceof HTMLElement) boom(dailyDialog);
   }
 
   let busy = false;

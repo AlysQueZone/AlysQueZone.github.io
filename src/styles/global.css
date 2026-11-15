@@ -104,6 +104,28 @@ html[data-plaska='on'] main {
     box-shadow: 6px 6px 0 var(--color-legend);
   }
 
+  /* Окно — сам `<dialog>` (card-pixel): ширина с полями, центрирование и
+     прокрутка живут на нём, а не на внутреннем div. `::backdrop` — затемнение
+     страницы; overflow/overscroll на обоих не дают прокрутке уходить на
+     страницу под окном — docs/adr/0008. */
+  .modal-dialog {
+    width: calc(100% - 2rem);
+    max-width: none;
+    max-height: calc(100dvh - 1rem);
+    margin: auto;
+    padding: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    color: inherit;
+  }
+
+  .modal-dialog::backdrop {
+    background-color: color-mix(in srgb, black 60%, transparent);
+    overflow: hidden;
+    overscroll-behavior: contain;
+  }
+
   /* Рамка кадра лота (карточка витрины и страница лота): пропорцию задаёт
      утилита рядом (`aspect-[77/136]` — карточка, `aspect-square` — лот).
      Один класс на оба места: геометрия кадра не разъезжается. */
