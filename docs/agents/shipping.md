@@ -4,6 +4,8 @@
 
 `agent-browser` — системная программа (пакетом в проекте не стоит), нужна версия 0.41+ и браузер: на этой машине CLI сам находит `/usr/bin/chromium`. Готовность — `agent-browser doctor --offline --quick`. Цикл: поднять `just preview` (фиксированный `4321`; чужой сервер на порту — ошибка с PID, а не тихий уход на `4322`), затем `export AGENT_BROWSER_SESSION="$(agent-browser session id --scope worktree --prefix <задача>)"` → `open http://localhost:4321/` → `snapshot -i` → `click/fill @eN` (после каждого изменения страницы заново `snapshot -i`, рефы протухают). В конце `close` + `just preview-stop`. Справочник — в самом CLI (`--help`, `skills get core --full`).
 
+`just preview` под агентом возвращается сразу — это не ошибка: с Astro 7 `astro dev`/`astro preview` сами уходят в фон, когда их запускает агент (детект `am-i-vibing`, OpenCode распознаётся), в stdout приходит JSON с pid, а сервер живёт отдельным процессом и пишет `.astro/preview.json`. Готовность проверяй запросом (`curl -fs http://localhost:4321/`; в dev есть `/_astro/status` → `{"ok":true}`, в preview его нет), состояние — `astro preview status`, остановка — прежняя `just preview-stop`. Запуск человеком из терминала остаётся в форграунде; вернуть такое поведение — `ASTRO_PREVIEW_BACKGROUND=0` / `ASTRO_DEV_BACKGROUND=0`.
+
 Готово, когда: браузер закрыт, `just preview-stop` выполнен.
 
 ## Состояния и ошибки
