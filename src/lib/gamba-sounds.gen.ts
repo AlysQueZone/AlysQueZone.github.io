@@ -41,5 +41,6 @@ export const GAMBA_SOUND_POOLS_FALLBACK = {
     'gamba-lose-pivka.mp3',
     'gamba-lose-proigrala-zhopu.mp3',
     'gamba-lose-dengi-na-pivo.mp3',
+    'gamba-lose-nyaa.mp3',
   ],
 } as const;

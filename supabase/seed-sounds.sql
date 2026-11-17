@@ -33,5 +33,6 @@ insert into public.gamba_sounds (pool, file) values
   ('lose', 'gamba-lose-higan.mp3'),
   ('lose', 'gamba-lose-pivka.mp3'),
   ('lose', 'gamba-lose-proigrala-zhopu.mp3'),
-  ('lose', 'gamba-lose-dengi-na-pivo.mp3')
+  ('lose', 'gamba-lose-dengi-na-pivo.mp3'),
+  ('lose', 'gamba-lose-nyaa.mp3')
 on conflict (pool, file) do nothing;

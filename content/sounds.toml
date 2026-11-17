@@ -141,3 +141,7 @@ file = "gamba-lose-proigrala-zhopu.mp3"
 [[sounds]]
 pool = "lose"
 file = "gamba-lose-dengi-na-pivo.mp3"
+
+[[sounds]]
+pool = "lose"
+file = "gamba-lose-nyaa.mp3"
