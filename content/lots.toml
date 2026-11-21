@@ -252,3 +252,9 @@ slug = "lot-privet-bla-bla-remololpro"
 title = "Здраствуй бла-бла, aka remololpro"
 price = 800
 video_url = "https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-bla-bla-remololpro.webm"
+
+[[lots]]
+slug = "lot-privet-vandalpivnoibochonokque"
+title = "Привет VandaLPivnoiBochonoKQuE"
+price = 800
+video_url = "https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-vandalpivnoibochonokque.webm"

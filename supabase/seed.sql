@@ -42,5 +42,6 @@ insert into public.lots (slug, title, price, video_url) values
   ('lot-privet-vandalque', 'Привет VandaLQuE', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-vandalque.webm'),
   ('lot-privet-virratu', 'Привет Virratu', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-virratu.webm'),
   ('lot-sub-melkij-strateg-2', 'Привет офлайн чатыку', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-sub-melkij-strateg-2.webm'),
-  ('lot-privet-bla-bla-remololpro', 'Здраствуй бла-бла, aka remololpro', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-bla-bla-remololpro.webm')
+  ('lot-privet-bla-bla-remololpro', 'Здраствуй бла-бла, aka remololpro', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-bla-bla-remololpro.webm'),
+  ('lot-privet-vandalpivnoibochonokque', 'Привет VandaLPivnoiBochonoKQuE', 800, 'https://wsunalldyhuwfhlzwpyp.supabase.co/storage/v1/object/public/media/videos/lot-privet-vandalpivnoibochonokque.webm')
 on conflict (slug) do nothing;
