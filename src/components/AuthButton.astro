@@ -1,6 +1,7 @@
 ---
 // Шапка-вход через Twitch:
-// «Войти через Twitch» гостю / логин + «Выйти» Чатерсу.
+// «Войти через Twitch» гостю / ник-ссылка в свой профиль Чатерсу.
+// «Выйти» в шапке нет — оно в паспорте своего профиля (src/pages/profile).
 // Сессия долгая (persist + авторефреш, см. src/lib/session.ts).
 // Термины — из GLOSSARY.md, тон — как на сайте.
 ---
@@ -10,30 +11,22 @@
     ▶ Войти через Twitch
   </button>
   <span data-auth-user-wrap class="hidden items-center gap-2">
-    <span
+    <a
       data-auth-user
-      class="chip-arcade max-w-36 truncate bg-void px-4 py-2 text-sm"
-      title="Ты на бирже, чатерс"
-    ></span>
-    <button
-      type="button"
-      data-auth-logout
-      class="btn-arcade btn-arcade-ghost px-4 py-2 text-sm text-mist"
-    >
-      Выйти
-    </button>
+      class="btn-arcade btn-arcade-ghost max-w-36 cursor-pointer truncate px-4 py-2 text-sm"
+    ></a>
   </span>
   <p data-auth-hint class="hidden text-xs font-bold text-melon"></p>
 </div>
 
 <script>
-  import { getSupabase, displayLogin, signInWithTwitch, signOut } from '@/lib/session';
+  import { getSupabase, displayLogin, signInWithTwitch } from '@/lib/session';
+  import { nickLink } from '@/lib/header';
 
   const root = document.querySelector('[data-auth]');
   const loginBtn = root?.querySelector('[data-auth-login]');
   const userWrap = root?.querySelector('[data-auth-user-wrap]');
   const userEl = root?.querySelector('[data-auth-user]');
-  const logoutBtn = root?.querySelector('[data-auth-logout]');
   const hint = root?.querySelector('[data-auth-hint]');
 
   function showHint(text: string): void {
@@ -42,19 +35,24 @@
     hint.classList.remove('hidden');
   }
 
-  function render(login: string | null): void {
-    const authed = login !== null;
-    loginBtn?.classList.toggle('hidden', authed);
-    userWrap?.classList.toggle('hidden', !authed);
-    userWrap?.classList.toggle('flex', authed);
-    if (authed && userEl) userEl.textContent = `@${login}`;
+  function render(login: string | null, uid: string | null): void {
+    const nick = nickLink({ login, uid });
+    loginBtn?.classList.toggle('hidden', nick.signedIn);
+    userWrap?.classList.toggle('hidden', !nick.signedIn);
+    userWrap?.classList.toggle('flex', nick.signedIn);
+    if (!(userEl instanceof HTMLAnchorElement)) return;
+    if (nick.signedIn) userEl.textContent = nick.text;
+    // Выход убирает адрес: ник без uid ссылкой не становится.
+    if (nick.href) userEl.setAttribute('href', nick.href);
+    else userEl.removeAttribute('href');
   }
 
   async function refresh(): Promise<void> {
     const sb = getSupabase();
     if (!sb) return;
     const { data } = await sb.auth.getSession();
-    render(data.session ? displayLogin(data.session.user) : null);
+    const user = data.session?.user ?? null;
+    render(user ? displayLogin(user) : null, user?.id ?? null);
   }
 
   loginBtn?.addEventListener('click', async () => {
@@ -65,18 +63,14 @@
     await signInWithTwitch();
   });
 
-  logoutBtn?.addEventListener('click', async () => {
-    await signOut();
-    render(null);
-  });
-
   const sb = getSupabase();
   if (!sb) {
     loginBtn?.setAttribute('title', 'Вход спит: не вбиты PUBLIC_SUPABASE_* (см. .env.example)');
   } else {
     void refresh();
     sb.auth.onAuthStateChange((_event, session) => {
-      render(session ? displayLogin(session.user) : null);
+      const user = session?.user ?? null;
+      render(user ? displayLogin(user) : null, user?.id ?? null);
     });
   }
 </script>
