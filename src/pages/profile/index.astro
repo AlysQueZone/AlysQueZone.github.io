@@ -20,216 +20,214 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
   title="Профиль чатерса — AlysQueZone"
   description="Публичный профиль чатерса биржи приветов: баланс, «Баланс + приветы» и приветы во владении."
 >
-  <div data-profile-root>
-    <!-- Скринридеру: «Загружаю…» и смену состояний объявляем всегда — даже
+  <!-- Скринридеру: «Загружаю…» и смену состояний объявляем всегда — даже
          когда сам паспорт скрыт («не найден» / «не загрузилось»). -->
-    <p data-profile-status class="sr-only" role="status">
-      Загружаю профиль…
-    </p>
-    <div
-      data-profile-shell
-      class="grid grid-cols-1 gap-4 md:grid-cols-[280px_minmax(0,1fr)] md:items-start"
-    >
-      <aside data-profile-passport class="card-pixel p-4 md:sticky md:top-24" aria-label="Паспорт">
-        <!-- Скелетон повторяет геометрию паспорта: квадрат, ник, дата, три
+  <p data-profile-status class="sr-only" role="status">
+    Загружаю профиль…
+  </p>
+  <div
+    data-profile-shell
+    class="grid grid-cols-1 gap-4 md:grid-cols-[280px_minmax(0,1fr)] md:items-start"
+  >
+    <aside data-profile-passport class="card-pixel p-4 md:sticky md:top-24" aria-label="Паспорт">
+      <!-- Скелетон повторяет геометрию паспорта: квадрат, ник, дата, три
              строки статов и кнопка. После первого ответа сносится целиком. -->
-        <div data-profile-skeleton aria-hidden="true">
-          <div class="skeleton-block mx-auto h-16 w-16"></div>
-          <div class="skeleton-block mx-auto mt-3 h-7 w-32"></div>
-          <div class="skeleton-block mx-auto mt-2 h-4 w-44"></div>
-          <dl class="mt-4 flex flex-col text-sm">
-            <div class="flex items-center justify-between border-b-2 border-milk/15 py-2">
-              <dt>
-                <span class="skeleton-block block h-4 w-20"></span>
-              </dt>
-              <dd>
-                <span class="skeleton-block block h-5 w-24"></span>
-              </dd>
-            </div>
-            <div class="flex items-center justify-between border-b-2 border-milk/15 py-2">
-              <dt>
-                <span class="skeleton-block block h-4 w-28"></span>
-              </dt>
-              <dd>
-                <span class="skeleton-block block h-5 w-24"></span>
-              </dd>
-            </div>
-            <div class="flex items-center justify-between border-b-2 border-milk/15 py-2">
-              <dt>
-                <span class="skeleton-block block h-4 w-20"></span>
-              </dt>
-              <dd>
-                <span class="skeleton-block block h-5 w-10"></span>
-              </dd>
-            </div>
-          </dl>
-          <div class="skeleton-block mt-4 h-11 w-full"></div>
-        </div>
-
-        <div data-profile-ready class="hidden">
-          <div
-            data-profile-initials
-            class="mx-auto grid h-16 w-16 place-items-center border-[3px] border-milk bg-pivko font-display text-sm text-cream shadow-[4px_4px_0_var(--color-milk)]"
-            aria-hidden="true"
-          >
-            ?
+      <div data-profile-skeleton aria-hidden="true">
+        <div class="skeleton-block mx-auto h-16 w-16"></div>
+        <div class="skeleton-block mx-auto mt-3 h-7 w-32"></div>
+        <div class="skeleton-block mx-auto mt-2 h-4 w-44"></div>
+        <dl class="mt-4 flex flex-col text-sm">
+          <div class="flex items-center justify-between border-b-2 border-milk/15 py-2">
+            <dt>
+              <span class="skeleton-block block h-4 w-20"></span>
+            </dt>
+            <dd>
+              <span class="skeleton-block block h-5 w-24"></span>
+            </dd>
           </div>
-          <h1 data-profile-login class="font-display mt-3 text-center text-lg break-all uppercase">
-            @чатерс
-          </h1>
-          <p data-profile-joined class="mt-1 text-center text-sm text-mist">
-            На бирже с …
-          </p>
-          <dl class="mt-4 flex flex-col text-sm">
-            <div class="flex items-center justify-between gap-3 border-b-2 border-milk/15 py-2">
-              <dt class="text-mist">Баланс</dt>
-              <dd class="font-black text-pivko">
-                <span data-profile-balance>—</span>
-                <span aria-hidden="true">🍺</span>
-              </dd>
-            </div>
-            <div class="flex items-center justify-between gap-3 border-b-2 border-milk/15 py-2">
-              <dt class="text-mist" title="Баланс и текущая стоимость приветов">
-                Баланс + приветы
-              </dt>
-              <dd class="font-black">
-                <span data-profile-capital>—</span>
-                <span aria-hidden="true">🍺</span>
-              </dd>
-            </div>
-            <div class="flex items-center justify-between gap-3 border-b-2 border-milk/15 py-2">
-              <dt class="text-mist">Приветов</dt>
-              <dd class="font-black" data-profile-lots-count>
-                —
-              </dd>
-            </div>
-          </dl>
-          <!-- «Выйти» — только в своём паспорте. Место кнопки держим всегда
-               (invisible), иначе чужой/свой профиль меняли бы высоту паспорта. -->
-          <button
-            type="button"
-            data-profile-logout
-            class="btn-arcade btn-arcade-ghost invisible mt-4 w-full px-3 py-2 text-xs text-mist"
-          >
-            Выйти
-          </button>
-        </div>
-      </aside>
+          <div class="flex items-center justify-between border-b-2 border-milk/15 py-2">
+            <dt>
+              <span class="skeleton-block block h-4 w-28"></span>
+            </dt>
+            <dd>
+              <span class="skeleton-block block h-5 w-24"></span>
+            </dd>
+          </div>
+          <div class="flex items-center justify-between border-b-2 border-milk/15 py-2">
+            <dt>
+              <span class="skeleton-block block h-4 w-20"></span>
+            </dt>
+            <dd>
+              <span class="skeleton-block block h-5 w-10"></span>
+            </dd>
+          </div>
+        </dl>
+        <div class="skeleton-block mt-4 h-11 w-full"></div>
+      </div>
 
-      <div class="min-w-0">
-        <!-- Приветы владельца: страницы по 12 (lib/catalog-page.ts), компактные
+      <div data-profile-ready class="hidden">
+        <div
+          data-profile-initials
+          class="mx-auto grid h-16 w-16 place-items-center border-[3px] border-milk bg-pivko font-display text-sm text-cream shadow-[4px_4px_0_var(--color-milk)]"
+          aria-hidden="true"
+        >
+          ?
+        </div>
+        <h1 data-profile-login class="font-display mt-3 text-center text-lg break-all uppercase">
+          @чатерс
+        </h1>
+        <p data-profile-joined class="mt-1 text-center text-sm text-mist">
+          На бирже с …
+        </p>
+        <dl class="mt-4 flex flex-col text-sm">
+          <div class="flex items-center justify-between gap-3 border-b-2 border-milk/15 py-2">
+            <dt class="text-mist">Баланс</dt>
+            <dd class="font-black text-pivko">
+              <span data-profile-balance>—</span>
+              <span aria-hidden="true">🍺</span>
+            </dd>
+          </div>
+          <div class="flex items-center justify-between gap-3 border-b-2 border-milk/15 py-2">
+            <dt class="text-mist" title="Баланс и текущая стоимость приветов">
+              Баланс + приветы
+            </dt>
+            <dd class="font-black">
+              <span data-profile-capital>—</span>
+              <span aria-hidden="true">🍺</span>
+            </dd>
+          </div>
+          <div class="flex items-center justify-between gap-3 border-b-2 border-milk/15 py-2">
+            <dt class="text-mist">Приветов</dt>
+            <dd class="font-black" data-profile-lots-count>
+              —
+            </dd>
+          </div>
+        </dl>
+        <!-- «Выйти» — только в своём паспорте. Место кнопки держим всегда
+               (invisible), иначе чужой/свой профиль меняли бы высоту паспорта. -->
+        <button
+          type="button"
+          data-profile-logout
+          class="btn-arcade btn-arcade-ghost invisible mt-4 w-full px-3 py-2 text-xs text-mist"
+        >
+          Выйти
+        </button>
+      </div>
+    </aside>
+
+    <div class="min-w-0">
+      <!-- Приветы владельца: страницы по 12 (lib/catalog-page.ts), компактные
              карточки K1 (LotCardCompact), покупка — общая модалка (BaseLayout).
              Секция включается, когда uid разобран; скелетоны держат геометрию
              до первого ответа. Покупки — соседняя секция ниже. -->
-        <section id="profile-lots" data-profile-lots hidden aria-label="Приветы">
-          <h2 class="font-display text-xs uppercase">Приветы</h2>
-          <p data-lots-note class="mt-3 hidden text-sm font-bold text-mist"></p>
-          <p data-lots-status class="sr-only" role="status">
-            Загружаю приветы…
-          </p>
-          <div data-lots-grid class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {Array.from({ length: CATALOG_PAGE_SIZE }, () => (
-              <LotCardCompactSkeleton />
-            ))}
-          </div>
-          <div data-lots-more class="mt-4 hidden">
-            <div class="flex flex-col items-center gap-2">
-              <button
-                type="button"
-                class="btn-arcade btn-arcade-ghost px-5 py-2 text-sm"
-                data-lots-more-btn
-              >
-                Показать ещё
-              </button>
-              <p data-lots-more-status class="text-sm font-bold text-mist" role="status"></p>
-            </div>
-          </div>
-          <p data-lots-end class="mt-4 hidden text-center text-sm font-bold text-mist">
-            Это все приветы
-          </p>
-        </section>
-
-        <section
-          id="profile-purchases"
-          data-profile-purchases
-          hidden
-          aria-label="История покупок"
-          class="mt-8"
-        >
-          <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-            <h2 class="font-display text-lg uppercase">История покупок</h2>
-            <a
-              data-profile-purchases-more
-              class="hidden text-sm font-bold text-pivko hover:text-ember"
-              href="#"
-            >
-              Вся история →
-            </a>
-          </div>
-          <p data-profile-purchases-status class="sr-only" role="status"></p>
-
-          <!-- Скелетон повторяет строку покупки: дата, название, цена. -->
-          <div data-profile-purchases-skeleton aria-hidden="true" class="mt-3 flex flex-col gap-2">
-            {Array.from({ length: 5 }, () => (
-              <div class="flex items-baseline gap-3 border-2 border-milk/15 px-3 py-2">
-                <div class="skeleton-block h-3 w-20"></div>
-                <div class="skeleton-block h-4 flex-1"></div>
-                <div class="skeleton-block h-3 w-16"></div>
-              </div>
-            ))}
-          </div>
-
-          <ul data-profile-purchases-list class="mt-3 hidden flex-col gap-2"></ul>
-
-          <p data-profile-purchases-empty class="mt-3 hidden text-sm font-bold text-mist">
-            Покупок пока нет
-          </p>
-
-          <div data-profile-purchases-error class="card-pixel mt-3 hidden p-4">
-            <p class="text-sm font-bold text-mist">
-              История покупок не загрузилась — проверь связь и попробуй ещё.
-            </p>
+      <section id="profile-lots" data-profile-lots hidden aria-label="Приветы">
+        <h2 class="font-display text-xs uppercase">Приветы</h2>
+        <p data-lots-note class="mt-3 hidden text-sm font-bold text-mist"></p>
+        <p data-lots-status class="sr-only" role="status">
+          Загружаю приветы…
+        </p>
+        <div data-lots-grid class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {Array.from({ length: CATALOG_PAGE_SIZE }, () => (
+            <LotCardCompactSkeleton />
+          ))}
+        </div>
+        <div data-lots-more class="mt-4 hidden">
+          <div class="flex flex-col items-center gap-2">
             <button
               type="button"
-              data-profile-purchases-retry
-              class="btn-arcade btn-arcade-ghost mt-3 px-4 py-2 text-sm"
+              class="btn-arcade btn-arcade-ghost px-5 py-2 text-sm"
+              data-lots-more-btn
             >
-              Обновить
+              Показать ещё
             </button>
+            <p data-lots-more-status class="text-sm font-bold text-mist" role="status"></p>
           </div>
-        </section>
-      </div>
-    </div>
+        </div>
+        <p data-lots-end class="mt-4 hidden text-center text-sm font-bold text-mist">
+          Это все приветы
+        </p>
+      </section>
 
-    <template data-lot-compact-template>
-      <LotCardCompact />
-    </template>
-    <template data-lot-compact-skeleton-template>
-      <LotCardCompactSkeleton />
-    </template>
-
-    <div data-profile-notfound class="card-pixel mt-6 hidden p-6 text-center sm:p-8">
-      <h1 class="font-display text-lg uppercase">Профиль не найден</h1>
-      <p class="mt-3 text-sm text-mist">Ссылка битая или такого чатерса нет на бирже.</p>
-      <a
-        href={`${import.meta.env.BASE_URL}lots/`}
-        class="btn-arcade btn-arcade-primary mt-5 px-6 py-3"
+      <section
+        id="profile-purchases"
+        data-profile-purchases
+        hidden
+        aria-label="История покупок"
+        class="mt-8"
       >
-        ← На биржу
-      </a>
-    </div>
+        <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+          <h2 class="font-display text-lg uppercase">История покупок</h2>
+          <a
+            data-profile-purchases-more
+            class="hidden text-sm font-bold text-pivko hover:text-ember"
+            href="#"
+          >
+            Вся история →
+          </a>
+        </div>
+        <p data-profile-purchases-status class="sr-only" role="status"></p>
 
-    <div data-profile-error class="card-pixel mt-6 hidden p-6 text-center sm:p-8">
-      <h2 class="font-display text-lg uppercase">Не загрузилось</h2>
-      <p class="mt-3 text-sm text-mist">Проверь связь и попробуй ещё.</p>
-      <button
-        type="button"
-        data-profile-retry
-        class="btn-arcade btn-arcade-ghost mt-5 px-6 py-3 text-sm"
-      >
-        Повторить
-      </button>
+        <!-- Скелетон повторяет строку покупки: дата, название, цена. -->
+        <div data-profile-purchases-skeleton aria-hidden="true" class="mt-3 flex flex-col gap-2">
+          {Array.from({ length: 5 }, () => (
+            <div class="flex items-baseline gap-3 border-2 border-milk/15 px-3 py-2">
+              <div class="skeleton-block h-3 w-20"></div>
+              <div class="skeleton-block h-4 flex-1"></div>
+              <div class="skeleton-block h-3 w-16"></div>
+            </div>
+          ))}
+        </div>
+
+        <ul data-profile-purchases-list class="mt-3 hidden flex-col gap-2"></ul>
+
+        <p data-profile-purchases-empty class="mt-3 hidden text-sm font-bold text-mist">
+          Покупок пока нет
+        </p>
+
+        <div data-profile-purchases-error class="card-pixel mt-3 hidden p-4">
+          <p class="text-sm font-bold text-mist">
+            История покупок не загрузилась — проверь связь и попробуй ещё.
+          </p>
+          <button
+            type="button"
+            data-profile-purchases-retry
+            class="btn-arcade btn-arcade-ghost mt-3 px-4 py-2 text-sm"
+          >
+            Обновить
+          </button>
+        </div>
+      </section>
     </div>
+  </div>
+
+  <template data-lot-compact-template>
+    <LotCardCompact />
+  </template>
+  <template data-lot-compact-skeleton-template>
+    <LotCardCompactSkeleton />
+  </template>
+
+  <div data-profile-notfound class="card-pixel mt-6 hidden p-6 text-center sm:p-8">
+    <h1 class="font-display text-lg uppercase">Профиль не найден</h1>
+    <p class="mt-3 text-sm text-mist">Ссылка битая или такого чатерса нет на бирже.</p>
+    <a
+      href={`${import.meta.env.BASE_URL}lots/`}
+      class="btn-arcade btn-arcade-primary mt-5 px-6 py-3"
+    >
+      ← На биржу
+    </a>
+  </div>
+
+  <div data-profile-error class="card-pixel mt-6 hidden p-6 text-center sm:p-8">
+    <h2 class="font-display text-lg uppercase">Не загрузилось</h2>
+    <p class="mt-3 text-sm text-mist">Проверь связь и попробуй ещё.</p>
+    <button
+      type="button"
+      data-profile-retry
+      class="btn-arcade btn-arcade-ghost mt-5 px-6 py-3 text-sm"
+    >
+      Повторить
+    </button>
   </div>
 </BaseLayout>
 
@@ -240,9 +238,11 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
   // общая раскладка Лота (LotCardCompact + fillLot, docs/adr/0009). Состояния:
   // скелетон, готовый паспорт, «не найден» (нет/битый/неизвестный uid),
   // «не загрузилось» с повтором; приветы — пусто и ошибка с повтором.
-  // «Выйти» — только когда uid сессии совпал с профилем. Смена uid, сделки и
-  // возврат на вкладку приходят из live.ts (docs/adr/0003): перечитываем статы,
-  // первую страницу приветов и превью покупок, нового канала страница не заводит.
+  // «Выйти» — только когда uid сессии совпал с профилем. Смена uid и сделки
+  // приходят из live.ts (docs/adr/0003): после сделки перечитываем статы,
+  // первую страницу приветов и превью покупок; смена uid/баланса — только
+  // перекраска кнопок. Возврат на вкладку страницу не перезапрашивает: список
+  // приветов листается страницами, и синк сбрасывал бы окно.
   import { live, readOwnerLotsPage, type LotState } from '@/lib/live';
   import { fetchDealLog } from '@/lib/purchases-read';
   import { fetchPublicProfile } from '@/lib/profile-read';
@@ -253,7 +253,7 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
     type ProfileStats,
   } from '@/lib/profile';
   import { dealFilterUrl } from '@/lib/deal-filter';
-  import { formatRelativeTime, type DealEntry } from '@/lib/trade-history';
+  import type { DealEntry } from '@/lib/trade-history';
   import { signOut } from '@/lib/session';
   import {
     CATALOG_PAGE_SIZE,
@@ -275,7 +275,6 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
   const LOTS_FAIL_TEXT = 'Не загрузилось — попробуй ещё';
   const LOTS_MORE_FAIL_TEXT = 'Не получилось подгрузить — попробуй ещё';
 
-  const root = document.querySelector('[data-profile-root]');
   const shell = document.querySelector('[data-profile-shell]');
   const skeleton = document.querySelector('[data-profile-skeleton]');
   const ready = document.querySelector('[data-profile-ready]');
@@ -326,9 +325,6 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
   const purchasesRetry = document.querySelector('[data-profile-purchases-retry]');
   const purchasesMore = document.querySelector('[data-profile-purchases-more]');
   const purchasesStatus = document.querySelector('[data-profile-purchases-status]');
-
-  // Точки расширения (тикеты 02/03) читают uid отсюда, не разбирая query.
-  if (root instanceof HTMLElement) root.dataset.profileUid = profileUid ?? '';
 
   /** Подгрузка паспорта: одно чтение в полёте + один хвостовой проход. */
   let loading = false;
@@ -548,7 +544,10 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
     if (lotHasMore && sentinelNear()) void loadMore(uid, false);
   }
 
-  /** Секция покупок и ссылка «Вся история →» появляются вместе с профилем. */
+  /**
+   * Секция покупок и ссылка «Вся история →» появляются вместе с профилем.
+   * Ссылка живёт отдельно от строк: сбой превью не отнимает путь в полный лог.
+   */
   function revealPurchases(uid: string): void {
     if (purchasesSection instanceof HTMLElement) purchasesSection.hidden = false;
     if (purchasesMore instanceof HTMLAnchorElement) {
@@ -556,6 +555,7 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
         { mode: 'user', uid },
         new URL(`${base}deals/`, window.location.origin)
       ).toString();
+      purchasesMore.classList.remove('hidden');
     }
   }
 
@@ -573,7 +573,9 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
 
     const date = document.createElement('span');
     date.className = 'text-xs font-bold whitespace-nowrap text-mist';
-    date.textContent = formatRelativeTime(entry.created_at);
+    // Дата, а не «54 ч назад»: превью живёт на профиле, относительное время
+    // там устаревает без перечитывания (спека: дата, название, цена).
+    date.textContent = formatProfileDate(entry.created_at);
 
     const title = document.createElement('span');
     title.className = 'min-w-0 flex-1 font-extrabold break-words';
@@ -596,16 +598,15 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
     toggle(purchasesList, shown);
     toggle(purchasesEmpty, !shown);
     toggle(purchasesError, false);
-    toggle(purchasesMore, true);
     announcePurchases(shown ? `Последние покупки: ${entries.length}` : 'Покупок пока нет');
   }
 
+  /** Строки и ошибка меняются, но «Вся история →» остаётся: путь в лог цел. */
   function showPurchasesLoading(): void {
     toggle(purchasesSkeleton, true);
     toggle(purchasesList, false);
     toggle(purchasesEmpty, false);
     toggle(purchasesError, false);
-    toggle(purchasesMore, false);
     announcePurchases('Загружаю историю покупок…');
   }
 
@@ -613,7 +614,6 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
     toggle(purchasesSkeleton, false);
     toggle(purchasesList, false);
     toggle(purchasesEmpty, false);
-    toggle(purchasesMore, false);
     toggle(purchasesError, true);
     announcePurchases('История покупок не загрузилась');
   }
@@ -695,7 +695,9 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
     announce('Профиль не найден');
   } else {
     const targetUid = profileUid;
-    toggle(lotsSection, true);
+    // Секция K1 скрыта атрибутом `hidden` (как соседние покупки): класс
+    // `hidden` её бы не открыл. Скелетоны внутри видны с этого момента.
+    if (lotsSection instanceof HTMLElement) lotsSection.hidden = false;
     showState('loading');
     void load(targetUid, true);
     void loadPurchases(true);
@@ -748,9 +750,11 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
         repaintLots();
       }
       if (change.kind === 'balance') repaintLots();
-      // Сделка, своя покупка и возврат на вкладку — повод перечитать статы,
-      // первую страницу приветов и превью покупок: они меняются на сервере.
-      if (change.kind === 'deals' || change.kind === 'sync' || change.kind === 'purchase') {
+      // Сделка и своя покупка — повод перечитать статы, первую страницу
+      // приветов и превью покупок: они меняются на сервере. `sync` (возврат на
+      // вкладку) сюда не входит: он сбрасывал бы окно страниц приветов, а спека
+      // обещает перечитывание после сделок.
+      if (change.kind === 'deals' || change.kind === 'purchase') {
         void load(targetUid, false);
         void loadPurchases(false);
       }
