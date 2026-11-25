@@ -525,6 +525,30 @@ video:-webkit-full-screen {
   text-shadow: 2px 2px 0 var(--color-milk);
 }
 
+/* Профиль: заголовок приветов — отдельная строка над колонкой карточек, а
+   паспорт и первая карточка начинаются на одной горизонтали (grid-areas).
+   Мобильная раскладка остаётся одной колонкой в порядке DOM: паспорт, ник,
+   карточки. */
+@media (min-width: 768px) {
+  [data-profile-shell] {
+    grid-template-areas:
+      '. lots-title'
+      'passport content';
+  }
+
+  [data-profile-passport] {
+    grid-area: passport;
+  }
+
+  [data-profile-lots-title] {
+    grid-area: lots-title;
+  }
+
+  [data-profile-content] {
+    grid-area: content;
+  }
+}
+
 /* Колонки K1 — по ширине самой колонки, а не вьюпорта (как в прототипе):
    280px паспорта отнимают место, и на планшете две карточки в узкой колонке
    тесны. Контейнер — секция приветов; на /lots/ правила не срабатывают:

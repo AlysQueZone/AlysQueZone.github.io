@@ -47,8 +47,12 @@ export interface OwnerBadgeView {
  */
 export function ownerBadgeView(st: LotState): OwnerBadgeView {
   const login = typeof st.owner_login === 'string' ? st.owner_login.trim() : '';
-  if (login.length === 0) return { login: '', href: null };
-  return { login, href: profileHref(st.owner_uid) };
+  const uid =
+    typeof st.owner_uid === 'string' && st.owner_uid.trim().length > 0 ? st.owner_uid : null;
+  // Аккаунт есть, ник потерян — общая подпись и ссылка; иначе лот с владельцем
+  // выглядел бы свободным, а «свободен» — это лот без owner_uid.
+  if (login.length === 0 && uid === null) return { login: '', href: null };
+  return { login: login || 'чатерс', href: profileHref(uid) };
 }
 
 export interface LotViewOptions {

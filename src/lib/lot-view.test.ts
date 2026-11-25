@@ -47,6 +47,13 @@ describe('ownerBadgeView', () => {
     });
   });
 
+  it('владелец без ника, но с uid — «чатерс» и ссылка на профиль', () => {
+    expect(ownerBadgeView(lot({ owner_login: null, owner_uid: OWNER }))).toEqual({
+      login: 'чатерс',
+      href: `/profile/?uid=${OWNER}`,
+    });
+  });
+
   it('свободный лот — пустой бейдж, ссылки нет', () => {
     expect(ownerBadgeView(lot({ owner_login: null, owner_uid: null }))).toEqual({
       login: '',

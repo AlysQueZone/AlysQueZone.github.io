@@ -130,17 +130,18 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
       </div>
     </aside>
 
-    <div class="min-w-0">
+    <!-- Заголовок — своя строка над колонкой карточек (grid-areas в global.css):
+         паспорт и первая карточка стартуют на одной горизонтали. -->
+    <h2 data-profile-lots-title class="font-display truncate text-lg uppercase">
+      Приветы
+    </h2>
+
+    <div data-profile-content class="min-w-0">
       <!-- Приветы владельца: страницы по 12 (lib/catalog-page.ts), компактные
              карточки K1 (LotCardCompact), покупка — общая модалка (BaseLayout).
              Секция включается, когда uid разобран; скелетоны держат геометрию
-             до первого ответа. Заголовок — в колонке карточек, рядом с
-             паспортом, а не над всей страницей: полоса-разделитель между
-             паспортом и приветами остаётся. -->
+             до первого ответа. -->
       <section id="profile-lots" data-profile-lots hidden>
-        <h2 data-profile-lots-title class="font-display mb-3 truncate text-lg uppercase">
-          Приветы
-        </h2>
         <p data-lots-note class="mt-3 hidden text-sm font-bold text-mist"></p>
         <div data-lots-grid class="grid grid-cols-1 gap-3">
           {Array.from({ length: CATALOG_PAGE_SIZE }, () => (
