@@ -24,11 +24,21 @@ describe('isMine', () => {
 });
 
 describe('ownerBadgeView', () => {
+  const OWNER = '5b1f0c2e-9d3a-4f7b-8c1d-2e3f4a5b6c7d';
+
   it('владелец с uid — бейдж ведёт в профиль, доступное имя — ник', () => {
+    expect(ownerBadgeView(lot({ owner_login: 'alice', owner_uid: OWNER }))).toEqual({
+      text: '👑 alice',
+      href: `/profile/?uid=${OWNER}`,
+      label: 'alice',
+    });
+  });
+
+  it('uid не uuid (старые данные, мусор) — бейдж текстом, а не битой ссылкой', () => {
     expect(ownerBadgeView(lot({ owner_login: 'alice', owner_uid: 'u1' }))).toEqual({
       text: '👑 alice',
-      href: '/profile/?uid=u1',
-      label: 'alice',
+      href: null,
+      label: null,
     });
   });
 
@@ -62,7 +72,6 @@ describe('buyButtonView', () => {
     expect(buyButtonView(intent, { balance: 500 })).toEqual({
       text: '▶ Забрать за 120 🍺',
       disabled: false,
-      muted: false,
     });
   });
 
@@ -70,7 +79,6 @@ describe('buyButtonView', () => {
     expect(buyButtonView(intent, { balance: 500, mine: true })).toEqual({
       text: 'Твой привет',
       disabled: true,
-      muted: true,
     });
   });
 
@@ -78,7 +86,6 @@ describe('buyButtonView', () => {
     expect(buyButtonView(intent, { balance: 500, mine: true, mineLabel: 'Твой лот' })).toEqual({
       text: 'Твой лот',
       disabled: true,
-      muted: true,
     });
     // Чужой Лот метку не берёт: она только про своё владение.
     expect(buyButtonView(intent, { balance: 500, mineLabel: 'Твой лот' }).text).toBe(
@@ -90,7 +97,6 @@ describe('buyButtonView', () => {
     expect(buyButtonView(intent, { balance: 100 })).toEqual({
       text: 'Не хватает · 120 🍺',
       disabled: true,
-      muted: true,
     });
   });
 
@@ -98,7 +104,6 @@ describe('buyButtonView', () => {
     expect(buyButtonView({ ...intent, price: null }, { balance: 0 })).toEqual({
       text: '▶ Забрать за … 🍺',
       disabled: false,
-      muted: false,
     });
   });
 });

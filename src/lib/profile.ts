@@ -7,8 +7,8 @@
  * поверхности 02–07 берут ссылку и статы отсюда, второй формулы не заводят.
  *
  * UID — вечная идентичность, логин — подпись: битый/пустой uid отсекается здесь,
- * чтобы Postgres не получил cast (22P02); логина может не быть — паспорт живёт
- * по uid («@чатерс», инициалы «?»).
+ * чтобы Postgres не получил cast (22P02), и ссылкой не становится («Биржа»);
+ * логина может не быть — паспорт живёт по uid («@чатерс», инициалы «?»).
  *
  * Даты считаются по UTC: дата регистрации — календарный день, а не деньги, зато
  * одинаковая у всех и в тестах. Числа — `ru-RU` (неразрывный разделитель).
@@ -63,18 +63,27 @@ export function profileUidFromQuery(search: string): string | null {
 }
 
 /**
- * Адрес профиля по uid — один на все поверхности. `null`/пусто — ссылки нет:
- * «Биржа», свободный лот и ник без uid остаются текстом.
+ * Адрес профиля по uid — один на все поверхности. Не uuid (пусто, «Биржа»,
+ * логин, мусор из сети) — ссылки нет: «Биржа», свободный лот и ник без uid
+ * остаются текстом, а Postgres не получит cast в uuid.
  */
 export function profileHref(uid: string | null | undefined): string | null {
-  const text = typeof uid === 'string' ? uid.trim() : '';
-  if (text.length === 0) return null;
+  const text = parseProfileUid(uid);
+  if (text === null) return null;
   return `${import.meta.env.BASE_URL}profile/?uid=${encodeURIComponent(text)}`;
+}
+
+/**
+ * Логин для подписи и заголовков: trim и без ведущих `@`. Пусто — пустая
+ * строка: «нет логина» решает вызывающий, а не эта уборка.
+ */
+export function cleanLogin(login: unknown): string {
+  return typeof login === 'string' ? login.trim().replace(/^@+/, '') : '';
 }
 
 /** Подпись в паспорте: `@login`; логина нет — `@чатерс` (не выдумываем ник). */
 export function profileCaption(login: unknown): string {
-  const text = typeof login === 'string' ? login.trim().replace(/^@+/, '') : '';
+  const text = cleanLogin(login);
   return `@${text || 'чатерс'}`;
 }
 
@@ -84,7 +93,7 @@ export function profileCaption(login: unknown): string {
  * логина нет — «?».
  */
 export function profileInitials(login: unknown): string {
-  const text = typeof login === 'string' ? login.trim().replace(/^@+/, '') : '';
+  const text = cleanLogin(login);
   if (text.length === 0) return '?';
   const words = text
     .replace(/([a-zа-яё0-9])([A-ZА-ЯЁ])/g, '$1 $2')
@@ -126,11 +135,10 @@ export function profileStats(row: ProfileRow | null | undefined): ProfileStats |
   const lotsCount = asCount(row.lots_count);
   if (uid === null || joinedAt === null || balance === null || capital === null) return null;
   if (lotsCount === null) return null;
-  const login =
-    typeof row.login === 'string' && row.login.trim().length > 0 ? row.login.trim() : null;
+  const login = cleanLogin(row.login);
   return {
     uid,
-    login,
+    login: login.length > 0 ? login : null,
     caption: profileCaption(login),
     initials: profileInitials(login),
     joinedAt,

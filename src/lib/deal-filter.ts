@@ -14,7 +14,7 @@
  * чтением, и без него подпись честно общая — uuid на экран не попадает.
  * Тесты — src/lib/deal-filter.test.ts.
  */
-import { parseProfileUid } from './profile';
+import { cleanLogin, parseProfileUid } from './profile';
 
 /** Состояние лога: вся биржа, мои покупки или покупки одного чатерса. */
 export type DealFilter = { mode: 'all' } | { mode: 'mine' } | { mode: 'user'; uid: string };
@@ -61,6 +61,6 @@ export function dealFilterUrl(filter: DealFilter, current: URL): URL {
 export function dealFilterTitle(filter: DealFilter, login: string | null | undefined): string {
   if (filter.mode === 'all') return 'Лог сделок';
   if (filter.mode === 'mine') return 'Мои покупки';
-  const text = typeof login === 'string' ? login.trim().replace(/^@+/, '') : '';
+  const text = cleanLogin(login);
   return text.length > 0 ? `Покупки @${text}` : 'Покупки чатерса';
 }

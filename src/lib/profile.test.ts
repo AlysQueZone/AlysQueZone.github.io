@@ -5,6 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  cleanLogin,
   formatProfileDate,
   formatProfileNumber,
   parseProfileUid,
@@ -39,8 +40,28 @@ describe('profileHref', () => {
     expect(profileHref('')).toBeNull();
   });
 
-  it('uid кодируется, как query-значение', () => {
-    expect(profileHref('a b&c')).toBe('/profile/?uid=a%20b%26c');
+  it('не uuid — не ссылка: «Биржа», логин и мусор не станут адресом профиля', () => {
+    for (const bad of ['Биржа', 'abc', '@ShidouQuE', 'a b&c', '5b1f0c2e-9d3a-4f7b-8c1d']) {
+      expect(profileHref(bad), bad).toBeNull();
+    }
+  });
+
+  it('uid приводится к канону: регистр и пробелы нормализуются', () => {
+    expect(profileHref(` ${UID.toUpperCase()} `)).toBe(`/profile/?uid=${UID}`);
+  });
+});
+
+describe('cleanLogin', () => {
+  it('убирает пробелы и ведущие `@` — одна уборка на подпись и заголовки', () => {
+    expect(cleanLogin('  @@ShidouQuE ')).toBe('ShidouQuE');
+    expect(cleanLogin('avrora_666')).toBe('avrora_666');
+  });
+
+  it('нет логина — пустая строка, а не «undefined»', () => {
+    expect(cleanLogin(null)).toBe('');
+    expect(cleanLogin(undefined)).toBe('');
+    expect(cleanLogin(42)).toBe('');
+    expect(cleanLogin(' @ ')).toBe('');
   });
 });
 
