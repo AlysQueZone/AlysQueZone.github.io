@@ -1,0 +1,22 @@
+---
+// Скелетон компактной Карточки Лота (K1): та же геометрия, что у
+// LotCardCompact в раскладке профиля — кадр 77:136 шириной 64px, справа бары
+// названия, цены и кнопки. Пропорция кадра — из lib/lot-video (один источник с
+// LotVideo). Профиль рисует приветы клиентом (docs/adr/0002), поэтому сервер
+// отдаёт только скелетоны; скрипт страницы сносит их после первого ответа.
+// aria-hidden: для скринридера состояние объявляет отдельный role="status".
+import { mediaAspectClass, LOT_CARD_ASPECT } from '@/lib/lot-video';
+---
+
+<article data-lot-skeleton data-lot-compact class="card-pixel flex gap-3 p-3" aria-hidden="true">
+  <div class="w-16 shrink-0">
+    <div class:list={['lot-media-frame', mediaAspectClass(LOT_CARD_ASPECT)]}>
+      <div class="skeleton-block h-full w-full"></div>
+    </div>
+  </div>
+  <div class="flex min-w-0 flex-1 flex-col gap-2">
+    <div class="skeleton-block h-4 w-3/4"></div>
+    <div class="skeleton-block h-4 w-1/2"></div>
+    <div class="skeleton-block mt-auto h-11 w-full"></div>
+  </div>
+</article>
