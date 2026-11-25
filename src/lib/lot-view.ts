@@ -11,6 +11,7 @@
  * - `[data-lot-video-root]` — видео; ориентация кадра — на кадр
  *   (`data-media-orientation`, для CSS), подложка квадрата — карточкам;
  * - `[data-owner-badge]` / `[data-free-badge]` / `[data-mine-badge]` — бейджи;
+ *   владелец с uid — ссылка на профиль (`profileHref`), без uid — текст;
  * - `[data-buy-intent]` — кнопка покупки (`lib/buy-intent.ts`).
  * Свои поля поверхность правит сама: title документа и автор привета —
  * страница Лота, сортировка и reconcile — витрина.
@@ -18,6 +19,7 @@
 import { setTitleEmotes } from './emotes';
 import { fillVideo, initLotVideos, type MediaOrientation } from './lot-video';
 import { buyAvailability, formatStaged, writeBuyIntent, type BuyIntent } from './buy-intent';
+import { profileHref } from './profile';
 import type { LotState } from './live-store-model';
 
 /** Адрес страницы Лота — один на все поверхности (`?id=` — slug). */
@@ -28,6 +30,28 @@ export function lotUrl(slug: string): string {
 /** «Мой ли Лот»: единственное правило владения, флаг не хранится в состоянии. */
 export function isMine(st: LotState, uid: string | null): boolean {
   return uid !== null && st.owner_uid === uid;
+}
+
+/** Бейдж владельца: видимый текст, адрес профиля и доступное имя ссылки. */
+export interface OwnerBadgeView {
+  /** «👑 nick»; пусто — владельца нет, бейдж скрыт («свободен» на месте). */
+  text: string;
+  /** Адрес профиля владельца; null — бейдж остаётся текстом («Биржа», нет uid). */
+  href: string | null;
+  /** Ник для `aria-label` ссылки (корона — не имя); null — бейдж не ссылка. */
+  label: string | null;
+}
+
+/**
+ * Владелец Лота — ссылка на профиль только по `owner_uid` (uid — идентичность,
+ * логин — подпись). Нет uid («Биржа», старый лот) — текст без `href`; лот
+ * свободен — бейджа нет. Одно правило на Карточку Лота и страницу Лота.
+ */
+export function ownerBadgeView(st: LotState): OwnerBadgeView {
+  const login = typeof st.owner_login === 'string' ? st.owner_login.trim() : '';
+  if (login.length === 0) return { text: '', href: null, label: null };
+  const href = profileHref(st.owner_uid);
+  return { text: `👑 ${login}`, href, label: href === null ? null : login };
 }
 
 export interface LotViewOptions {
@@ -172,20 +196,33 @@ function removeSquareBlur(frame: HTMLElement): void {
 /**
  * Заполнить бейджи владельца над кадром — один контракт разметки на карточку
  * витрины и страницу Лота (`LotBadges`: data-owner-badge / data-free-badge /
- * data-mine-badge). Владелец — тёмный бейдж с короной, у свободного Лота
- * показан светлый «свободен»; «Твой» — по селектору isMine. Отдельной строки с
+ * data-mine-badge). Владелец — тёмный бейдж с короной: с uid это ссылка на
+ * профиль (доступное имя — ник), без uid — текст; у свободного Лота показан
+ * светлый «свободен», «Твой» — по селектору isMine. Отдельной строки с
  * владельцем нет: как на витрине, так и в подробностях.
  */
 function fillOwnerBadges(root: ParentNode | null, st: LotState, mine: boolean): void {
   if (!root) return;
-  const owned = Boolean(st.owner_login);
+  const view = ownerBadgeView(st);
   const owner = root.querySelector('[data-owner-badge]');
   if (owner instanceof HTMLElement) {
-    owner.textContent = owned ? `👑 ${st.owner_login}` : '';
-    owner.classList.toggle('hidden', !owned);
+    owner.textContent = view.text;
+    owner.classList.toggle('hidden', view.text.length === 0);
+    if (owner instanceof HTMLAnchorElement) {
+      // Ссылка — настоящий href, а не обработчик: клавиатура и контекстное
+      // меню работают штатно. Нет uid — атрибуты снимаются: `a` без href и
+      // aria-label читается как текст и из Tab выпадает.
+      if (view.href === null) {
+        owner.removeAttribute('href');
+        owner.removeAttribute('aria-label');
+      } else {
+        owner.href = view.href;
+        owner.setAttribute('aria-label', view.label ?? view.text);
+      }
+    }
   }
   const free = root.querySelector('[data-free-badge]');
-  if (free instanceof HTMLElement) free.classList.toggle('hidden', owned);
+  if (free instanceof HTMLElement) free.classList.toggle('hidden', view.text.length > 0);
   const mineBadge = root.querySelector('[data-mine-badge]');
   if (mineBadge instanceof HTMLElement) mineBadge.classList.toggle('hidden', !mine);
 }

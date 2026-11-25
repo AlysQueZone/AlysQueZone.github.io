@@ -1,10 +1,10 @@
 /**
  * Представление Лота: селектор владения («Твой» считается от uid, а не хранится
- * в снапшоте) и надпись кнопки покупки — одно правило на все поверхности
- * (docs/adr/0009).
+ * в снапшоте), ссылка на профиль владельца и надпись кнопки покупки — одно
+ * правило на все поверхности (docs/adr/0009).
  */
 import { describe, expect, it } from 'vitest';
-import { buyButtonView, isMine } from './lot-view';
+import { buyButtonView, isMine, ownerBadgeView } from './lot-view';
 import type { BuyIntent } from './buy-intent';
 import { lot } from './live-store-test-fixtures';
 
@@ -20,6 +20,32 @@ describe('isMine', () => {
 
   it('свободный лот не становится моим у гостя', () => {
     expect(isMine(lot({ owner_uid: null }), null)).toBe(false);
+  });
+});
+
+describe('ownerBadgeView', () => {
+  it('владелец с uid — бейдж ведёт в профиль, доступное имя — ник', () => {
+    expect(ownerBadgeView(lot({ owner_login: 'alice', owner_uid: 'u1' }))).toEqual({
+      text: '👑 alice',
+      href: '/profile/?uid=u1',
+      label: 'alice',
+    });
+  });
+
+  it('«Биржа» и владелец без uid остаются текстом без ссылки', () => {
+    expect(ownerBadgeView(lot({ owner_login: 'Биржа', owner_uid: null }))).toEqual({
+      text: '👑 Биржа',
+      href: null,
+      label: null,
+    });
+  });
+
+  it('свободный лот — пустой бейдж, ссылки нет', () => {
+    expect(ownerBadgeView(lot({ owner_login: null, owner_uid: null }))).toEqual({
+      text: '',
+      href: null,
+      label: null,
+    });
   });
 });
 
