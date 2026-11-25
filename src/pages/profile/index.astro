@@ -1,0 +1,813 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import LotCardCompact from '@/components/LotCardCompact.astro';
+import LotCardCompactSkeleton from '@/components/LotCardCompactSkeleton.astro';
+import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
+
+// Публичный профиль чатерса — статический каркас: в HTML нет данных и нет
+// запросов к БД (docs/adr/0002). UID из `?uid=` разбирает клиент; один RPC
+// `public_profile` через lib/profile-read рисует паспорт. UID — идентичность,
+// логин — подпись, поэтому битая ссылка — состояние внутри страницы, а не 404.
+// Паспорт: десктоп — слева и липкий, телефон — сверху; аватар Twitch в квадрате,
+// инициалы — фолбэк без URL и при ошибке картинки (docs/adr/0014).
+// Приветы — страницы по 12 компактными карточками K1 (LotCardCompact): та же
+// раскладка Лота, что на витрине, но кадр 64px и цена строкой (docs/adr/0009).
+// Скелетонов — страница целиком: столько же карточек вернёт первый запрос.
+// Превью покупок читает тот же лог сделок с фильтром по покупателю — новый
+// запрос на профиль не заводится, полная история живёт на `/deals/?user=`.
+---
+
+<BaseLayout
+  title="Профиль чатерса — AlysQueZone"
+  description="Публичный профиль чатерса биржи приветов: баланс, «Баланс + приветы» и приветы во владении."
+>
+  <!-- Скринридеру: «Загружаю…» и смену состояний объявляем всегда — даже
+         когда сам паспорт скрыт («не найден» / «не загрузилось»). -->
+  <p data-profile-status class="sr-only" role="status">
+    Загружаю профиль…
+  </p>
+  <div
+    data-profile-shell
+    class="grid grid-cols-1 gap-4 md:grid-cols-[280px_minmax(0,1fr)] md:items-start"
+  >
+    <aside data-profile-passport class="card-pixel p-4 md:sticky md:top-24" aria-label="Паспорт">
+      <!-- Скелетон повторяет геометрию паспорта: квадрат, ник, дата, три
+             строки статов и кнопка. После первого ответа сносится целиком. -->
+      <div data-profile-skeleton aria-hidden="true">
+        <div class="skeleton-block mx-auto h-16 w-16"></div>
+        <div class="skeleton-block mx-auto mt-3 h-7 w-32"></div>
+        <div class="skeleton-block mx-auto mt-2 h-4 w-44"></div>
+        <dl class="mt-4 flex flex-col text-sm">
+          <div class="flex items-center justify-between border-b-2 border-milk/15 py-2">
+            <dt>
+              <span class="skeleton-block block h-4 w-20"></span>
+            </dt>
+            <dd>
+              <span class="skeleton-block block h-5 w-24"></span>
+            </dd>
+          </div>
+          <div class="flex items-center justify-between border-b-2 border-milk/15 py-2">
+            <dt>
+              <span class="skeleton-block block h-4 w-28"></span>
+            </dt>
+            <dd>
+              <span class="skeleton-block block h-5 w-24"></span>
+            </dd>
+          </div>
+          <div class="flex items-center justify-between border-b-2 border-milk/15 py-2">
+            <dt>
+              <span class="skeleton-block block h-4 w-20"></span>
+            </dt>
+            <dd>
+              <span class="skeleton-block block h-5 w-10"></span>
+            </dd>
+          </div>
+        </dl>
+        <div class="skeleton-block mt-4 h-11 w-full"></div>
+      </div>
+
+      <div data-profile-ready class="hidden">
+        <!-- Квадрат паспорта один: аватар Twitch поверх инициалов. Пока
+               картинка грузится или сломалась, показывает инициалы — высота
+               квадрата не меняется. -->
+        <div class="relative mx-auto h-16 w-16 border-[3px] border-milk bg-pivko shadow-[4px_4px_0_var(--color-milk)]">
+          <div
+            data-profile-initials
+            class="absolute inset-0 grid place-items-center font-display text-sm text-cream"
+            aria-hidden="true"
+          >
+            ?
+          </div>
+          <img
+            data-profile-avatar
+            class="absolute inset-0 hidden h-full w-full object-cover"
+            alt=""
+            width="64"
+            height="64"
+            decoding="async"
+            referrerpolicy="no-referrer"
+          />
+        </div>
+        <h1 data-profile-login class="font-display mt-3 text-center text-lg break-all uppercase">
+          @чатерс
+        </h1>
+        <p data-profile-joined class="mt-1 text-center text-sm text-mist">
+          На бирже с …
+        </p>
+        <dl class="mt-4 flex flex-col text-sm">
+          <div class="flex items-center justify-between gap-3 border-b-2 border-milk/15 py-2">
+            <dt class="text-mist">Баланс</dt>
+            <dd class="font-black text-pivko">
+              <span data-profile-balance>—</span>
+              <span aria-hidden="true">🍺</span>
+            </dd>
+          </div>
+          <div class="flex items-center justify-between gap-3 border-b-2 border-milk/15 py-2">
+            <dt class="text-mist" title="Баланс и текущая стоимость приветов">
+              Баланс + приветы
+            </dt>
+            <dd class="font-black">
+              <span data-profile-capital>—</span>
+              <span aria-hidden="true">🍺</span>
+            </dd>
+          </div>
+          <div class="flex items-center justify-between gap-3 border-b-2 border-milk/15 py-2">
+            <dt class="text-mist">Приветов</dt>
+            <dd class="font-black" data-profile-lots-count>
+              —
+            </dd>
+          </div>
+        </dl>
+        <!-- «Выйти» — только в своём паспорте. Место кнопки держим всегда
+               (invisible), иначе чужой/свой профиль меняли бы высоту паспорта. -->
+        <button
+          type="button"
+          data-profile-logout
+          class="btn-arcade btn-arcade-ghost invisible mt-4 w-full px-3 py-2 text-xs text-mist"
+        >
+          Выйти
+        </button>
+      </div>
+    </aside>
+
+    <!-- Заголовок — своя строка над колонкой карточек (grid-areas в global.css):
+         паспорт и первая карточка стартуют на одной горизонтали. -->
+    <h2 data-profile-lots-title class="font-display truncate text-lg uppercase">
+      Приветы
+    </h2>
+
+    <div data-profile-content class="min-w-0">
+      <!-- Приветы владельца: страницы по 12 (lib/catalog-page.ts), компактные
+             карточки K1 (LotCardCompact), покупка — общая модалка (BaseLayout).
+             Секция включается, когда uid разобран; скелетоны держат геометрию
+             до первого ответа. -->
+      <section id="profile-lots" data-profile-lots hidden>
+        <p data-lots-note class="mt-3 hidden text-sm font-bold text-mist"></p>
+        <div data-lots-grid class="grid grid-cols-1 gap-3">
+          {Array.from({ length: CATALOG_PAGE_SIZE }, () => (
+            <LotCardCompactSkeleton />
+          ))}
+        </div>
+        <div data-lots-more class="mt-4 hidden">
+          <div class="flex flex-col items-center gap-2">
+            <button
+              type="button"
+              class="btn-arcade btn-arcade-ghost px-5 py-2 text-sm"
+              data-lots-more-btn
+            >
+              Показать ещё
+            </button>
+            <p data-lots-more-status class="text-sm font-bold text-mist"></p>
+          </div>
+        </div>
+      </section>
+
+      <section id="profile-purchases" data-profile-purchases hidden class="mt-8">
+        <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+          <h2 class="font-display text-lg uppercase">История покупок</h2>
+          <a
+            data-profile-purchases-more
+            class="hidden text-sm font-bold text-pivko hover:text-ember"
+            href="#"
+          >
+            Вся история →
+          </a>
+        </div>
+
+        <!-- Скелетон повторяет строку покупки: дата, название, цена. -->
+        <div data-profile-purchases-skeleton aria-hidden="true" class="mt-3 flex flex-col gap-2">
+          {Array.from({ length: 5 }, () => (
+            <div class="flex items-baseline gap-3 py-2">
+              <div class="skeleton-block h-3 w-20"></div>
+              <div class="skeleton-block h-4 flex-1"></div>
+              <div class="skeleton-block h-3 w-16"></div>
+            </div>
+          ))}
+        </div>
+
+        <ul data-profile-purchases-list class="mt-3 hidden flex-col gap-2"></ul>
+
+        <p data-profile-purchases-empty class="mt-3 hidden text-sm font-bold text-mist">
+          Покупок пока нет
+        </p>
+
+        <div data-profile-purchases-error class="card-pixel mt-3 hidden p-4">
+          <p class="text-sm font-bold text-mist">
+            История покупок не загрузилась — проверь связь и попробуй ещё.
+          </p>
+          <button
+            type="button"
+            data-profile-purchases-retry
+            class="btn-arcade btn-arcade-ghost mt-3 px-4 py-2 text-sm"
+          >
+            Обновить
+          </button>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <template data-lot-compact-template>
+    <LotCardCompact />
+  </template>
+  <template data-lot-compact-skeleton-template>
+    <LotCardCompactSkeleton />
+  </template>
+
+  <div data-profile-notfound class="card-pixel mt-6 hidden p-6 text-center sm:p-8">
+    <h1 class="font-display text-lg uppercase">Профиль не найден</h1>
+    <p class="mt-3 text-sm text-mist">Ссылка битая или такого чатерса нет на бирже.</p>
+    <a
+      href={`${import.meta.env.BASE_URL}lots/`}
+      class="btn-arcade btn-arcade-primary mt-5 px-6 py-3"
+    >
+      ← На биржу
+    </a>
+  </div>
+
+  <div data-profile-error class="card-pixel mt-6 hidden p-6 text-center sm:p-8">
+    <h2 class="font-display text-lg uppercase">Не загрузилось</h2>
+    <p class="mt-3 text-sm text-mist">Проверь связь и попробуй ещё.</p>
+    <button
+      type="button"
+      data-profile-retry
+      class="btn-arcade btn-arcade-ghost mt-5 px-6 py-3 text-sm"
+    >
+      Повторить
+    </button>
+  </div>
+</BaseLayout>
+
+<script>
+  // Страница рисует паспорт из одного публичного RPC (lib/profile-read) и
+  // приветы владельца страницами по 12 (readOwnerLotsPage: тот же keyset
+  // `(price, slug)`, что у витрины). Статы и форматы — lib/profile.ts, карточки —
+  // общая раскладка Лота (LotCardCompact + fillLot, docs/adr/0009). Состояния:
+  // скелетон, готовый паспорт, «не найден» (нет/битый/неизвестный uid),
+  // «не загрузилось» с повтором; приветы — пусто и ошибка с повтором.
+  // «Выйти» — только когда uid сессии совпал с профилем. Смена uid и сделки
+  // приходят из live.ts (docs/adr/0003): после сделки перечитываем статы,
+  // первую страницу приветов и превью покупок; смена uid/баланса — только
+  // перекраска кнопок. Возврат на вкладку страницу не перезапрашивает: список
+  // приветов листается страницами, и синк сбрасывал бы окно.
+  import { live, readOwnerLotsPage, type LotState } from '@/lib/live';
+  import { fetchDealLog } from '@/lib/purchases-read';
+  import { fetchPublicProfile } from '@/lib/profile-read';
+  import {
+    formatProfileDate,
+    formatProfileNumber,
+    profileUidFromQuery,
+    type ProfileStats,
+  } from '@/lib/profile';
+  import { dealFilterUrl } from '@/lib/deal-filter';
+  import type { DealEntry } from '@/lib/trade-history';
+  import { signOut } from '@/lib/session';
+  import {
+    CATALOG_PAGE_SIZE,
+    appendCatalogPage,
+    catalogCursor,
+    type CatalogCursor,
+  } from '@/lib/catalog-page';
+  import { fillLot, lotUrl } from '@/lib/lot-view';
+
+  /** Превью покупок: ровно пятёрка, листания здесь нет. */
+  const PURCHASES_PREVIEW = 5;
+
+  const base = import.meta.env.BASE_URL;
+  const profileUid = profileUidFromQuery(window.location.search);
+
+  /** Свой Лот на профиле — «Твой лот» (раскладка K1, docs/adr/0009). */
+  const MINE_LABEL = 'Твой лот';
+  const LOTS_EMPTY_TEXT = 'Пока нет приветов';
+  const LOTS_FAIL_TEXT = 'Не загрузилось — попробуй ещё';
+  const LOTS_MORE_FAIL_TEXT = 'Не получилось подгрузить — попробуй ещё';
+
+  const shell = document.querySelector('[data-profile-shell]');
+  const skeleton = document.querySelector('[data-profile-skeleton]');
+  const ready = document.querySelector('[data-profile-ready]');
+  const notFound = document.querySelector('[data-profile-notfound]');
+  const error = document.querySelector('[data-profile-error]');
+  const retry = document.querySelector('[data-profile-retry]');
+  const status = document.querySelector('[data-profile-status]');
+  const logout = document.querySelector('[data-profile-logout]');
+  const initials = document.querySelector('[data-profile-initials]');
+  const avatar = document.querySelector('[data-profile-avatar]');
+  const login = document.querySelector('[data-profile-login]');
+  const joined = document.querySelector('[data-profile-joined]');
+  const balance = document.querySelector('[data-profile-balance]');
+  const capital = document.querySelector('[data-profile-capital]');
+  const lotsCount = document.querySelector('[data-profile-lots-count]');
+  const lotsSection = document.querySelector('[data-profile-lots]');
+  const lotsTitle = document.querySelector('[data-profile-lots-title]');
+  const lotsGrid = document.querySelector('[data-lots-grid]');
+  const lotsNote = document.querySelector('[data-lots-note]');
+  const lotsMore = document.querySelector('[data-lots-more]');
+  const lotsMoreBtn = document.querySelector('[data-lots-more-btn]');
+  const lotsMoreStatus = document.querySelector('[data-lots-more-status]');
+  const lotsTpl = document.querySelector('[data-lot-compact-template]');
+  const lotsSkeletonTpl = document.querySelector('[data-lot-compact-skeleton-template]');
+
+  // Приветы — снимок страниц: перечитываем первую страницу по сигналу живых
+  // данных (ADR 0003), окно витрины профиль не включает (ADR 0012).
+  let lotStates: LotState[] = [];
+  let lotCursor: CatalogCursor | null = null;
+  let lotHasMore = false;
+  /** Первый ответ получен — скелетоны сняты, «пусто» честное. */
+  let lotsLoaded = false;
+  /** Первый ответ не пришёл — заметка и «Повторить» вместо пустоты. */
+  let lotsFailed = false;
+  let lotsMoreState: 'idle' | 'loading' | 'error' = 'idle';
+  // Поколение чтения: ответ первой страницы, пришедший после перечитывания,
+  // не должен дописываться к новому снимку.
+  let lotsGeneration = 0;
+  /** Первая страница едет — новую подгрузку не начинаем (курсор сменится). */
+  let lotsReloading = false;
+  // slug → карточка: перекраска по балансу/uid без перезапроса и перестройки DOM.
+  const lotCards = new Map<string, HTMLElement>();
+  const purchasesSection = document.querySelector('[data-profile-purchases]');
+  const purchasesList = document.querySelector('[data-profile-purchases-list]');
+  const purchasesSkeleton = document.querySelector('[data-profile-purchases-skeleton]');
+  const purchasesEmpty = document.querySelector('[data-profile-purchases-empty]');
+  const purchasesError = document.querySelector('[data-profile-purchases-error]');
+  const purchasesRetry = document.querySelector('[data-profile-purchases-retry]');
+  const purchasesMore = document.querySelector('[data-profile-purchases-more]');
+
+  /** Подгрузка паспорта: одно чтение в полёте + один хвостовой проход. */
+  let loading = false;
+  let pendingReload = false;
+
+  function toggle(node: Element | null, show: boolean): void {
+    if (node instanceof HTMLElement) node.classList.toggle('hidden', !show);
+  }
+
+  function announce(text: string): void {
+    if (status instanceof HTMLElement) status.textContent = text;
+  }
+
+  type PageState = 'loading' | 'ready' | 'notfound' | 'error';
+
+  function showState(state: PageState): void {
+    toggle(shell, state === 'loading' || state === 'ready');
+    toggle(skeleton, state === 'loading');
+    toggle(ready, state === 'ready');
+    toggle(notFound, state === 'notfound');
+    toggle(error, state === 'error');
+  }
+
+  /** Свой паспорт — только при совпадении uid сессии и профиля. */
+  function renderOwn(): void {
+    if (!(logout instanceof HTMLButtonElement)) return;
+    const own = profileUid !== null && live.uid() === profileUid;
+    logout.classList.toggle('invisible', !own);
+    logout.disabled = !own;
+    logout.tabIndex = own ? 0 : -1;
+    if (own) logout.removeAttribute('aria-hidden');
+    else logout.setAttribute('aria-hidden', 'true');
+  }
+
+  // Аватар: картинка перекрывает инициалы только после load — квадрат 64×64
+  // никогда не пустует и не меняет высоту. Сломанный URL запоминаем: повторная
+  // отрисовка паспорта его не дёргает, остаются инициалы (docs/adr/0014).
+  const failedAvatars = new Set<string>();
+  let requestedAvatar: string | null = null;
+
+  function showInitials(): void {
+    toggle(avatar, false);
+    toggle(initials, true);
+  }
+
+  function showAvatar(): void {
+    toggle(avatar, true);
+    toggle(initials, false);
+  }
+
+  function applyAvatar(url: string | null): void {
+    if (!(avatar instanceof HTMLImageElement)) return;
+    const target = url !== null && !failedAvatars.has(url) ? url : null;
+    requestedAvatar = target;
+    if (target === null) {
+      avatar.removeAttribute('src');
+      showInitials();
+      return;
+    }
+    if (avatar.getAttribute('src') !== target) {
+      avatar.src = target;
+      showInitials();
+    }
+  }
+
+  if (avatar instanceof HTMLImageElement) {
+    avatar.addEventListener('load', () => {
+      // Поздний load старого URL не перекрывает инициалы новой картинки.
+      if (requestedAvatar !== null && avatar.getAttribute('src') === requestedAvatar) {
+        showAvatar();
+      }
+    });
+    avatar.addEventListener('error', () => {
+      const broken = avatar.getAttribute('src');
+      if (broken !== null) failedAvatars.add(broken);
+      requestedAvatar = null;
+      avatar.removeAttribute('src');
+      showInitials();
+    });
+  }
+
+  function fill(stats: ProfileStats): void {
+    if (lotsTitle instanceof HTMLElement) lotsTitle.textContent = `Приветы ${stats.caption}`;
+    if (initials instanceof HTMLElement) initials.textContent = stats.initials;
+    applyAvatar(stats.avatarUrl);
+    if (login instanceof HTMLElement) login.textContent = stats.caption;
+    if (joined instanceof HTMLElement) {
+      joined.textContent = `На бирже с ${formatProfileDate(stats.joinedAt)}`;
+    }
+    if (balance instanceof HTMLElement) balance.textContent = formatProfileNumber(stats.balance);
+    if (capital instanceof HTMLElement) capital.textContent = formatProfileNumber(stats.capital);
+    if (lotsCount instanceof HTMLElement)
+      lotsCount.textContent = formatProfileNumber(stats.lotsCount);
+    document.title = `${stats.caption} — AlysQueZone`;
+    renderOwn();
+  }
+
+  // --- Приветы: страницы по 12, общая раскладка Лота -------------------------
+
+  function setNote(text: string | null): void {
+    toggle(lotsNote, text !== null);
+    if (lotsNote instanceof HTMLElement) lotsNote.textContent = text ?? '';
+  }
+
+  function clearSkeletons(): void {
+    document.querySelectorAll('[data-lot-skeleton]').forEach((node) => node.remove());
+  }
+
+  /** Стартовые скелетоны страницы: на повтор первой страницы без карточек. */
+  function resetSkeletons(): void {
+    if (!(lotsGrid instanceof HTMLElement)) return;
+    const tpl = lotsSkeletonTpl;
+    if (!(tpl instanceof HTMLTemplateElement)) return;
+    if (lotsGrid.querySelector('[data-lot-compact]')) return;
+    lotsGrid.replaceChildren();
+    for (let i = 0; i < CATALOG_PAGE_SIZE; i++) {
+      const fresh = tpl.content.firstElementChild;
+      if (!(fresh instanceof HTMLElement)) return;
+      lotsGrid.appendChild(fresh.cloneNode(true));
+    }
+  }
+
+  /** Подгрузка идёт скелетонами K1 — не текстом-заглушкой (AGENTS.md). */
+  function addLoadingSkeletons(): void {
+    if (!(lotsGrid instanceof HTMLElement)) return;
+    const tpl = lotsSkeletonTpl;
+    if (!(tpl instanceof HTMLTemplateElement)) return;
+    for (let i = 0; i < 3; i++) {
+      const fresh = tpl.content.firstElementChild;
+      if (!(fresh instanceof HTMLElement)) return;
+      const clone = fresh.cloneNode(true) as HTMLElement;
+      // Маркер свой: серверные скелетоны снимает первая отрисовка, эти — ответ.
+      clone.removeAttribute('data-lot-skeleton');
+      clone.dataset.lotsLoading = '1';
+      lotsGrid.appendChild(clone);
+    }
+  }
+
+  function removeLoadingSkeletons(): void {
+    document.querySelectorAll('[data-lots-loading]').forEach((node) => node.remove());
+  }
+
+  function updateLotsUi(): void {
+    const empty = lotsLoaded && lotStates.length === 0;
+    setNote(lotsFailed ? LOTS_FAIL_TEXT : empty ? LOTS_EMPTY_TEXT : null);
+    // Блок подгрузки — единственная кнопка повтора и для первой страницы.
+    toggle(lotsMore, lotsFailed || (lotsLoaded && lotHasMore));
+    if (lotsMoreBtn instanceof HTMLButtonElement) {
+      lotsMoreBtn.disabled = lotsMoreState === 'loading';
+      lotsMoreBtn.textContent =
+        lotsFailed || lotsMoreState === 'error'
+          ? 'Повторить'
+          : lotsMoreState === 'loading'
+            ? 'Загружаю ещё…'
+            : 'Показать ещё';
+    }
+    if (lotsMoreStatus instanceof HTMLElement) {
+      lotsMoreStatus.textContent = lotsMoreState === 'error' ? LOTS_MORE_FAIL_TEXT : '';
+    }
+    // Один live-регион на страницу: объявляем итог чтения, не каждый шаг
+    // (видимая подпись у кнопки остаётся и без объявления).
+    if (lotsFailed) announce(LOTS_FAIL_TEXT);
+    else if (lotsMoreState === 'error') announce(LOTS_MORE_FAIL_TEXT);
+    else if (empty) announce(LOTS_EMPTY_TEXT);
+  }
+
+  /** Повтор первой страницы: снять заметку об ошибке и вернуть скелетоны. */
+  function prepareFirstPageRetry(): void {
+    if (lotsLoaded) return;
+    lotsFailed = false;
+    lotsMoreState = 'idle';
+    updateLotsUi();
+    resetSkeletons();
+  }
+
+  /** Снимок страниц → сетка: карточки заново, порядок — порядок чтения. */
+  function renderLots(): void {
+    if (!(lotsGrid instanceof HTMLElement) || !(lotsTpl instanceof HTMLTemplateElement)) return;
+    clearSkeletons();
+    removeLoadingSkeletons();
+    lotCards.clear();
+    lotsGrid.replaceChildren();
+    const balance = live.balance();
+    const uid = live.uid();
+    for (const state of lotStates) {
+      const fresh = lotsTpl.content.firstElementChild;
+      if (!(fresh instanceof HTMLElement)) break;
+      const card = fresh.cloneNode(true) as HTMLElement;
+      lotCards.set(state.slug, card);
+      fillLot(card, state, { balance, uid, mineLabel: MINE_LABEL });
+      lotsGrid.appendChild(card);
+    }
+    updateLotsUi();
+  }
+
+  /** Баланс/uid изменились — перекрасить кнопки и цену, не перезапрашивая. */
+  function repaintLots(): void {
+    const balance = live.balance();
+    const uid = live.uid();
+    for (const state of lotStates) {
+      const card = lotCards.get(state.slug);
+      if (card) fillLot(card, state, { balance, uid, mineLabel: MINE_LABEL });
+    }
+  }
+
+  /**
+   * Перечитать первую страницу: после сделок снимок владельца мог измениться,
+   * окно страниц сбрасывается на первую. Ошибка после успешного ответа
+   * последний хороший снимок не затирает (как и в паспорте).
+   */
+  async function reloadLots(uid: string): Promise<void> {
+    lotsReloading = true;
+    const generation = ++lotsGeneration;
+    lotsMoreState = 'idle';
+    const result = await readOwnerLotsPage(uid, null, CATALOG_PAGE_SIZE);
+    if (generation !== lotsGeneration) return;
+    lotsReloading = false;
+    if (!result.ok) {
+      if (!lotsLoaded) {
+        lotsFailed = true;
+        clearSkeletons();
+        removeLoadingSkeletons();
+        updateLotsUi();
+      }
+      return;
+    }
+    lotsFailed = false;
+    lotsLoaded = true;
+    lotStates = [...result.states];
+    lotCursor = catalogCursor(result.states);
+    lotHasMore = result.hasMore;
+    renderLots();
+  }
+
+  /** Сентинел в зоне подгрузки: короткая страница — тянем следующую. */
+  function sentinelNear(): boolean {
+    if (!(lotsMore instanceof HTMLElement) || lotsMore.classList.contains('hidden')) return false;
+    return lotsMore.getBoundingClientRect().top <= window.innerHeight + 600;
+  }
+
+  /** Догрузить страницу; `manual` — клик, он же снимает блок ошибки. */
+  async function loadMore(uid: string, manual: boolean): Promise<void> {
+    if (!lotsLoaded || lotsReloading || lotsMoreState === 'loading' || !lotHasMore) return;
+    if (lotsMoreState === 'error' && !manual) return;
+    const generation = lotsGeneration;
+    lotsMoreState = 'loading';
+    updateLotsUi();
+    addLoadingSkeletons();
+    const result = await readOwnerLotsPage(uid, lotCursor, CATALOG_PAGE_SIZE);
+    // Пока страница ехала, первую перечитали — ответ устарел вместе со снимком.
+    if (generation !== lotsGeneration) return;
+    if (!result.ok) {
+      removeLoadingSkeletons();
+      lotsMoreState = 'error';
+      updateLotsUi();
+      return;
+    }
+    lotsMoreState = 'idle';
+    lotStates = appendCatalogPage(lotStates, result.states);
+    lotCursor = catalogCursor(result.states) ?? lotCursor;
+    lotHasMore = result.hasMore;
+    renderLots();
+    // Пересечение уже было — нового колбэка не будет: сентинел всё ещё в зоне
+    // загрузки (страница не заполнила экран) — тянем следующую.
+    if (lotHasMore && sentinelNear()) void loadMore(uid, false);
+  }
+
+  /**
+   * Секция покупок и ссылка «Вся история →» появляются вместе с профилем.
+   * Ссылка живёт отдельно от строк: сбой превью не отнимает путь в полный лог.
+   */
+  function revealPurchases(uid: string): void {
+    if (purchasesSection instanceof HTMLElement) purchasesSection.hidden = false;
+    if (purchasesMore instanceof HTMLAnchorElement) {
+      purchasesMore.href = dealFilterUrl(
+        { mode: 'user', uid },
+        new URL(`${base}deals/`, window.location.origin)
+      ).toString();
+      purchasesMore.classList.remove('hidden');
+    }
+  }
+
+  /** Строка превью: дата, название, цена; вся площадь ведёт на страницу привета. */
+  function purchasesRow(entry: DealEntry): HTMLLIElement {
+    const row = document.createElement('li');
+    const link = document.createElement('a');
+    link.href = lotUrl(entry.slug);
+    link.className =
+      'flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 py-2 hover:text-ember';
+
+    const date = document.createElement('span');
+    date.className = 'text-xs font-bold whitespace-nowrap text-mist';
+    // Дата, а не «54 ч назад»: превью живёт на профиле, относительное время
+    // там устаревает без перечитывания (спека: дата, название, цена).
+    date.textContent = formatProfileDate(entry.created_at);
+
+    const title = document.createElement('span');
+    title.className = 'min-w-0 flex-1 font-extrabold break-words';
+    title.textContent = entry.title;
+
+    const price = document.createElement('span');
+    price.className = 'font-black whitespace-nowrap text-pivko';
+    price.textContent = `${formatProfileNumber(entry.price)} 🍺`;
+
+    link.append(date, title, price);
+    row.append(link);
+    return row;
+  }
+
+  function renderPurchases(entries: readonly DealEntry[]): void {
+    if (!(purchasesList instanceof HTMLElement)) return;
+    purchasesList.replaceChildren(...entries.map(purchasesRow));
+    const shown = entries.length > 0;
+    toggle(purchasesSkeleton, false);
+    toggle(purchasesList, shown);
+    toggle(purchasesEmpty, !shown);
+    toggle(purchasesError, false);
+    announce(shown ? `Последние покупки: ${entries.length}` : 'Покупок пока нет');
+  }
+
+  /** Строки и ошибка меняются, но «Вся история →» остаётся: путь в лог цел. */
+  function showPurchasesLoading(): void {
+    toggle(purchasesSkeleton, true);
+    toggle(purchasesList, false);
+    toggle(purchasesEmpty, false);
+    toggle(purchasesError, false);
+    announce('Загружаю историю покупок…');
+  }
+
+  function showPurchasesError(): void {
+    toggle(purchasesSkeleton, false);
+    toggle(purchasesList, false);
+    toggle(purchasesEmpty, false);
+    toggle(purchasesError, true);
+    announce('История покупок не загрузилась');
+  }
+
+  /** Подгрузка превью: одно чтение в полёте + один хвостовой проход. */
+  let purchasesLoading = false;
+  let purchasesPending = false;
+
+  /**
+   * Последние пять покупок профиля — существующий лог сделок с фильтром по
+   * `buyer_uid`. `first` — первая загрузка: только она показывает ошибку;
+   * фоновая ошибка не стирает уже показанные строки.
+   */
+  async function loadPurchases(first: boolean): Promise<void> {
+    const uid = profileUid;
+    if (uid === null) return;
+    if (purchasesLoading) {
+      purchasesPending = true;
+      return;
+    }
+    purchasesLoading = true;
+    let initial = first;
+    try {
+      do {
+        purchasesPending = false;
+        revealPurchases(uid);
+        const page = await fetchDealLog(PURCHASES_PREVIEW, null, uid);
+        if (page.ok) renderPurchases(page.entries);
+        else if (initial) showPurchasesError();
+        initial = false;
+      } while (purchasesPending);
+    } finally {
+      purchasesLoading = false;
+    }
+  }
+
+  /**
+   * Чтение профиля. `first` — это первая загрузка состояния: только она
+   * показывает «не найден»/«не загрузилось». После первого успеха фоновая
+   * ошибка не затирает последний хороший паспорт.
+   */
+  async function load(uid: string, first: boolean): Promise<void> {
+    if (loading) {
+      pendingReload = true;
+      return;
+    }
+    loading = true;
+    let initial = first;
+    try {
+      do {
+        pendingReload = false;
+        const [result] = await Promise.all([fetchPublicProfile(uid), reloadLots(uid)]);
+        if (result.status === 'ok') {
+          fill(result.profile);
+          showState('ready');
+          announce(`Профиль ${result.profile.caption} загружен`);
+        } else if (initial) {
+          const missing = result.status === 'not-found';
+          showState(missing ? 'notfound' : 'error');
+          announce(missing ? 'Профиль не найден' : 'Профиль не загрузился — попробуй ещё');
+        }
+        initial = false;
+      } while (pendingReload);
+    } finally {
+      loading = false;
+    }
+  }
+
+  if (logout instanceof HTMLButtonElement) {
+    logout.addEventListener('click', () => {
+      if (logout.disabled) return;
+      logout.disabled = true;
+      void signOut().finally(() => window.location.assign(base));
+    });
+  }
+
+  if (profileUid === null) {
+    showState('notfound');
+    announce('Профиль не найден');
+  } else {
+    const targetUid = profileUid;
+    // Секция K1 скрыта атрибутом `hidden` (как соседние покупки): класс
+    // `hidden` её бы не открыл. Скелетоны внутри видны с этого момента.
+    if (lotsSection instanceof HTMLElement) lotsSection.hidden = false;
+    showState('loading');
+    void load(targetUid, true);
+    void loadPurchases(true);
+
+    if (retry instanceof HTMLButtonElement) {
+      retry.addEventListener('click', () => {
+        showState('loading');
+        announce('Загружаю профиль…');
+        prepareFirstPageRetry();
+        void load(targetUid, true);
+      });
+    }
+
+    if (lotsMoreBtn instanceof HTMLButtonElement) {
+      lotsMoreBtn.addEventListener('click', () => {
+        if (!lotsLoaded) {
+          // Первая страница не пришла: та же кнопка повторяет чтение снимка.
+          prepareFirstPageRetry();
+          void load(targetUid, false);
+          return;
+        }
+        void loadMore(targetUid, true);
+      });
+    }
+
+    // Подгрузка — скроллом к сентинелу; кнопка остаётся для клавиатуры и как
+    // повтор после ошибки. rootMargin — начинать заранее.
+    if (lotsMore && 'IntersectionObserver' in window) {
+      const observer = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((entry) => entry.isIntersecting)) void loadMore(targetUid, false);
+        },
+        { rootMargin: '600px 0px' }
+      );
+      observer.observe(lotsMore);
+    }
+
+    if (purchasesRetry instanceof HTMLButtonElement) {
+      purchasesRetry.addEventListener('click', () => {
+        showPurchasesLoading();
+        void loadPurchases(true);
+      });
+    }
+
+    live.subscribe((change) => {
+      if (change.kind === 'uid') {
+        renderOwn();
+        // «Твой лот» и доступность покупки считаются от сессии — перекраска
+        // без перезапроса, приветы от этого не меняются.
+        repaintLots();
+      }
+      if (change.kind === 'balance') repaintLots();
+      // Сделка и своя покупка — повод перечитать статы, первую страницу
+      // приветов и превью покупок: они меняются на сервере. `sync` (возврат на
+      // вкладку) сюда не входит: он сбрасывал бы окно страниц приветов, а спека
+      // обещает перечитывание после сделок.
+      if (change.kind === 'deals' || change.kind === 'purchase') {
+        void load(targetUid, false);
+        void loadPurchases(false);
+      }
+    });
+  }
+</script>

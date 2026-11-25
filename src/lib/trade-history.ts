@@ -46,6 +46,8 @@ export interface DealEntry {
   title: string;
   /** Продавец; у ничейного лота — «Биржа» (`PURCHASE_SELLER_FALLBACK`). */
   seller: string;
+  /** UID продавца; `''` только у «Биржи» (нет аккаунта) — ник текстом. */
+  seller_uid: string;
   buyer: string;
   /** Пометка «ТВОЙ»: uid покупателя. */
   buyer_uid: string;
@@ -68,6 +70,8 @@ export interface HistoryEntry {
   /** Номер строки `purchases` — ключ дедупа при слиянии и вторая часть курсора. */
   id: number;
   from: string;
+  /** UID продавца; `''` только у «Биржи» (нет аккаунта) — ник текстом. */
+  seller_uid: string;
   to: string;
   price: number;
   buyer_uid: string;
@@ -104,6 +108,21 @@ export interface TradeRow {
 /** Непустая строка или null: пустое значение — это отсутствие, а не текст. */
 function asText(value: unknown): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+/**
+ * Продавец записи: подпись и uid всегда согласованы. Продавца-аккаунта нет
+ * (`seller_uid` null) — «Биржа» без ссылки. Аккаунт есть, но ник потерян
+ * (старые seed-лоты) — подпись «чатерс» и ссылка по uid: «Биржа» под ссылкой
+ * врала бы, а профиль такого счёта сам покажет «@чатерс». Ник есть, uid нет
+ * (старая запись) — текст без ссылки.
+ */
+function sellerOf(row: TradeRow): { name: string; uid: string } {
+  const login = asText(row.seller_login);
+  const uid = asText(row.seller_uid) ?? '';
+  if (login !== null) return { name: login, uid };
+  if (uid.length > 0) return { name: 'чатерс', uid };
+  return { name: PURCHASE_SELLER_FALLBACK, uid: '' };
 }
 
 /** Конечный положительный id строки или null (без него курсор и дедуп не стоят). */
@@ -145,9 +164,11 @@ export function historyEntries(rows: readonly TradeRow[]): HistoryEntry[] {
     const price = asPrice(row.price_paid);
     const created_at = asTime(row.created_at);
     if (id === null || to === null || price === null || created_at === null) continue;
+    const seller = sellerOf(row);
     entries.push({
       id,
-      from: asText(row.seller_login) ?? PURCHASE_SELLER_FALLBACK,
+      from: seller.name,
+      seller_uid: seller.uid,
       to,
       price,
       buyer_uid: asText(row.buyer_uid) ?? '',
@@ -177,11 +198,13 @@ export function dealEntries(rows: readonly TradeRow[]): DealEntry[] {
     }
     const slug = asText(lot['slug']);
     if (slug === null) continue;
+    const seller = sellerOf(row);
     entries.push({
       id,
       slug,
       title: asText(lot['title']) ?? slug,
-      seller: asText(row.seller_login) ?? PURCHASE_SELLER_FALLBACK,
+      seller: seller.name,
+      seller_uid: seller.uid,
       buyer,
       buyer_uid: asText(row.buyer_uid) ?? '',
       price,
@@ -376,10 +399,15 @@ export function outbidCatchup(rows: readonly TradeRow[], uid: string, limit: num
     const at = created === null ? NaN : Date.parse(created);
     if (price === null || !Number.isFinite(at)) continue;
     const title = asText(lot['title']);
+    // Ник потерян, но аккаунт известен — общая подпись и живая ссылка;
+    // «Чатерс» без uid остаётся текстом.
+    const login = asText(row.buyer_login);
+    const buyerUid = asText(row.buyer_uid);
     events.push({
       slug,
       title: title ?? slug,
-      by: asText(row.buyer_login) ?? BUYER_FALLBACK,
+      by: login ?? (buyerUid !== null ? 'чатерс' : BUYER_FALLBACK),
+      buyer_uid: buyerUid,
       price,
       at,
       video: asText(lot['video_url']),

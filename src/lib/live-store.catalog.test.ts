@@ -438,6 +438,7 @@ describe('createCatalogOwner', () => {
         slug: 'lot-mine',
         title: 'Мой',
         by: 'carol',
+        buyer_uid: 'u3',
         price: 150,
         video: 'https://media/lot-mine.mp4',
       },

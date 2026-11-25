@@ -73,12 +73,7 @@ const base = import.meta.env.BASE_URL;
         </button>
       </div>
 
-      <section
-        data-lot-cell="history"
-        data-lot-history
-        aria-label="История перепродаж"
-        class="card-pixel hidden p-5 sm:p-8"
-      >
+      <section data-lot-cell="history" data-lot-history class="card-pixel hidden p-5 sm:p-8">
         <!-- Направление истории неочевидно: подпись
              показывается только когда есть что листать — над пустой историей
              она лишняя. -->
@@ -140,6 +135,7 @@ const base = import.meta.env.BASE_URL;
   import { HISTORY_PAGE_SIZE, formatRelativeTime, type HistoryEntry } from '@/lib/trade-history';
   import { live, type LotState } from '@/lib/live';
   import { fillLot } from '@/lib/lot-view';
+  import { profileNick } from '@/lib/profile-link';
 
   const slug = (new URLSearchParams(window.location.search).get('id') ?? '').trim();
 
@@ -247,6 +243,14 @@ const base = import.meta.env.BASE_URL;
   }
 
   /**
+   * Ник в истории перепродаж: ссылка на профиль, когда uid валиден; «Биржа» и
+   * ник без uid остаются текстом. Жирность наследует список (`font-bold`).
+   */
+  function nickEl(name: string, uid: string): HTMLElement {
+    return profileNick(name, uid, { tag: 'b' });
+  }
+
+  /**
    * Строка истории: `from → to · price` + пометки и относительное время.
    * `uid` — своя покупка («ТВОЙ»), `author` — ник автора привета: его продажа
    * получает знак «автор».
@@ -261,9 +265,9 @@ const base = import.meta.env.BASE_URL;
     who.className = 'break-all';
     // Пометки стоят у своего ника, а не в конце строки: «автор» — у продавца
     // (в сделке автора он и есть продавец), «ТВОЙ» — у покупателя.
-    who.append(textEl('b', '', entry.from));
+    who.append(nickEl(entry.from, entry.seller_uid));
     if (author !== null && entry.from === author) who.append(mark('автор', 'bg-legend'));
-    who.append(textEl('span', 'text-mist', ' → '), textEl('b', '', entry.to));
+    who.append(textEl('span', 'text-mist', ' → '), nickEl(entry.to, entry.buyer_uid));
     if (uid !== null && entry.buyer_uid !== '' && entry.buyer_uid === uid) {
       who.append(mark('ТВОЙ', 'bg-pivko'));
     }

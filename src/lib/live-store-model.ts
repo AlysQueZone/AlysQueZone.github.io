@@ -76,6 +76,8 @@ export interface LiveOutbid {
   slug: string;
   title: string;
   by: string;
+  /** uid нового владельца — ссылка на профиль; null — ник остаётся текстом. */
+  buyer_uid: string | null;
   price: number;
   at: number;
   video: string | null;
@@ -139,12 +141,17 @@ export function mergeLotState(
   return { state: raw, changed: true };
 }
 
-/** Событие перекупа из свежей строки: один строитель на все диффы. */
+/**
+ * Событие перекупа из свежей строки: один строитель на все диффы. Подпись и
+ * uid согласованы: ник потерян, но счёт известен — «чатерс» и ссылка;
+ * «Чатерс» без uid остаётся текстом.
+ */
 export function outbidFrom(st: LotState): LiveOutbid {
   return {
     slug: st.slug,
     title: st.title,
-    by: st.owner_login ?? 'Чатерс',
+    by: st.owner_login ?? (st.owner_uid !== null ? 'чатерс' : 'Чатерс'),
+    buyer_uid: st.owner_uid,
     price: st.price,
     at: Date.now(),
     video: st.video_url,

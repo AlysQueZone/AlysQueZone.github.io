@@ -7,16 +7,19 @@
  * стандартные слоты, какие есть в корне, в одном порядке:
  * - `[data-lot-link]` — ссылка на страницу Лота (`lotUrl`);
  * - `[data-lot-title]` — заголовок с эмоутами (`lib/emotes.ts`);
+ * - `[data-lot-price]` — отдельная строка цены: только раскладка K1 на профиле;
  * - `[data-lot-video-root]` — видео; ориентация кадра — на кадр
  *   (`data-media-orientation`, для CSS), подложка квадрата — карточкам;
  * - `[data-owner-badge]` / `[data-free-badge]` / `[data-mine-badge]` — бейджи;
+ *   владелец с uid — ссылка на профиль (`profileHref`), без uid — текст;
  * - `[data-buy-intent]` — кнопка покупки (`lib/buy-intent.ts`).
  * Свои поля поверхность правит сама: title документа и автор привета —
  * страница Лота, сортировка и reconcile — витрина.
  */
 import { setTitleEmotes } from './emotes';
 import { fillVideo, initLotVideos, type MediaOrientation } from './lot-video';
-import { buyAvailability, formatStaged, writeBuyIntent } from './buy-intent';
+import { buyAvailability, formatStaged, writeBuyIntent, type BuyIntent } from './buy-intent';
+import { profileHref } from './profile';
 import type { LotState } from './live-store-model';
 
 /** Адрес страницы Лота — один на все поверхности (`?id=` — slug). */
@@ -29,11 +32,74 @@ export function isMine(st: LotState, uid: string | null): boolean {
   return uid !== null && st.owner_uid === uid;
 }
 
+/** Бейдж владельца: ник (и доступное имя) и адрес профиля. */
+export interface OwnerBadgeView {
+  /** Ник без короны; пусто — владельца нет, бейдж скрыт («свободен» на месте). */
+  login: string;
+  /** Адрес профиля владельца; null — бейдж остаётся текстом («Биржа», нет uid). */
+  href: string | null;
+}
+
+/**
+ * Владелец Лота — ссылка на профиль только по `owner_uid` (uid — идентичность,
+ * логин — подпись). Нет uid («Биржа», старый лот) — текст без `href`; лот
+ * свободен — бейджа нет. Одно правило на Карточку Лота и страницу Лота.
+ */
+export function ownerBadgeView(st: LotState): OwnerBadgeView {
+  const login = typeof st.owner_login === 'string' ? st.owner_login.trim() : '';
+  const uid =
+    typeof st.owner_uid === 'string' && st.owner_uid.trim().length > 0 ? st.owner_uid : null;
+  // Аккаунт есть, ник потерян — общая подпись и ссылка; иначе лот с владельцем
+  // выглядел бы свободным, а «свободен» — это лот без owner_uid.
+  if (login.length === 0 && uid === null) return { login: '', href: null };
+  return { login: login || 'чатерс', href: profileHref(uid) };
+}
+
 export interface LotViewOptions {
   /** Баланс — зеркало серверного гейта: не хватает — кнопка гаснет. */
   balance?: number | null;
   /** uid текущей сессии: «Твой» и «Твой привет» считаются при отрисовке. */
   uid?: string | null;
+  /**
+   * Надпись погашенной кнопки своего Лота. По умолчанию «Твой привет»;
+   * профиль говорит «Твой лот» (раскладка K1, docs/adr/0009).
+   */
+  mineLabel?: string;
+}
+
+/** Надпись и доступность кнопки покупки — одно правило на все поверхности. */
+export interface BuyButtonView {
+  text: string;
+  /** Погашена: свой Лот или не хватает баланса — общий opacity. */
+  disabled: boolean;
+}
+
+/**
+ * Надпись и доступность кнопки покупки по намерению Лота. Отдельно от DOM:
+ * правка формы тут меняет все экраны, а тест держит слова и состояния
+ * (`fillBuyButton` только переносит результат на кнопку).
+ *
+ * Исключения: свой Лот — `mineLabel` (по умолчанию «Твой привет»; цены нет,
+ * покупка невозможна), не хватает баланса — «Не хватает · N 🍺», N неизвестна —
+ * «…» (намерение несёт `price: null`, сервер посчитает сам).
+ */
+export function buyButtonView(
+  intent: BuyIntent,
+  opts: { balance?: number | null; mine?: boolean; mineLabel?: string } = {}
+): BuyButtonView {
+  const availability = buyAvailability(intent, opts.balance ?? null);
+  const mine = opts.mine ?? false;
+  // Свой лот купить нельзя (перекуп у себя бессмыслен) — кнопка гаснет.
+  // N неизвестна — не гасим по балансу: сравнить не с чем, решает сервер.
+  const off = mine || availability === 'short';
+  return {
+    text: mine
+      ? (opts.mineLabel ?? 'Твой привет')
+      : availability === 'short'
+        ? `Не хватает · ${formatStaged(intent.price)} 🍺`
+        : `▶ Забрать за ${formatStaged(intent.price)} 🍺`,
+    disabled: off,
+  };
 }
 
 /**
@@ -52,6 +118,11 @@ export function fillLot(root: Element | null, st: LotState, opts: LotViewOptions
 
   setTitleEmotes(root.querySelector('[data-lot-title]'), st.title);
 
+  // Отдельная строка цены — только у раскладки K1 на профиле (docs/adr/0009):
+  // у витрины и страницы Лота цена остаётся в кнопке.
+  const price = root.querySelector('[data-lot-price]');
+  if (price instanceof HTMLElement) price.textContent = `${formatStaged(st.nextPrice)} 🍺`;
+
   const media = root.querySelector<HTMLElement>('[data-lot-video-root]');
   if (media) {
     if (st.video_url) {
@@ -66,7 +137,13 @@ export function fillLot(root: Element | null, st: LotState, opts: LotViewOptions
   }
 
   fillOwnerBadges(root, st, mine);
-  fillBuyButton(root.querySelector('[data-buy-intent]'), st, opts.balance ?? null, mine);
+  fillBuyButton(
+    root.querySelector('[data-buy-intent]'),
+    st,
+    opts.balance ?? null,
+    mine,
+    opts.mineLabel
+  );
   // «Смотреть» — часть представления: поверхность не помнит второй шаг
   // (initLotVideos идемпотентен и не трогает уже навешенный клик).
   initLotVideos(root);
@@ -118,42 +195,56 @@ function removeSquareBlur(frame: HTMLElement): void {
 /**
  * Заполнить бейджи владельца над кадром — один контракт разметки на карточку
  * витрины и страницу Лота (`LotBadges`: data-owner-badge / data-free-badge /
- * data-mine-badge). Владелец — тёмный бейдж с короной, у свободного Лота
- * показан светлый «свободен»; «Твой» — по селектору isMine. Отдельной строки с
+ * data-mine-badge). Владелец — тёмный бейдж с короной: с uid это ссылка на
+ * профиль (доступное имя — ник), без uid — текст; у свободного Лота показан
+ * светлый «свободен», «Твой» — по селектору isMine. Отдельной строки с
  * владельцем нет: как на витрине, так и в подробностях.
  */
 function fillOwnerBadges(root: ParentNode | null, st: LotState, mine: boolean): void {
   if (!root) return;
-  const owned = Boolean(st.owner_login);
+  const view = ownerBadgeView(st);
   const owner = root.querySelector('[data-owner-badge]');
   if (owner instanceof HTMLElement) {
-    owner.textContent = owned ? `👑 ${st.owner_login}` : '';
-    owner.classList.toggle('hidden', !owned);
+    // Корона — отдельный `aria-hidden`-спан: доступное имя ссылки — ник, и
+    // видимый ник входит в него (Label in Name). Подпись пишем в свой слот,
+    // иначе span-корона стёрлась бы textContent.
+    const name = owner.querySelector('[data-owner-name]');
+    if (name instanceof HTMLElement) name.textContent = view.login;
+    else owner.textContent = view.login;
+    owner.classList.toggle('hidden', view.login.length === 0);
+    if (owner instanceof HTMLAnchorElement) {
+      // Ссылка — настоящий href, а не обработчик: клавиатура и контекстное
+      // меню работают штатно. Нет uid — атрибуты снимаются: `a` без href и
+      // aria-label читается как текст и из Tab выпадает.
+      if (view.href === null) {
+        owner.removeAttribute('href');
+        owner.removeAttribute('aria-label');
+      } else {
+        owner.href = view.href;
+        owner.setAttribute('aria-label', view.login);
+      }
+    }
   }
   const free = root.querySelector('[data-free-badge]');
-  if (free instanceof HTMLElement) free.classList.toggle('hidden', owned);
+  if (free instanceof HTMLElement) free.classList.toggle('hidden', view.login.length > 0);
   const mineBadge = root.querySelector('[data-mine-badge]');
   if (mineBadge instanceof HTMLElement) mineBadge.classList.toggle('hidden', !mine);
 }
 
 /**
  * Заполнить кнопку покупки данными Лота — намерение через lib/buy-intent.ts
- * (`data-buy-intent`), правило «не хватает» — оттуда же (buyAvailability).
- * Одно место на витрину, страницу Лота и главную: правка формы тут меняет
- * все экраны. `balance` — зеркало серверного гейта: N известна и баланс
- * меньше — кнопка гаснет с честной надписью, но цена в ней остаётся
- * («Не хватает · N 🍺»). Исключения: свой Лот — «Твой привет» (цены нет,
- * покупка невозможна), N неизвестна — «…» (намерение несёт price: null,
- * сервер посчитает сам).
+ * (`data-buy-intent`), надпись и доступность — из `buyButtonView`.
+ * `mineLabel` — своя надпись своего Лота (профиль: «Твой лот»).
  */
 function fillBuyButton(
   btn: Element | null,
   st: LotState,
   balance: number | null = null,
-  mine = false
+  mine = false,
+  mineLabel?: string
 ): void {
   if (!(btn instanceof HTMLButtonElement)) return;
-  const intent = {
+  const intent: BuyIntent = {
     slug: st.slug,
     title: st.title,
     price: st.nextPrice,
@@ -161,15 +252,8 @@ function fillBuyButton(
     video: st.video_url,
   };
   writeBuyIntent(btn, intent);
-  // Свой лот купить нельзя (перекуп у себя бессмыслен) — кнопка гаснет.
-  // N неизвестна — не гасим по балансу: сравнить не с чем, решает сервер.
-  const availability = buyAvailability(intent, balance);
-  const off = mine || availability === 'short';
-  btn.disabled = off;
-  btn.textContent = mine
-    ? 'Твой привет'
-    : availability === 'short'
-      ? `Не хватает · ${formatStaged(st.nextPrice)} 🍺`
-      : `▶ Забрать за ${formatStaged(st.nextPrice)} 🍺`;
-  btn.classList.toggle('opacity-50', off);
+  const view = buyButtonView(intent, { balance, mine, mineLabel });
+  btn.disabled = view.disabled;
+  btn.textContent = view.text;
+  btn.classList.toggle('opacity-50', view.disabled);
 }

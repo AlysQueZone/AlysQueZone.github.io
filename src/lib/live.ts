@@ -14,12 +14,14 @@
  * (`live.refreshBalance()`, `live.refreshLot(slug)`). Каталог читается срезом
  * страницы: витрина `/lots/` включает страницы (`live.useCatalogPages`),
  * главная — случайную выборку (`live.useRandomLots`), страница лота — один
- * лот (`live.useLot`); «Мои приветы» — отдельный запрос владельца
- * (`live.trackMyLots`). Полный каталог не читает никто (docs/adr/0012).
+ * лот (`live.useLot`); приветы владельца на профиле листаются страницами
+ * (`readOwnerLotsPage`), полный список владельца для колокольчика — отдельный
+ * запрос (`live.trackMyLots`). Полный каталог не читает никто (docs/adr/0012).
  * Модуль сам поднимается на первом subscribe / refresh / report — отдельного
  * «старта» у поверхностей нет.
  */
 import { getSupabase, withAuthRetry } from './session';
+import { parseProfileUid } from './profile';
 import type { CatalogCursor } from './catalog-page';
 import { createLiveRegistry, type LivePayload, type LiveTransport } from './live-core';
 import {
@@ -131,6 +133,40 @@ async function readList(
   }
 }
 
+/**
+ * Страница в порядке витрины `(price, slug)` после курсора. `ownerUid`
+ * фильтрует приветы владельца (профиль) — механика листания одна, второй
+ * формулы курсора нет. Строк берём на одну больше: по ней честно знаем
+ * «есть ещё».
+ */
+async function readOrderedPage(
+  ownerUid: string | null,
+  cursor: CatalogCursor | null,
+  limit: number
+): Promise<CatalogPageRead> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, states: [], hasMore: false };
+  const cap = Math.max(1, Math.floor(limit));
+  const read = await readList((table, columns) => {
+    let query = sb
+      .from(table)
+      .select(columns)
+      .order('price', { ascending: true })
+      .order('slug', { ascending: true })
+      .limit(cap + 1);
+    if (ownerUid !== null) query = query.eq('owner_uid', ownerUid);
+    if (cursor) {
+      query = query.or(
+        `price.gt.${cursor.price},and(price.eq.${cursor.price},slug.gt.${cursor.slug})`
+      );
+    }
+    return query;
+  });
+  if (!read.ok) return { ok: false, states: [], hasMore: false };
+  const list = fillCatalogList(read.rows);
+  return { ok: true, states: list.slice(0, cap), hasMore: list.length > cap };
+}
+
 /** Читатели живых данных поверх Supabase (ядро зовёт их, DOM/сети не знает). */
 function supabaseReaders(): LiveReaders {
   return {
@@ -186,29 +222,9 @@ function supabaseReaders(): LiveReaders {
      * Одна страница витрины после курсора (null — первая). Keyset по паре
      * `(price, slug)`: цена меняется от перекупов, slug добивает ничью и
      * держит границу страниц на месте (offset бы сдвинулся живой вставкой).
-     * Строк берём на одну больше — по ней честно знаем «есть ещё».
      */
     async readCatalogPage(cursor: CatalogCursor | null, limit: number): Promise<CatalogPageRead> {
-      const sb = getSupabase();
-      if (!sb) return { ok: false, states: [], hasMore: false };
-      const cap = Math.max(1, Math.floor(limit));
-      const read = await readList((table, columns) => {
-        let query = sb
-          .from(table)
-          .select(columns)
-          .order('price', { ascending: true })
-          .order('slug', { ascending: true })
-          .limit(cap + 1);
-        if (cursor) {
-          query = query.or(
-            `price.gt.${cursor.price},and(price.eq.${cursor.price},slug.gt.${cursor.slug})`
-          );
-        }
-        return query;
-      });
-      if (!read.ok) return { ok: false, states: [], hasMore: false };
-      const list = fillCatalogList(read.rows);
-      return { ok: true, states: list.slice(0, cap), hasMore: list.length > cap };
+      return readOrderedPage(null, cursor, limit);
     },
 
     /**
@@ -282,6 +298,24 @@ function supabaseReaders(): LiveReaders {
   };
 }
 
+/**
+ * Приветы владельца страницами — профиль чатерса. Тот же keyset `(price, slug)`
+ * и те же колонки/маппер, что у витрины, плюс фильтр `owner_uid`; срез
+ * каталога профиль не включает (docs/adr/0012) и снапшот не трогает: это
+ * снимок страницы, а не живое окно. Индекс — `lots_owner_uid_idx`.
+ * Не uuid (пусто, «Биржа», мусор) — честный отказ без запроса: Postgres упал
+ * бы на cast в uuid (22P02). Валидный uid приводится к канону (`eq` — точный).
+ */
+export function readOwnerLotsPage(
+  uid: string,
+  cursor: CatalogCursor | null,
+  limit: number
+): Promise<CatalogPageRead> {
+  const ownerUid = parseProfileUid(uid);
+  if (ownerUid === null) return Promise.resolve({ ok: false, states: [], hasMore: false });
+  return readOrderedPage(ownerUid, cursor, limit);
+}
+
 // ---------------------------------------------------------------------------
 // Транспорт Realtime: реестр каналов ядра, канал на «таблица+событие+
 // фильтр», реф-каунт долей.
@@ -323,7 +357,11 @@ function supabaseTransport(): LiveTransport {
 const registry = createLiveRegistry(supabaseTransport());
 const store = createLiveStore(supabaseReaders());
 
-/** Баланс из payload профиля: строка видна только своя (RLS) — без чтения. */
+/**
+ * Баланс из payload профиля — без чтения. Строка приходит по своему каналу
+ * (фильтр `user_id=eq.<uid>`); публичная политика `profiles` этому не мешает,
+ * но чужие строки в снапшот не попадают (docs/adr/0014).
+ */
 function balanceFromPayload(payload: LivePayload): number | null {
   const row = (payload.new ?? {}) as Record<string, unknown>;
   return normalizeBalance(row['balance']);

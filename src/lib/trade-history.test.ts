@@ -45,6 +45,7 @@ function entry(overrides: Partial<HistoryEntry> = {}): HistoryEntry {
   return {
     id: 1,
     from: 'author',
+    seller_uid: 'author-uid',
     to: 'buyer',
     price: 880,
     buyer_uid: 'buyer-uid',
@@ -65,6 +66,7 @@ describe('historyEntries', () => {
       {
         id: 1,
         from: 'melkij_strateg',
+        seller_uid: 'author-uid',
         to: 'foxindique',
         price: 880,
         buyer_uid: 'buyer-uid',
@@ -73,10 +75,22 @@ describe('historyEntries', () => {
     ]);
   });
 
-  it('ничейный лот: пустой продавец — «Биржа», а не пустая строка', () => {
+  it('ничейный лот: пустой продавец — «Биржа», uid продавца пуст', () => {
     const entries = historyEntries([purchase({ seller_uid: null, seller_login: null })]);
     expect(entries[0]?.from).toBe(PURCHASE_SELLER_FALLBACK);
+    expect(entries[0]?.seller_uid).toBe('');
     expect(PURCHASE_SELLER_FALLBACK).toBe('Биржа');
+  });
+
+  it('uid продавца сохранён — по нему ник ведёт в профиль', () => {
+    const entries = historyEntries([purchase({ seller_uid: 'seller-me' })]);
+    expect(entries[0]?.seller_uid).toBe('seller-me');
+  });
+
+  it('uid без ника — подпись «чатерс» и ссылка, а не «Биржа» под ссылкой', () => {
+    const entries = historyEntries([purchase({ seller_uid: 'legacy-uid', seller_login: null })]);
+    expect(entries[0]?.from).toBe('чатерс');
+    expect(entries[0]?.seller_uid).toBe('legacy-uid');
   });
 
   it('пустая история — пустой список', () => {
@@ -413,6 +427,7 @@ describe('outbidCatchup', () => {
         slug: 'lot-x',
         title: 'Привет X',
         by: 'carol',
+        buyer_uid: 'buyer-uid',
         price: 150,
         at: Date.parse('2026-10-14T10:00:00.000Z'),
         video: 'https://media/x.mp4',
@@ -420,14 +435,40 @@ describe('outbidCatchup', () => {
     ]);
   });
 
-  it('покупатель без ника — «Чатерс»; без названия — slug', () => {
+  it('покупатель без ника, но с uid — «чатерс» со ссылкой; без названия — slug', () => {
     const events = outbidCatchup(
       [mine({ buyer_login: null, lots: lot({ slug: 'lot-y', title: '' }) })],
       me,
       10
     );
-    expect(events[0]?.by).toBe('Чатерс');
+    expect(events[0]?.by).toBe('чатерс');
+    expect(events[0]?.buyer_uid).toBe('buyer-uid');
     expect(events[0]?.title).toBe('lot-y');
+  });
+
+  it('покупатель без ника и uid — «Чатерс» без ссылки', () => {
+    const events = outbidCatchup(
+      [mine({ buyer_login: null, buyer_uid: null, lots: lot({ slug: 'lot-z' }) })],
+      me,
+      10
+    );
+    expect(events[0]?.by).toBe('Чатерс');
+    expect(events[0]?.buyer_uid).toBeNull();
+  });
+
+  it('uid покупателя из строки: без него — null, ссылкой ник не станет', () => {
+    const events = outbidCatchup(
+      [
+        mine({ buyer_uid: 'carol-uid', buyer_login: 'carol', lots: lot({ slug: 'with-uid' }) }),
+        mine({ buyer_uid: null, buyer_login: 'anon', lots: lot({ slug: 'without-uid' }) }),
+      ],
+      me,
+      10
+    );
+    expect(events.map((event) => [event.slug, event.buyer_uid])).toEqual([
+      ['with-uid', 'carol-uid'],
+      ['without-uid', null],
+    ]);
   });
 
   it('битые строки (нет лота, битая цена/время) отбрасываются', () => {
@@ -452,6 +493,7 @@ function deal(overrides: Partial<DealEntry> = {}): DealEntry {
     slug: 'lot-a',
     title: 'Привет',
     seller: 'author',
+    seller_uid: 'author-uid',
     buyer: 'buyer',
     buyer_uid: 'buyer-uid',
     price: 880,
@@ -493,6 +535,7 @@ describe('dealEntries', () => {
         slug: 'privet',
         title: 'Привет с дачи',
         seller: 'melkij_strateg',
+        seller_uid: 'author-uid',
         buyer: 'foxindique',
         buyer_uid: 'buyer-uid',
         price: 990,
@@ -502,9 +545,21 @@ describe('dealEntries', () => {
     ]);
   });
 
-  it('пустой продавец — «Биржа», а не пустая строка', () => {
-    const entries = dealEntries([purchase({ seller_login: null })]);
+  it('пустой продавец — «Биржа», uid продавца пуст', () => {
+    const entries = dealEntries([purchase({ seller_uid: null, seller_login: null })]);
     expect(entries[0]?.seller).toBe(PURCHASE_SELLER_FALLBACK);
+    expect(entries[0]?.seller_uid).toBe('');
+  });
+
+  it('uid продавца сохранён — по нему ник ведёт в профиль', () => {
+    const entries = dealEntries([purchase({ seller_uid: 'seller-me' })]);
+    expect(entries[0]?.seller_uid).toBe('seller-me');
+  });
+
+  it('uid без ника — «чатерс» и ссылка по uid, а не «Биржа» под ссылкой', () => {
+    const entries = dealEntries([purchase({ seller_uid: 'legacy-uid', seller_login: null })]);
+    expect(entries[0]?.seller).toBe('чатерс');
+    expect(entries[0]?.seller_uid).toBe('legacy-uid');
   });
 
   it('лот без названия — запись остаётся с slug вместо названия', () => {
