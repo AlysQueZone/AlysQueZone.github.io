@@ -67,13 +67,13 @@ export function dealFilterTitle(filter: DealFilter, login: string | null | undef
 }
 
 /**
- * Пустое состояние своим словами: «забери первый привет» — совет только для
- * всей биржи. В чужом фильтре это чужие покупки, советовать нечего; в «Моих» —
- * реплика про тебя. Логина нет — общая честная фраза без ника.
+ * Пустое состояние своим словами: у «Все» и «Моих» — прежняя фраза лога
+ * (совет забрать первый привет уместен и для себя), у чужого фильтра —
+ * покупки другого человека, советовать нечего. Логина нет — общая честная
+ * фраза без ника.
  */
 export function dealFilterEmptyText(filter: DealFilter, login: string | null | undefined): string {
-  if (filter.mode === 'all') return 'Сделок пока нет — забери первый привет';
-  if (filter.mode === 'mine') return 'Ты пока ничего не покупал';
+  if (filter.mode !== 'user') return 'Сделок пока нет — забери первый привет';
   const text = cleanLogin(login);
   return text.length > 0 ? `Покупок у @${text} пока нет` : 'Покупок пока нет';
 }

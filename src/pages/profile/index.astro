@@ -249,7 +249,7 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
     catalogCursor,
     type CatalogCursor,
   } from '@/lib/catalog-page';
-  import { fillLot } from '@/lib/lot-view';
+  import { fillLot, lotUrl } from '@/lib/lot-view';
 
   /** Превью покупок: ровно пятёрка, листания здесь нет. */
   const PURCHASES_PREVIEW = 5;
@@ -420,8 +420,10 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
     if (lotsMoreStatus instanceof HTMLElement) {
       lotsMoreStatus.textContent = lotsMoreState === 'error' ? LOTS_MORE_FAIL_TEXT : '';
     }
-    // Один live-регион на страницу: объявляем итог чтения, не каждый шаг.
+    // Один live-регион на страницу: объявляем итог чтения, не каждый шаг
+    // (видимая подпись у кнопки остаётся и без объявления).
     if (lotsFailed) announce(LOTS_FAIL_TEXT);
+    else if (lotsMoreState === 'error') announce(LOTS_MORE_FAIL_TEXT);
     else if (empty) announce(LOTS_EMPTY_TEXT);
   }
 
@@ -545,7 +547,7 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
   function purchasesRow(entry: DealEntry): HTMLLIElement {
     const row = document.createElement('li');
     const link = document.createElement('a');
-    link.href = `${base}lot/?id=${encodeURIComponent(entry.slug)}`;
+    link.href = lotUrl(entry.slug);
     link.className =
       'flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 py-2 hover:text-ember';
 

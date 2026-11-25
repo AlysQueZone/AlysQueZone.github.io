@@ -111,15 +111,18 @@ function asText(value: unknown): string | null {
 }
 
 /**
- * Продавец записи: подпись и uid всегда согласованы. Нет ника — «Биржа» без
- * uid: продавца либо не было, либо его подпись потеряна (старые seed-лоты),
- * и ссылка на аккаунт под чужой подписью «Биржа» вводила бы в заблуждение.
- * Ник есть, uid нет («Биржа» со старой записью) — текст без ссылки.
+ * Продавец записи: подпись и uid всегда согласованы. Продавца-аккаунта нет
+ * (`seller_uid` null) — «Биржа» без ссылки. Аккаунт есть, но ник потерян
+ * (старые seed-лоты) — подпись «чатерс» и ссылка по uid: «Биржа» под ссылкой
+ * врала бы, а профиль такого счёта сам покажет «@чатерс». Ник есть, uid нет
+ * (старая запись) — текст без ссылки.
  */
 function sellerOf(row: TradeRow): { name: string; uid: string } {
-  const name = asText(row.seller_login);
-  if (name === null) return { name: PURCHASE_SELLER_FALLBACK, uid: '' };
-  return { name, uid: asText(row.seller_uid) ?? '' };
+  const login = asText(row.seller_login);
+  const uid = asText(row.seller_uid) ?? '';
+  if (login !== null) return { name: login, uid };
+  if (uid.length > 0) return { name: 'чатерс', uid };
+  return { name: PURCHASE_SELLER_FALLBACK, uid: '' };
 }
 
 /** Конечный положительный id строки или null (без него курсор и дедуп не стоят). */
@@ -396,11 +399,15 @@ export function outbidCatchup(rows: readonly TradeRow[], uid: string, limit: num
     const at = created === null ? NaN : Date.parse(created);
     if (price === null || !Number.isFinite(at)) continue;
     const title = asText(lot['title']);
+    // Ник потерян, но аккаунт известен — общая подпись и живая ссылка;
+    // «Чатерс» без uid остаётся текстом.
+    const login = asText(row.buyer_login);
+    const buyerUid = asText(row.buyer_uid);
     events.push({
       slug,
       title: title ?? slug,
-      by: asText(row.buyer_login) ?? BUYER_FALLBACK,
-      buyer_uid: asText(row.buyer_uid),
+      by: login ?? (buyerUid !== null ? 'чатерс' : BUYER_FALLBACK),
+      buyer_uid: buyerUid,
       price,
       at,
       video: asText(lot['video_url']),

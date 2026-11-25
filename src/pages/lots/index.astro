@@ -10,9 +10,9 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
 // (см. docs/adr/0002). Шаблон карточки — единственный источник разметки.
 // Скелетонов — ровно на первую страницу: столько же карточек вернёт первый
 // запрос, поэтому загрузка не прыгает.
-// «Мои приветы» живут на профиле (docs/adr/0009): здесь только ссылка в свой
+// «Мои приветы» живут на профиле (docs/adr/0012): здесь только ссылка в свой
 // профиль, гостю — прежняя подсказка входа. Подсказка стартует скрытой:
-// залогиненному её не видно ни кадра (секция JS-driven, no-JS — статический
+// залогиненному её не видно ни кадра (блок JS-driven, no-JS — статический
 // каркас).
 ---
 
@@ -58,6 +58,9 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
         <p data-lots-more-status class="text-sm font-bold text-mist"></p>
       </div>
     </div>
+    <p data-lots-end class="mt-4 hidden text-center text-sm font-bold text-mist">
+      Это все приветы
+    </p>
 
     <SuggestGreeting />
   </section>
@@ -103,6 +106,7 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
   const moreWrap = document.querySelector('[data-lots-more]');
   const moreBtn = document.querySelector('[data-lots-more-btn]');
   const moreStatus = document.querySelector('[data-lots-more-status]');
+  const endNote = document.querySelector('[data-lots-end]');
   const skeletonTpl = document.querySelector('[data-lot-skeleton-template]');
 
   function toggle(el: Element | null, show: boolean): void {
@@ -217,7 +221,9 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
   function updateMoreUi(): void {
     const known = live.catalogKnown();
     const hasMore = live.catalogHasMore();
+    const count = live.catalogWindow().length;
     toggle(moreWrap, known && hasMore);
+    toggle(endNote, known && !hasMore && count > 0);
     if (moreBtn instanceof HTMLButtonElement) {
       moreBtn.disabled = moreState === 'loading';
       moreBtn.textContent =

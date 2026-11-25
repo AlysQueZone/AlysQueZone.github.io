@@ -506,8 +506,16 @@ video:-webkit-full-screen {
   display: none;
 }
 
+/* Подпись «смотреть» визуально скрыта, но остаётся доступным именем кнопки:
+   голый ::after-«▶» скринридер не прочитает. */
 [data-lot-compact] [data-lot-video-play] > span {
-  display: none;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 [data-lot-compact] [data-lot-video-play]::after {

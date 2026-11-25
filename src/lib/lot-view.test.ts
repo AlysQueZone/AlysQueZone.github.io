@@ -28,37 +28,29 @@ describe('ownerBadgeView', () => {
 
   it('владелец с uid — бейдж ведёт в профиль, доступное имя — ник', () => {
     expect(ownerBadgeView(lot({ owner_login: 'alice', owner_uid: OWNER }))).toEqual({
-      text: '👑 alice',
       login: 'alice',
       href: `/profile/?uid=${OWNER}`,
-      label: 'alice',
     });
   });
 
   it('uid не uuid (старые данные, мусор) — бейдж текстом, а не битой ссылкой', () => {
     expect(ownerBadgeView(lot({ owner_login: 'alice', owner_uid: 'u1' }))).toEqual({
-      text: '👑 alice',
       login: 'alice',
       href: null,
-      label: null,
     });
   });
 
   it('«Биржа» и владелец без uid остаются текстом без ссылки', () => {
     expect(ownerBadgeView(lot({ owner_login: 'Биржа', owner_uid: null }))).toEqual({
-      text: '👑 Биржа',
       login: 'Биржа',
       href: null,
-      label: null,
     });
   });
 
   it('свободный лот — пустой бейдж, ссылки нет', () => {
     expect(ownerBadgeView(lot({ owner_login: null, owner_uid: null }))).toEqual({
-      text: '',
       login: '',
       href: null,
-      label: null,
     });
   });
 });

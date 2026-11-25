@@ -137,14 +137,10 @@ describe('dealFilterTitle', () => {
 });
 
 describe('dealFilterEmptyText', () => {
-  it('пустая биржа зовёт забрать первый привет', () => {
-    expect(dealFilterEmptyText({ mode: 'all' }, null)).toBe(
-      'Сделок пока нет — забери первый привет'
-    );
-  });
-
-  it('«Мои покупки» — про тебя, без совета забрать привет', () => {
-    expect(dealFilterEmptyText({ mode: 'mine' }, null)).toBe('Ты пока ничего не покупал');
+  it('пустая биржа и «Мои покупки» — прежняя фраза лога', () => {
+    for (const filter of [{ mode: 'all' as const }, { mode: 'mine' as const }]) {
+      expect(dealFilterEmptyText(filter, null)).toBe('Сделок пока нет — забери первый привет');
+    }
   });
 
   it('чужой фильтр называет чатерса и не советует ему покупать', () => {

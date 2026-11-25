@@ -32,16 +32,12 @@ export function isMine(st: LotState, uid: string | null): boolean {
   return uid !== null && st.owner_uid === uid;
 }
 
-/** Бейдж владельца: видимый текст, адрес профиля и доступное имя ссылки. */
+/** Бейдж владельца: ник (и доступное имя) и адрес профиля. */
 export interface OwnerBadgeView {
-  /** «👑 nick»; пусто — владельца нет, бейдж скрыт («свободен» на месте). */
-  text: string;
-  /** Ник без короны — подпись в разметке; корона скрыта от скринридера. */
+  /** Ник без короны; пусто — владельца нет, бейдж скрыт («свободен» на месте). */
   login: string;
   /** Адрес профиля владельца; null — бейдж остаётся текстом («Биржа», нет uid). */
   href: string | null;
-  /** Ник для `aria-label` ссылки (корона — не имя); null — бейдж не ссылка. */
-  label: string | null;
 }
 
 /**
@@ -51,9 +47,8 @@ export interface OwnerBadgeView {
  */
 export function ownerBadgeView(st: LotState): OwnerBadgeView {
   const login = typeof st.owner_login === 'string' ? st.owner_login.trim() : '';
-  if (login.length === 0) return { text: '', login: '', href: null, label: null };
-  const href = profileHref(st.owner_uid);
-  return { text: `👑 ${login}`, login, href, label: href === null ? null : login };
+  if (login.length === 0) return { login: '', href: null };
+  return { login, href: profileHref(st.owner_uid) };
 }
 
 export interface LotViewOptions {
@@ -211,7 +206,7 @@ function fillOwnerBadges(root: ParentNode | null, st: LotState, mine: boolean): 
     // иначе span-корона стёрлась бы textContent.
     const name = owner.querySelector('[data-owner-name]');
     if (name instanceof HTMLElement) name.textContent = view.login;
-    else owner.textContent = view.text;
+    else owner.textContent = view.login;
     owner.classList.toggle('hidden', view.login.length === 0);
     if (owner instanceof HTMLAnchorElement) {
       // Ссылка — настоящий href, а не обработчик: клавиатура и контекстное
@@ -222,7 +217,7 @@ function fillOwnerBadges(root: ParentNode | null, st: LotState, mine: boolean): 
         owner.removeAttribute('aria-label');
       } else {
         owner.href = view.href;
-        owner.setAttribute('aria-label', view.label ?? view.login);
+        owner.setAttribute('aria-label', view.login);
       }
     }
   }

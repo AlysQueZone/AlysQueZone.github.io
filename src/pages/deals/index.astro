@@ -233,6 +233,9 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
       return;
     }
     const uid = filter.uid;
+    // Чужой фильтр сменился (в т.ч. «назад» на другого чатерса): старый ник
+    // не должен остаться в пустой фразе, пока читается новый.
+    filterLogin = null;
     applyTitle(dealFilterTitle(filter, null), false);
     syncEmptyText();
     const result = await fetchPublicProfile(uid);
@@ -670,7 +673,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 
   /**
    * Переключить фильтр кнопкой «Все» / «Мои покупки». Уход из чужого фильтра —
-   * push, чтобы браузерная «назад» вернула «Покупки @nick» (US 15); смена
+   * push, чтобы браузерная «назад» вернула «Покупки @nick»; смена
    * «Все» ↔ «Мои» по-прежнему replace.
    */
   function setFilter(next: DealFilter): void {
