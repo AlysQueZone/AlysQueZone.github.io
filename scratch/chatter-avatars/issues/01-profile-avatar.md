@@ -9,10 +9,10 @@
 - [x] `profiles.avatar_url text` + бэкфилл из `auth.users.raw_user_meta_data` (`avatar_url` → `picture`); тот же триггер, что синкает логин, обновляет картинку при вставке и изменении метаданных, пустые метаданные не затирают старую.
 - [x] `public_profile(uid)` возвращает `avatar_url`; новых грантов/политик нет, колонка `profiles` клиентам не открывается.
 - [x] Чистое ядро: `ProfileStats.avatarUrl` только `https:` или `null`; тесты на валидный URL, отсутствие, пустую строку, `http:`, мусор и `javascript:`.
-- [x] Паспорт: `<img>` в том же квадрате 64×64, `alt=""`, `width`/`height`, `loading="lazy"`, `decoding="async"`, `referrerpolicy="no-referrer"`; инициалы — фолбэк при отсутствии URL и при `error` картинки, без скачка высоты.
+- [x] Паспорт: `<img>` в том же квадрате 64×64, `alt=""`, `width`/`height`, `decoding="async"` (без `loading="lazy"`: скрытая до `load` картинка иначе не начинает грузиться), `referrerpolicy="no-referrer"`, `referrerpolicy="no-referrer"`; инициалы — фолбэк при отсутствии URL и при `error` картинки, без скачка высоты.
 - [x] Комментарии и документы: `docs/adr/0014-public-chatter-profile.md` больше не говорит «без аватаров»; шапка модуля профиля описывает фолбэк; `AGENTS.md` — указатель на источник аватара.
 - [x] Гейты `just check` зелёные; `pnpm build` не ходит в БД.
-- [ ] Проверено на локальном Supabase и в preview: гость/свой/чужой профиль, аватар есть/нет/битый URL, телефон и десктоп.
+- [x] Проверено на локальном Supabase и в preview: гость/свой/чужой профиль, аватар есть/нет/битый URL, телефон и десктоп.
 
 ## Comments
 
