@@ -1,0 +1,1 @@
+import{a as e}from"./profile.B2aaWnEI.js";function t(t,n,r={}){let i=r.base??``,a=e(n);if(a===null){let e=document.createElement(r.tag??`span`);return e.className=i,e.textContent=t,e}let o=document.createElement(`a`);return o.className=[i,r.link??`hover:text-ember`].filter(Boolean).join(` `),o.href=a,o.textContent=t,o}export{t};

@@ -1,0 +1,1 @@
+import{a as e,t}from"./profile.B2aaWnEI.js";function n(n){let r=t(n.login);return r.length===0?{signedIn:!1,text:``,href:null}:{signedIn:!0,text:`@${r}`,href:e(n.uid)}}function r(t){let n=e(t.uid);return t.uid===null||!t.balanceKnown?{visible:!1,value:``,href:n}:{visible:!0,value:t.balance===null?`—`:String(t.balance),href:n}}export{n,r as t};
