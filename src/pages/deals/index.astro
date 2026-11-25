@@ -136,6 +136,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
   import { createHistoryPager } from '@/lib/history-pager';
   import { live } from '@/lib/live';
   import { videoSources } from '@/lib/lot-video';
+  import { profileHref } from '@/lib/profile';
   import { fetchPublicProfile } from '@/lib/profile-read';
   import {
     buyerUidFor,
@@ -330,12 +331,29 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
     return el('span', 'font-black whitespace-nowrap text-pivko', `${money(price)} 🍺`);
   }
 
+  /**
+   * Ник в сделке: ссылка на профиль, когда uid непустой; «Биржа», пустой
+   * владелец и ник без uid остаются текстом. `bold` — покупатель в строке
+   * таблицы и оба ника в карточке; пометку «ТВОЙ» дописывает вызывающий.
+   */
+  function nick(text: string, uid: string, bold: boolean): HTMLElement {
+    const className = bold ? 'font-bold break-all' : 'break-all';
+    const href = profileHref(uid);
+    if (href === null) return el(bold ? 'b' : 'span', className, text);
+    // Ссылка поднимается над растяжкой карточки ([data-deal-card] в
+    // global.css): иначе клик по нику открывал бы Лот.
+    const link = el('a', `${className} hover:text-ember`, text);
+    link.href = href;
+    link.dataset.profileLink = 'true';
+    return link;
+  }
+
   function whoLine(entry: DealEntry): HTMLElement {
     const line = el('div', 'flex flex-wrap items-baseline gap-x-1.5');
     line.append(
-      el('b', 'break-all', entry.seller),
+      nick(entry.seller, entry.seller_uid, true),
       el('span', 'text-mist', '→'),
-      el('b', 'break-all', entry.buyer)
+      nick(entry.buyer, entry.buyer_uid, true)
     );
     const mark = mineMark(entry);
     if (mark) line.append(mark);
@@ -377,15 +395,18 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
     );
     lotCell.append(lotLink);
 
-    const buyerCell = el('td', 'px-3 py-2 break-all');
-    buyerCell.append(el('b', '', entry.buyer));
+    const sellerCell = el('td', 'px-3 py-2');
+    sellerCell.append(nick(entry.seller, entry.seller_uid, false));
+
+    const buyerCell = el('td', 'px-3 py-2');
+    buyerCell.append(nick(entry.buyer, entry.buyer_uid, true));
     const mark = mineMark(entry);
     if (mark) buyerCell.append(mark);
 
     const priceCell = el('td', 'px-3 py-2 text-right whitespace-nowrap');
     priceCell.append(priceEl(entry.price));
 
-    tr.append(lotCell, el('td', 'px-3 py-2 break-all', entry.seller), buyerCell, priceCell);
+    tr.append(lotCell, sellerCell, buyerCell, priceCell);
     return tr;
   }
 
