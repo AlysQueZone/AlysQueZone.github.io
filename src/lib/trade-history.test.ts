@@ -413,6 +413,7 @@ describe('outbidCatchup', () => {
         slug: 'lot-x',
         title: 'Привет X',
         by: 'carol',
+        buyer_uid: 'buyer-uid',
         price: 150,
         at: Date.parse('2026-10-14T10:00:00.000Z'),
         video: 'https://media/x.mp4',
@@ -428,6 +429,21 @@ describe('outbidCatchup', () => {
     );
     expect(events[0]?.by).toBe('Чатерс');
     expect(events[0]?.title).toBe('lot-y');
+  });
+
+  it('uid покупателя из строки: без него — null, ссылкой ник не станет', () => {
+    const events = outbidCatchup(
+      [
+        mine({ buyer_uid: 'carol-uid', buyer_login: 'carol', lots: lot({ slug: 'with-uid' }) }),
+        mine({ buyer_uid: null, buyer_login: 'anon', lots: lot({ slug: 'without-uid' }) }),
+      ],
+      me,
+      10
+    );
+    expect(events.map((event) => [event.slug, event.buyer_uid])).toEqual([
+      ['with-uid', 'carol-uid'],
+      ['without-uid', null],
+    ]);
   });
 
   it('битые строки (нет лота, битая цена/время) отбрасываются', () => {

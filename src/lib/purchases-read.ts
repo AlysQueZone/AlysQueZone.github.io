@@ -153,7 +153,9 @@ export async function fetchOutbidCatchup(
   try {
     let query = sb
       .from('purchases')
-      .select('seller_uid,buyer_login,price_paid,created_at,lots(slug,title,video_url,owner_uid)')
+      .select(
+        'seller_uid,buyer_login,buyer_uid,price_paid,created_at,lots(slug,title,video_url,owner_uid)'
+      )
       .eq('seller_uid', uid)
       .order('created_at', { ascending: false })
       .order('id', { ascending: false })

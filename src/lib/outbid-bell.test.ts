@@ -19,6 +19,7 @@ function ev(overrides: Partial<OutbidEvent> = {}): OutbidEvent {
     slug: 'lot-a',
     title: 'Привет A',
     by: 'foxindique',
+    buyer_uid: 'fox-uid',
     price: 880,
     at: 1000,
     video: null,
@@ -110,6 +111,9 @@ describe('add', () => {
     const { bell } = makeBell();
     bell.add(ev({ title: 'Старое название' }));
     expect(bell.add(ev({ title: 'Новое название' }))).toBe('duplicate');
+    // uid — только для ссылки на профиль; дедуп остаётся прежним.
+    bell.add(ev({ buyer_uid: 'other-uid' }));
+    expect(bell.snapshot().entries).toHaveLength(1);
   });
 });
 

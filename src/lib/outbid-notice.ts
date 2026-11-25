@@ -14,6 +14,8 @@
  *   (до 3 свежих), остальное — в истории колокольчика;
  * - колокольчик в шапке: счётчик непрочитанных + панель истории за сессию
  *   (макс 10, у каждой записи кнопка перекупа). Только залогиненным.
+ *   Ник покупателя в панели ведёт в его профиль (`profileHref`), когда uid
+ *   известен; кнопка перекупа — соседняя, ссылку не перекрывает.
  *   Цену кнопки история дочитывает по своим slug'ам (`live.refreshLots`):
  *   оффлайн-догон приходит из purchases без N, а лота может не быть в окне
  *   витрины (ADR 0012).
@@ -34,8 +36,9 @@ import { fetchOutbidCatchup } from './purchases-read';
 import { live, normalizeNextPrice } from './live';
 import { readBuyIntent, updateBuyIntentPrice } from './buy-intent';
 import { createOutbidBell, outbidEventKey, type OutbidBellStorage } from './outbid-bell';
-import { sellerLine, type OutbidEvent } from './outbid-event';
+import { sellerLineParts, type OutbidEvent } from './outbid-event';
 import { playOutbidSound } from './outbid-sound';
+import { profileHref } from './profile';
 import { makeRebuyButton, rebuyLabel, showOutbidNotice } from './outbid-notices';
 import { closeNotices, MAX_NOTICES } from './notice';
 import { POPOVER_MARGIN, placePanel } from './popover';
@@ -192,7 +195,21 @@ export function initOutbidNotice(): void {
       item.style.fontSize = '13px';
       item.style.fontWeight = '700';
       const line = document.createElement('div');
-      line.textContent = sellerLine(ev);
+      const parts = sellerLineParts(ev);
+      const href = profileHref(ev.buyer_uid);
+      if (href === null) {
+        line.append(document.createTextNode(parts.by));
+      } else {
+        // Ник — сама ссылка: доступное имя совпадает с текстом, фокус — общий
+        // `:focus-visible`; кнопка перекупа остаётся соседкой, не потомком.
+        const link = document.createElement('a');
+        link.href = href;
+        link.className =
+          'text-mist underline decoration-dotted underline-offset-[3px] hover:text-milk hover:decoration-solid';
+        link.textContent = parts.by;
+        line.append(link);
+      }
+      line.append(document.createTextNode(parts.rest));
       item.append(line, makeRebuyButton(ev));
       bellPanel.appendChild(item);
     }

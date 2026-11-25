@@ -242,7 +242,7 @@ describe('createLiveStore', () => {
     expect(outbids).toHaveLength(1);
     expect(outbids[0]).toMatchObject({
       kind: 'outbid',
-      event: { slug: 'lot-mine', title: 'Мой', by: 'carol', price: 1200 },
+      event: { slug: 'lot-mine', title: 'Мой', by: 'carol', buyer_uid: 'u3', price: 1200 },
     });
     expect(store.catalogWindow().map((st) => st.slug)).toEqual(['lot-other']);
     // Свежая строка — в карте (её найдёт кнопка возврата), но не в окне.

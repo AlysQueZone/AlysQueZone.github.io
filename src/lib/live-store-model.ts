@@ -76,6 +76,8 @@ export interface LiveOutbid {
   slug: string;
   title: string;
   by: string;
+  /** uid нового владельца — ссылка на профиль; null — ник остаётся текстом. */
+  buyer_uid: string | null;
   price: number;
   at: number;
   video: string | null;
@@ -145,6 +147,7 @@ export function outbidFrom(st: LotState): LiveOutbid {
     slug: st.slug,
     title: st.title,
     by: st.owner_login ?? 'Чатерс',
+    buyer_uid: st.owner_uid,
     price: st.price,
     at: Date.now(),
     video: st.video_url,
