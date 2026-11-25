@@ -1,0 +1,300 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+
+// Публичный профиль чатерса — статический каркас: в HTML нет данных и нет
+// запросов к БД (docs/adr/0002). UID из `?uid=` разбирает клиент; один RPC
+// `public_profile` через lib/profile-read рисует паспорт. UID — идентичность,
+// логин — подпись, поэтому битая ссылка — состояние внутри страницы, а не 404.
+// Паспорт: десктоп — слева и липкий, телефон — сверху; без аватаров, инициалы.
+---
+
+<BaseLayout
+  title="Профиль чатерса — AlysQueZone"
+  description="Публичный профиль чатерса биржи приветов: баланс, «Баланс + приветы» и приветы во владении."
+>
+  <div data-profile-root>
+    <div
+      data-profile-shell
+      class="grid grid-cols-1 gap-4 md:grid-cols-[280px_minmax(0,1fr)] md:items-start"
+    >
+      <aside data-profile-passport class="card-pixel p-4 md:sticky md:top-24" aria-label="Паспорт">
+        <p data-profile-status class="sr-only" role="status">
+          Загружаю профиль…
+        </p>
+
+        <!-- Скелетон повторяет геометрию паспорта: квадрат, ник, дата, три
+             строки статов и кнопка. После первого ответа сносится целиком. -->
+        <div data-profile-skeleton aria-hidden="true">
+          <div class="skeleton-block mx-auto h-16 w-16"></div>
+          <div class="skeleton-block mx-auto mt-3 h-5 w-32"></div>
+          <div class="skeleton-block mx-auto mt-2 h-4 w-44"></div>
+          <dl class="mt-4 flex flex-col text-sm">
+            <div class="flex items-center justify-between border-b-2 border-milk/15 py-2">
+              <dt>
+                <span class="skeleton-block block h-4 w-20"></span>
+              </dt>
+              <dd>
+                <span class="skeleton-block block h-5 w-24"></span>
+              </dd>
+            </div>
+            <div class="flex items-center justify-between border-b-2 border-milk/15 py-2">
+              <dt>
+                <span class="skeleton-block block h-4 w-28"></span>
+              </dt>
+              <dd>
+                <span class="skeleton-block block h-5 w-24"></span>
+              </dd>
+            </div>
+            <div class="flex items-center justify-between border-b-2 border-milk/15 py-2">
+              <dt>
+                <span class="skeleton-block block h-4 w-20"></span>
+              </dt>
+              <dd>
+                <span class="skeleton-block block h-5 w-10"></span>
+              </dd>
+            </div>
+          </dl>
+          <div class="skeleton-block mt-4 h-9 w-full"></div>
+        </div>
+
+        <div data-profile-ready class="hidden">
+          <div
+            data-profile-initials
+            class="mx-auto grid h-16 w-16 place-items-center border-[3px] border-milk bg-pivko font-display text-sm text-cream shadow-[4px_4px_0_var(--color-milk)]"
+            aria-hidden="true"
+          >
+            ?
+          </div>
+          <h1 data-profile-login class="font-display mt-3 text-center text-lg break-all uppercase">
+            @чатерс
+          </h1>
+          <p data-profile-joined class="mt-1 text-center text-sm text-mist">
+            На бирже с …
+          </p>
+          <dl class="mt-4 flex flex-col text-sm">
+            <div class="flex items-center justify-between gap-3 border-b-2 border-milk/15 py-2">
+              <dt class="text-mist">Баланс</dt>
+              <dd class="font-black text-pivko">
+                <span data-profile-balance>—</span>
+                <span aria-hidden="true">🍺</span>
+              </dd>
+            </div>
+            <div class="flex items-center justify-between gap-3 border-b-2 border-milk/15 py-2">
+              <dt class="text-mist" title="Баланс и текущая стоимость приветов">
+                Баланс + приветы
+              </dt>
+              <dd class="font-black">
+                <span data-profile-capital>—</span>
+                <span aria-hidden="true">🍺</span>
+              </dd>
+            </div>
+            <div class="flex items-center justify-between gap-3 border-b-2 border-milk/15 py-2">
+              <dt class="text-mist">Приветов</dt>
+              <dd class="font-black" data-profile-lots>
+                —
+              </dd>
+            </div>
+          </dl>
+          <!-- «Выйти» — только в своём паспорте. Место кнопки держим всегда
+               (invisible), иначе чужой/свой профиль меняли бы высоту паспорта. -->
+          <button
+            type="button"
+            data-profile-logout
+            class="btn-arcade btn-arcade-ghost invisible mt-4 w-full px-3 py-2 text-xs text-mist"
+          >
+            Выйти
+          </button>
+        </div>
+      </aside>
+
+      <div class="min-w-0">
+        <!-- Точки расширения: приветы — владелец тикет 02, покупки — тикет 03.
+             Контракт: секции остаются на месте, id и data-* стабильны; uid
+             профиля — в data-profile-uid на [data-profile-root]. Пока разделы
+             пустые и hidden, страница лоты/покупки не читает. -->
+        <section id="profile-lots" data-profile-lots hidden aria-label="Приветы"></section>
+        <section
+          id="profile-purchases"
+          data-profile-purchases
+          hidden
+          aria-label="История покупок"
+          class="mt-8"
+        ></section>
+      </div>
+    </div>
+
+    <div data-profile-notfound class="card-pixel mt-6 hidden p-6 text-center sm:p-8">
+      <h1 class="font-display text-lg uppercase">Профиль не найден</h1>
+      <p class="mt-3 text-sm text-mist">Ссылка битая или такого чатерса нет на бирже.</p>
+      <a
+        href={`${import.meta.env.BASE_URL}lots/`}
+        class="btn-arcade btn-arcade-primary mt-5 px-6 py-3"
+      >
+        ← На биржу
+      </a>
+    </div>
+
+    <div data-profile-error class="card-pixel mt-6 hidden p-6 text-center sm:p-8">
+      <h2 class="font-display text-lg uppercase">Не загрузилось</h2>
+      <p class="mt-3 text-sm text-mist">Проверь связь и попробуй ещё.</p>
+      <button
+        type="button"
+        data-profile-retry
+        class="btn-arcade btn-arcade-ghost mt-5 px-6 py-3 text-sm"
+      >
+        Повторить
+      </button>
+    </div>
+  </div>
+</BaseLayout>
+
+<script>
+  // Страница рисует паспорт из одного публичного RPC (lib/profile-read);
+  // статы и форматы — lib/profile.ts. Состояния: скелетон, готовый паспорт,
+  // «не найден» (нет/битый/неизвестный uid) и «не загрузилось» с повтором.
+  // «Выйти» — только когда uid сессии совпал с профилем; смена uid приходит
+  // из live.ts (docs/adr/0003), нового канала страница не заводит.
+  import { live } from '@/lib/live';
+  import { fetchPublicProfile } from '@/lib/profile-read';
+  import {
+    formatProfileDate,
+    formatProfileNumber,
+    profileUidFromQuery,
+    type ProfileStats,
+  } from '@/lib/profile';
+  import { signOut } from '@/lib/session';
+
+  const base = import.meta.env.BASE_URL;
+  const profileUid = profileUidFromQuery(window.location.search);
+
+  const root = document.querySelector('[data-profile-root]');
+  const shell = document.querySelector('[data-profile-shell]');
+  const skeleton = document.querySelector('[data-profile-skeleton]');
+  const ready = document.querySelector('[data-profile-ready]');
+  const notFound = document.querySelector('[data-profile-notfound]');
+  const error = document.querySelector('[data-profile-error]');
+  const retry = document.querySelector('[data-profile-retry]');
+  const status = document.querySelector('[data-profile-status]');
+  const logout = document.querySelector('[data-profile-logout]');
+  const initials = document.querySelector('[data-profile-initials]');
+  const login = document.querySelector('[data-profile-login]');
+  const joined = document.querySelector('[data-profile-joined]');
+  const balance = document.querySelector('[data-profile-balance]');
+  const capital = document.querySelector('[data-profile-capital]');
+  const lots = document.querySelector('[data-profile-lots]');
+
+  // Точки расширения (тикеты 02/03) читают uid отсюда, не разбирая query.
+  if (root instanceof HTMLElement) root.dataset.profileUid = profileUid ?? '';
+
+  /** Подгрузка паспорта: одно чтение в полёте + один хвостовой проход. */
+  let loading = false;
+  let pendingReload = false;
+
+  function toggle(node: Element | null, show: boolean): void {
+    if (node instanceof HTMLElement) node.classList.toggle('hidden', !show);
+  }
+
+  function announce(text: string): void {
+    if (status instanceof HTMLElement) status.textContent = text;
+  }
+
+  type PageState = 'loading' | 'ready' | 'notfound' | 'error';
+
+  function showState(state: PageState): void {
+    toggle(shell, state === 'loading' || state === 'ready');
+    toggle(skeleton, state === 'loading');
+    toggle(ready, state === 'ready');
+    toggle(notFound, state === 'notfound');
+    toggle(error, state === 'error');
+  }
+
+  /** Свой паспорт — только при совпадении uid сессии и профиля. */
+  function renderOwn(): void {
+    if (!(logout instanceof HTMLButtonElement)) return;
+    const own = profileUid !== null && live.uid() === profileUid;
+    logout.classList.toggle('invisible', !own);
+    logout.disabled = !own;
+    logout.tabIndex = own ? 0 : -1;
+    if (own) logout.removeAttribute('aria-hidden');
+    else logout.setAttribute('aria-hidden', 'true');
+  }
+
+  function fill(stats: ProfileStats): void {
+    if (initials instanceof HTMLElement) initials.textContent = stats.initials;
+    if (login instanceof HTMLElement) login.textContent = stats.caption;
+    if (joined instanceof HTMLElement) {
+      joined.textContent = `На бирже с ${formatProfileDate(stats.joinedAt)}`;
+    }
+    if (balance instanceof HTMLElement) balance.textContent = formatProfileNumber(stats.balance);
+    if (capital instanceof HTMLElement) capital.textContent = formatProfileNumber(stats.capital);
+    if (lots instanceof HTMLElement) lots.textContent = formatProfileNumber(stats.lotsCount);
+    document.title = `${stats.caption} — AlysQueZone`;
+    renderOwn();
+  }
+
+  /**
+   * Чтение профиля. `first` — это первая загрузка состояния: только она
+   * показывает «не найден»/«не загрузилось». После первого успеха фоновая
+   * ошибка не затирает последний хороший паспорт.
+   */
+  async function load(uid: string, first: boolean): Promise<void> {
+    if (loading) {
+      pendingReload = true;
+      return;
+    }
+    loading = true;
+    let initial = first;
+    try {
+      do {
+        pendingReload = false;
+        const result = await fetchPublicProfile(uid);
+        if (result.status === 'ok') {
+          fill(result.profile);
+          showState('ready');
+          announce(`Профиль ${result.profile.caption} загружен`);
+        } else if (initial) {
+          const missing = result.status === 'not-found';
+          showState(missing ? 'notfound' : 'error');
+          announce(missing ? 'Профиль не найден' : 'Профиль не загрузился — попробуй ещё');
+        }
+        initial = false;
+      } while (pendingReload);
+    } finally {
+      loading = false;
+    }
+  }
+
+  if (logout instanceof HTMLButtonElement) {
+    logout.addEventListener('click', () => {
+      if (logout.disabled) return;
+      logout.disabled = true;
+      void signOut().finally(() => window.location.assign(base));
+    });
+  }
+
+  if (profileUid === null) {
+    showState('notfound');
+    announce('Профиль не найден');
+  } else {
+    const targetUid = profileUid;
+    showState('loading');
+    void load(targetUid, true);
+
+    if (retry instanceof HTMLButtonElement) {
+      retry.addEventListener('click', () => {
+        showState('loading');
+        announce('Загружаю профиль…');
+        void load(targetUid, true);
+      });
+    }
+
+    live.subscribe((change) => {
+      if (change.kind === 'uid') renderOwn();
+      // Сделка, своя покупка и возврат на вкладку — повод перечитать статы:
+      // баланс/капитал/число приветов меняются на сервере, не в шапке.
+      if (change.kind === 'deals' || change.kind === 'sync' || change.kind === 'purchase') {
+        void load(targetUid, false);
+      }
+    });
+  }
+</script>
