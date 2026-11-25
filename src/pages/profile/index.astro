@@ -13,20 +13,21 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
   description="Публичный профиль чатерса биржи приветов: баланс, «Баланс + приветы» и приветы во владении."
 >
   <div data-profile-root>
+    <!-- Скринридеру: «Загружаю…» и смену состояний объявляем всегда — даже
+         когда сам паспорт скрыт («не найден» / «не загрузилось»). -->
+    <p data-profile-status class="sr-only" role="status">
+      Загружаю профиль…
+    </p>
     <div
       data-profile-shell
       class="grid grid-cols-1 gap-4 md:grid-cols-[280px_minmax(0,1fr)] md:items-start"
     >
       <aside data-profile-passport class="card-pixel p-4 md:sticky md:top-24" aria-label="Паспорт">
-        <p data-profile-status class="sr-only" role="status">
-          Загружаю профиль…
-        </p>
-
         <!-- Скелетон повторяет геометрию паспорта: квадрат, ник, дата, три
              строки статов и кнопка. После первого ответа сносится целиком. -->
         <div data-profile-skeleton aria-hidden="true">
           <div class="skeleton-block mx-auto h-16 w-16"></div>
-          <div class="skeleton-block mx-auto mt-3 h-5 w-32"></div>
+          <div class="skeleton-block mx-auto mt-3 h-7 w-32"></div>
           <div class="skeleton-block mx-auto mt-2 h-4 w-44"></div>
           <dl class="mt-4 flex flex-col text-sm">
             <div class="flex items-center justify-between border-b-2 border-milk/15 py-2">
@@ -54,7 +55,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
               </dd>
             </div>
           </dl>
-          <div class="skeleton-block mt-4 h-9 w-full"></div>
+          <div class="skeleton-block mt-4 h-11 w-full"></div>
         </div>
 
         <div data-profile-ready class="hidden">
