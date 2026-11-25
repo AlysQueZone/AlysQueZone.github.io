@@ -8,11 +8,12 @@
  * `live.ts`) — компоненты лишь накладывают результат.
  *
  * Ник без uid ссылкой не становится (ник — вечная идентичность, ADR 0014).
+ * Пустой логин — гость, как и `null`: `@` на экран не выводится.
  * Пока ответа по балансу нет, плашку не показываем, чтобы не мигать прочерком.
  *
  * Тесты — src/lib/header.test.ts.
  */
-import { profileHref } from './profile';
+import { cleanLogin, profileHref } from './profile';
 
 /** Ник в шапке: видимость, подпись и адрес своего профиля. */
 export interface NickLinkState {
@@ -23,10 +24,12 @@ export interface NickLinkState {
 }
 
 export function nickLink(input: { login: string | null; uid: string | null }): NickLinkState {
-  if (input.login === null) return { signedIn: false, text: '', href: null };
+  // Пустой логин — та же пустота, что и `null` (паспорт: `profileCaption`).
+  const login = cleanLogin(input.login);
+  if (login.length === 0) return { signedIn: false, text: '', href: null };
   return {
     signedIn: true,
-    text: `@${input.login}`,
+    text: `@${login}`,
     href: profileHref(input.uid),
   };
 }

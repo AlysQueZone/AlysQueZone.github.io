@@ -69,9 +69,8 @@ export interface LotViewOptions {
 /** Надпись и доступность кнопки покупки — одно правило на все поверхности. */
 export interface BuyButtonView {
   text: string;
-  disabled: boolean;
   /** Погашена: свой Лот или не хватает баланса — общий opacity. */
-  muted: boolean;
+  disabled: boolean;
 }
 
 /**
@@ -99,7 +98,6 @@ export function buyButtonView(
         ? `Не хватает · ${formatStaged(intent.price)} 🍺`
         : `▶ Забрать за ${formatStaged(intent.price)} 🍺`,
     disabled: off,
-    muted: off,
   };
 }
 
@@ -251,5 +249,5 @@ function fillBuyButton(
   const view = buyButtonView(intent, { balance, mine, mineLabel });
   btn.disabled = view.disabled;
   btn.textContent = view.text;
-  btn.classList.toggle('opacity-50', view.muted);
+  btn.classList.toggle('opacity-50', view.disabled);
 }

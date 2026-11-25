@@ -33,6 +33,27 @@ describe('nickLink', () => {
       href: null,
     });
   });
+
+  it('пустой логин — гость: одинокого `@` на экране нет', () => {
+    expect(nickLink({ login: '', uid: UID })).toEqual({
+      signedIn: false,
+      text: '',
+      href: null,
+    });
+    expect(nickLink({ login: '  ', uid: UID })).toEqual({
+      signedIn: false,
+      text: '',
+      href: null,
+    });
+  });
+
+  it('чужой мусор вместо uid не превращает ник в ссылку', () => {
+    expect(nickLink({ login: 'ShidouQuE', uid: 'Биржа' })).toEqual({
+      signedIn: true,
+      text: '@ShidouQuE',
+      href: null,
+    });
+  });
 });
 
 describe('balancePlate', () => {

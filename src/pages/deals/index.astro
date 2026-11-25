@@ -136,7 +136,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
   import { createHistoryPager } from '@/lib/history-pager';
   import { live } from '@/lib/live';
   import { videoSources } from '@/lib/lot-video';
-  import { profileHref } from '@/lib/profile';
+  import { profileNick } from '@/lib/profile-link';
   import { fetchPublicProfile } from '@/lib/profile-read';
   import {
     buyerUidFor,
@@ -332,20 +332,19 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
   }
 
   /**
-   * Ник в сделке: ссылка на профиль, когда uid непустой; «Биржа», пустой
+   * Ник в сделке: ссылка на профиль, когда uid валиден; «Биржа», пустой
    * владелец и ник без uid остаются текстом. `bold` — покупатель в строке
    * таблицы и оба ника в карточке; пометку «ТВОЙ» дописывает вызывающий.
    */
   function nick(text: string, uid: string, bold: boolean): HTMLElement {
-    const className = bold ? 'font-bold break-all' : 'break-all';
-    const href = profileHref(uid);
-    if (href === null) return el(bold ? 'b' : 'span', className, text);
+    const node = profileNick(text, uid, {
+      base: bold ? 'font-bold break-all' : 'break-all',
+      tag: bold ? 'b' : 'span',
+    });
     // Ссылка поднимается над растяжкой карточки ([data-deal-card] в
     // global.css): иначе клик по нику открывал бы Лот.
-    const link = el('a', `${className} hover:text-ember`, text);
-    link.href = href;
-    link.dataset.profileLink = 'true';
-    return link;
+    if (node instanceof HTMLAnchorElement) node.dataset.profileLink = 'true';
+    return node;
   }
 
   function whoLine(entry: DealEntry): HTMLElement {

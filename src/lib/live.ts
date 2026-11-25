@@ -14,12 +14,14 @@
  * (`live.refreshBalance()`, `live.refreshLot(slug)`). Каталог читается срезом
  * страницы: витрина `/lots/` включает страницы (`live.useCatalogPages`),
  * главная — случайную выборку (`live.useRandomLots`), страница лота — один
- * лот (`live.useLot`); «Мои приветы» — отдельный запрос владельца
- * (`live.trackMyLots`). Полный каталог не читает никто (docs/adr/0012).
+ * лот (`live.useLot`); приветы владельца на профиле листаются страницами
+ * (`readOwnerLotsPage`), полный список владельца для колокольчика — отдельный
+ * запрос (`live.trackMyLots`). Полный каталог не читает никто (docs/adr/0012).
  * Модуль сам поднимается на первом subscribe / refresh / report — отдельного
  * «старта» у поверхностей нет.
  */
 import { getSupabase, withAuthRetry } from './session';
+import { parseProfileUid } from './profile';
 import type { CatalogCursor } from './catalog-page';
 import { createLiveRegistry, type LivePayload, type LiveTransport } from './live-core';
 import {
@@ -301,15 +303,17 @@ function supabaseReaders(): LiveReaders {
  * и те же колонки/маппер, что у витрины, плюс фильтр `owner_uid`; срез
  * каталога профиль не включает (docs/adr/0012) и снапшот не трогает: это
  * снимок страницы, а не живое окно. Индекс — `lots_owner_uid_idx`.
- * Пустой uid — честный отказ без запроса (Postgres упал бы на cast).
+ * Не uuid (пусто, «Биржа», мусор) — честный отказ без запроса: Postgres упал
+ * бы на cast в uuid (22P02). Валидный uid приводится к канону (`eq` — точный).
  */
 export function readOwnerLotsPage(
   uid: string,
   cursor: CatalogCursor | null,
   limit: number
 ): Promise<CatalogPageRead> {
-  if (uid.length === 0) return Promise.resolve({ ok: false, states: [], hasMore: false });
-  return readOrderedPage(uid, cursor, limit);
+  const ownerUid = parseProfileUid(uid);
+  if (ownerUid === null) return Promise.resolve({ ok: false, states: [], hasMore: false });
+  return readOrderedPage(ownerUid, cursor, limit);
 }
 
 // ---------------------------------------------------------------------------
