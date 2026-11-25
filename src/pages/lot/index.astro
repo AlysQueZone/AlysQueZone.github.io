@@ -140,6 +140,7 @@ const base = import.meta.env.BASE_URL;
   import { HISTORY_PAGE_SIZE, formatRelativeTime, type HistoryEntry } from '@/lib/trade-history';
   import { live, type LotState } from '@/lib/live';
   import { fillLot } from '@/lib/lot-view';
+  import { profileHref } from '@/lib/profile';
 
   const slug = (new URLSearchParams(window.location.search).get('id') ?? '').trim();
 
@@ -247,6 +248,20 @@ const base = import.meta.env.BASE_URL;
   }
 
   /**
+   * Ник в истории перепродаж: ссылка на профиль, когда uid есть; «Биржа» и
+   * пустой uid остаются текстом. Жирность наследует список (`font-bold`).
+   */
+  function nickEl(name: string, uid: string): HTMLElement {
+    const href = profileHref(uid);
+    if (href === null) return textEl('b', '', name);
+    const link = document.createElement('a');
+    link.href = href;
+    link.className = 'hover:text-ember';
+    link.textContent = name;
+    return link;
+  }
+
+  /**
    * Строка истории: `from → to · price` + пометки и относительное время.
    * `uid` — своя покупка («ТВОЙ»), `author` — ник автора привета: его продажа
    * получает знак «автор».
@@ -261,9 +276,9 @@ const base = import.meta.env.BASE_URL;
     who.className = 'break-all';
     // Пометки стоят у своего ника, а не в конце строки: «автор» — у продавца
     // (в сделке автора он и есть продавец), «ТВОЙ» — у покупателя.
-    who.append(textEl('b', '', entry.from));
+    who.append(nickEl(entry.from, entry.seller_uid));
     if (author !== null && entry.from === author) who.append(mark('автор', 'bg-legend'));
-    who.append(textEl('span', 'text-mist', ' → '), textEl('b', '', entry.to));
+    who.append(textEl('span', 'text-mist', ' → '), nickEl(entry.to, entry.buyer_uid));
     if (uid !== null && entry.buyer_uid !== '' && entry.buyer_uid === uid) {
       who.append(mark('ТВОЙ', 'bg-pivko'));
     }

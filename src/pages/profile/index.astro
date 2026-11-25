@@ -12,6 +12,8 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
 // Приветы — страницы по 12 компактными карточками K1 (LotCardCompact): та же
 // раскладка Лота, что на витрине, но кадр 64px и цена строкой (docs/adr/0009).
 // Скелетонов — страница целиком: столько же карточек вернёт первый запрос.
+// Превью покупок читает тот же лог сделок с фильтром по покупателю — новый
+// запрос на профиль не заводится, полная история живёт на `/deals/?user=`.
 ---
 
 <BaseLayout
@@ -118,7 +120,7 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
         <!-- Приветы владельца: страницы по 12 (lib/catalog-page.ts), компактные
              карточки K1 (LotCardCompact), покупка — общая модалка (BaseLayout).
              Секция включается, когда uid разобран; скелетоны держат геометрию
-             до первого ответа. Покупки — тикет 03, здесь их нет. -->
+             до первого ответа. Покупки — соседняя секция ниже. -->
         <section id="profile-lots" data-profile-lots hidden aria-label="Приветы">
           <h2 class="font-display text-xs uppercase">Приветы</h2>
           <p data-lots-note class="mt-3 hidden text-sm font-bold text-mist"></p>
@@ -153,7 +155,49 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
           hidden
           aria-label="История покупок"
           class="mt-8"
-        ></section>
+        >
+          <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+            <h2 class="font-display text-lg uppercase">История покупок</h2>
+            <a
+              data-profile-purchases-more
+              class="hidden text-sm font-bold text-pivko hover:text-ember"
+              href="#"
+            >
+              Вся история →
+            </a>
+          </div>
+          <p data-profile-purchases-status class="sr-only" role="status"></p>
+
+          <!-- Скелетон повторяет строку покупки: дата, название, цена. -->
+          <div data-profile-purchases-skeleton aria-hidden="true" class="mt-3 flex flex-col gap-2">
+            {Array.from({ length: 5 }, () => (
+              <div class="flex items-baseline gap-3 border-2 border-milk/15 px-3 py-2">
+                <div class="skeleton-block h-3 w-20"></div>
+                <div class="skeleton-block h-4 flex-1"></div>
+                <div class="skeleton-block h-3 w-16"></div>
+              </div>
+            ))}
+          </div>
+
+          <ul data-profile-purchases-list class="mt-3 hidden flex-col gap-2"></ul>
+
+          <p data-profile-purchases-empty class="mt-3 hidden text-sm font-bold text-mist">
+            Покупок пока нет
+          </p>
+
+          <div data-profile-purchases-error class="card-pixel mt-3 hidden p-4">
+            <p class="text-sm font-bold text-mist">
+              История покупок не загрузилась — проверь связь и попробуй ещё.
+            </p>
+            <button
+              type="button"
+              data-profile-purchases-retry
+              class="btn-arcade btn-arcade-ghost mt-3 px-4 py-2 text-sm"
+            >
+              Обновить
+            </button>
+          </div>
+        </section>
       </div>
     </div>
 
@@ -197,9 +241,10 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
   // скелетон, готовый паспорт, «не найден» (нет/битый/неизвестный uid),
   // «не загрузилось» с повтором; приветы — пусто и ошибка с повтором.
   // «Выйти» — только когда uid сессии совпал с профилем. Смена uid, сделки и
-  // возврат на вкладку приходят из live.ts (docs/adr/0003): перечитываем статы и
-  // первую страницу приветов, нового канала страница не заводит.
+  // возврат на вкладку приходят из live.ts (docs/adr/0003): перечитываем статы,
+  // первую страницу приветов и превью покупок, нового канала страница не заводит.
   import { live, readOwnerLotsPage, type LotState } from '@/lib/live';
+  import { fetchDealLog } from '@/lib/purchases-read';
   import { fetchPublicProfile } from '@/lib/profile-read';
   import {
     formatProfileDate,
@@ -207,6 +252,8 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
     profileUidFromQuery,
     type ProfileStats,
   } from '@/lib/profile';
+  import { dealFilterUrl } from '@/lib/deal-filter';
+  import { formatRelativeTime, type DealEntry } from '@/lib/trade-history';
   import { signOut } from '@/lib/session';
   import {
     CATALOG_PAGE_SIZE,
@@ -215,6 +262,9 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
     type CatalogCursor,
   } from '@/lib/catalog-page';
   import { fillLot } from '@/lib/lot-view';
+
+  /** Превью покупок: ровно пятёрка, листания здесь нет. */
+  const PURCHASES_PREVIEW = 5;
 
   const base = import.meta.env.BASE_URL;
   const profileUid = profileUidFromQuery(window.location.search);
@@ -268,6 +318,14 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
   let lotsReloading = false;
   // slug → карточка: перекраска по балансу/uid без перезапроса и перестройки DOM.
   const lotCards = new Map<string, HTMLElement>();
+  const purchasesSection = document.querySelector('[data-profile-purchases]');
+  const purchasesList = document.querySelector('[data-profile-purchases-list]');
+  const purchasesSkeleton = document.querySelector('[data-profile-purchases-skeleton]');
+  const purchasesEmpty = document.querySelector('[data-profile-purchases-empty]');
+  const purchasesError = document.querySelector('[data-profile-purchases-error]');
+  const purchasesRetry = document.querySelector('[data-profile-purchases-retry]');
+  const purchasesMore = document.querySelector('[data-profile-purchases-more]');
+  const purchasesStatus = document.querySelector('[data-profile-purchases-status]');
 
   // Точки расширения (тикеты 02/03) читают uid отсюда, не разбирая query.
   if (root instanceof HTMLElement) root.dataset.profileUid = profileUid ?? '';
@@ -490,6 +548,108 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
     if (lotHasMore && sentinelNear()) void loadMore(uid, false);
   }
 
+  /** Секция покупок и ссылка «Вся история →» появляются вместе с профилем. */
+  function revealPurchases(uid: string): void {
+    if (purchasesSection instanceof HTMLElement) purchasesSection.hidden = false;
+    if (purchasesMore instanceof HTMLAnchorElement) {
+      purchasesMore.href = dealFilterUrl(
+        { mode: 'user', uid },
+        new URL(`${base}deals/`, window.location.origin)
+      ).toString();
+    }
+  }
+
+  function announcePurchases(text: string): void {
+    if (purchasesStatus instanceof HTMLElement) purchasesStatus.textContent = text;
+  }
+
+  /** Строка превью: дата, название, цена; вся площадь ведёт на страницу привета. */
+  function purchasesRow(entry: DealEntry): HTMLLIElement {
+    const row = document.createElement('li');
+    const link = document.createElement('a');
+    link.href = `${base}lot/?id=${encodeURIComponent(entry.slug)}`;
+    link.className =
+      'flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-2 border-milk/15 px-3 py-2 hover:border-milk hover:bg-void/50';
+
+    const date = document.createElement('span');
+    date.className = 'text-xs font-bold whitespace-nowrap text-mist';
+    date.textContent = formatRelativeTime(entry.created_at);
+
+    const title = document.createElement('span');
+    title.className = 'min-w-0 flex-1 font-extrabold break-words';
+    title.textContent = entry.title;
+
+    const price = document.createElement('span');
+    price.className = 'font-black whitespace-nowrap text-pivko';
+    price.textContent = `${formatProfileNumber(entry.price)} 🍺`;
+
+    link.append(date, title, price);
+    row.append(link);
+    return row;
+  }
+
+  function renderPurchases(entries: readonly DealEntry[]): void {
+    if (!(purchasesList instanceof HTMLElement)) return;
+    purchasesList.replaceChildren(...entries.map(purchasesRow));
+    const shown = entries.length > 0;
+    toggle(purchasesSkeleton, false);
+    toggle(purchasesList, shown);
+    toggle(purchasesEmpty, !shown);
+    toggle(purchasesError, false);
+    toggle(purchasesMore, true);
+    announcePurchases(shown ? `Последние покупки: ${entries.length}` : 'Покупок пока нет');
+  }
+
+  function showPurchasesLoading(): void {
+    toggle(purchasesSkeleton, true);
+    toggle(purchasesList, false);
+    toggle(purchasesEmpty, false);
+    toggle(purchasesError, false);
+    toggle(purchasesMore, false);
+    announcePurchases('Загружаю историю покупок…');
+  }
+
+  function showPurchasesError(): void {
+    toggle(purchasesSkeleton, false);
+    toggle(purchasesList, false);
+    toggle(purchasesEmpty, false);
+    toggle(purchasesMore, false);
+    toggle(purchasesError, true);
+    announcePurchases('История покупок не загрузилась');
+  }
+
+  /** Подгрузка превью: одно чтение в полёте + один хвостовой проход. */
+  let purchasesLoading = false;
+  let purchasesPending = false;
+
+  /**
+   * Последние пять покупок профиля — существующий лог сделок с фильтром по
+   * `buyer_uid`. `first` — первая загрузка: только она показывает ошибку;
+   * фоновая ошибка не стирает уже показанные строки.
+   */
+  async function loadPurchases(first: boolean): Promise<void> {
+    const uid = profileUid;
+    if (uid === null) return;
+    if (purchasesLoading) {
+      purchasesPending = true;
+      return;
+    }
+    purchasesLoading = true;
+    let initial = first;
+    try {
+      do {
+        purchasesPending = false;
+        revealPurchases(uid);
+        const page = await fetchDealLog(PURCHASES_PREVIEW, null, uid);
+        if (page.ok) renderPurchases(page.entries);
+        else if (initial) showPurchasesError();
+        initial = false;
+      } while (purchasesPending);
+    } finally {
+      purchasesLoading = false;
+    }
+  }
+
   /**
    * Чтение профиля. `first` — это первая загрузка состояния: только она
    * показывает «не найден»/«не загрузилось». После первого успеха фоновая
@@ -538,6 +698,7 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
     toggle(lotsSection, true);
     showState('loading');
     void load(targetUid, true);
+    void loadPurchases(true);
 
     if (retry instanceof HTMLButtonElement) {
       retry.addEventListener('click', () => {
@@ -572,6 +733,13 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
       observer.observe(lotsMore);
     }
 
+    if (purchasesRetry instanceof HTMLButtonElement) {
+      purchasesRetry.addEventListener('click', () => {
+        showPurchasesLoading();
+        void loadPurchases(true);
+      });
+    }
+
     live.subscribe((change) => {
       if (change.kind === 'uid') {
         renderOwn();
@@ -580,10 +748,11 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
         repaintLots();
       }
       if (change.kind === 'balance') repaintLots();
-      // Сделка, своя покупка и возврат на вкладку — повод перечитать статы и
-      // первую страницу приветов: баланс/капитал/владение меняются на сервере.
+      // Сделка, своя покупка и возврат на вкладку — повод перечитать статы,
+      // первую страницу приветов и превью покупок: они меняются на сервере.
       if (change.kind === 'deals' || change.kind === 'sync' || change.kind === 'purchase') {
         void load(targetUid, false);
+        void loadPurchases(false);
       }
     });
   }

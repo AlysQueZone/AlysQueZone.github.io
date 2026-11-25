@@ -4,15 +4,19 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 // «Лог сделок» — статический каркас, данные рисует клиент из БД (docs/adr/0002).
 // Страница держит три вещи: листание по курсору (lib/trade-history.ts), живое
 // событие `deals` модуля живых данных (docs/adr/0003) и фильтр «Все / Мои
-// покупки» (`?mine=1`, uid — только через live.ts). Отбор строк и деление на
-// дни — чистое ядро; здесь состояния, URL, разметка и перерисовка.
+// покупки / Покупки чатерса» (`?mine=1`, `?user=<uid>`; uid сессии — только
+// через live.ts). Состояние фильтра, URL и заголовок — lib/deal-filter.ts;
+// отбор строк и деление на дни — lib/trade-history.ts. Здесь история браузера,
+// состояния, разметка и перерисовка.
 ---
 
 <BaseLayout title="Лог сделок — AlysQueZone">
   <div class="flex flex-wrap items-end justify-between gap-3">
     <div>
-      <h1 class="font-display text-xl uppercase sm:text-2xl">Лог сделок</h1>
-      <p class="mt-2 max-w-xl text-sm font-bold text-mist">
+      <h1 data-log-title class="font-display text-xl uppercase sm:text-2xl">
+        Лог сделок
+      </h1>
+      <p data-log-desc class="mt-2 max-w-xl text-sm font-bold text-mist">
         Кто, когда, что и за сколько забрал. Новые сверху.
       </p>
     </div>
@@ -125,13 +129,22 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 <script>
   // Страница рисует срез лога: запрос — lib/purchases-read.ts, автомат
   // пагинации — lib/history-pager.ts, отбор и деление на дни —
-  // lib/trade-history.ts. Здесь состояния страницы, фильтр «Все / Мои» и его
-  // URL, разметка и перерисовка; uid и сессию знает только live.ts
-  // (docs/adr/0003).
+  // lib/trade-history.ts, состояние фильтра — lib/deal-filter.ts. Здесь
+  // история браузера (push у «Все»/«Мои» из чужого фильтра), разметка и
+  // перерисовка; uid и сессию знает только live.ts (docs/adr/0003).
   import { fetchDealLog } from '@/lib/purchases-read';
   import { createHistoryPager } from '@/lib/history-pager';
   import { live } from '@/lib/live';
   import { videoSources } from '@/lib/lot-video';
+  import { profileHref } from '@/lib/profile';
+  import { fetchPublicProfile } from '@/lib/profile-read';
+  import {
+    buyerUidFor,
+    dealFilterTitle,
+    dealFilterUrl,
+    parseDealFilter,
+    type DealFilter,
+  } from '@/lib/deal-filter';
   import {
     DEAL_PAGE_SIZE,
     formatRelativeTime,
@@ -152,17 +165,21 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
   const more = document.querySelector('[data-log-more]');
   const moreButton = document.querySelector('[data-log-load-more]');
   const pill = document.querySelector('[data-log-new]');
+  const titleEl = document.querySelector('[data-log-title]');
+  const descEl = document.querySelector('[data-log-desc]');
   const filterButtons = document.querySelectorAll('[data-log-mine]');
 
   /** Наблюдатель автоподгрузки живёт у поверхности: пейджер о скролле не знает. */
   let observer: IntersectionObserver | null = null;
 
-  /** «Мои покупки» (`?mine=1`); состояние фильтра живёт в URL. */
-  let mine = new URL(window.location.href).searchParams.get('mine') === '1';
+  /** Фильтр из URL (`?user` сильнее `?mine=1`); состояние живёт в адресе. */
+  let filter: DealFilter = parseDealFilter(window.location.search);
   /** uid прочитан хотя бы раз: до этого гостевую подсказку не показываем. */
   let uidReady = false;
   /** Последний uid из снапшота — смена перезагружает «Мои покупки». */
   let seenUid: string | null = null;
+  /** Поколение заголовка: ответ прошлого фильтра не переписывает новый. */
+  let titleToken = 0;
 
   function toggle(el: Element | null, show: boolean): void {
     if (el instanceof HTMLElement) el.classList.toggle('hidden', !show);
@@ -172,9 +189,9 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
     if (status) status.textContent = text;
   }
 
-  /** Фильтр запроса: «Мои» — uid сессии; «Все» — без фильтра. */
+  /** Фильтр запроса: «Мои» — uid сессии; «Все» — без фильтра; `user` — из ссылки. */
   function buyerUid(): string | null {
-    return mine ? live.uid() : null;
+    return buyerUidFor(filter, live.uid());
   }
 
   /**
@@ -186,22 +203,50 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
     fetchDealLog(DEAL_PAGE_SIZE, cursor, buyerUid())
   );
 
+  /** Одинаковые состояния: сравниваем вид и uid чужого фильтра. */
+  function sameFilter(a: DealFilter, b: DealFilter): boolean {
+    if (a.mode === 'user' && b.mode === 'user') return a.uid === b.uid;
+    return a.mode === b.mode;
+  }
+
+  /** Заголовок и описание: описание — только у всей биржи, новых слов не выдумываем. */
+  function applyTitle(text: string, description: boolean): void {
+    if (titleEl instanceof HTMLElement) titleEl.textContent = text;
+    toggle(descEl, description);
+    document.title = `${text} — AlysQueZone`;
+  }
+
+  /**
+   * Заголовок текущего фильтра. Логин чужого фильтра — один публичный RPC на
+   * смену фильтра (не на строку): нет строки/подписи — честное «Покупки
+   * чатерса». Пока логин читается, стоит тот же фолбэк, а не uuid.
+   */
+  async function syncTitle(): Promise<void> {
+    const token = ++titleToken;
+    if (filter.mode !== 'user') {
+      applyTitle(dealFilterTitle(filter, null), filter.mode === 'all');
+      return;
+    }
+    const uid = filter.uid;
+    applyTitle(dealFilterTitle(filter, null), false);
+    const result = await fetchPublicProfile(uid);
+    if (token !== titleToken) return;
+    const login = result.status === 'ok' ? result.profile.login : null;
+    applyTitle(dealFilterTitle(filter, login), false);
+  }
+
   function syncFilterUi(): void {
     for (const node of filterButtons) {
       if (!(node instanceof HTMLElement)) continue;
-      const active = node.dataset.logMine === '1' ? mine : !mine;
+      const mineButton = node.dataset.logMine === '1';
+      // В чужом фильтре не подсвечена ни одна кнопка: это не «Все» и не «Мои»,
+      // но обе остаются выходами и сбрасывают `user`.
+      const active =
+        filter.mode === 'user' ? false : filter.mode === 'mine' ? mineButton : !mineButton;
       node.classList.toggle('btn-arcade-primary', active);
       node.classList.toggle('btn-arcade-ghost', !active);
       node.setAttribute('aria-pressed', String(active));
     }
-  }
-
-  /** Состояние фильтра в URL: `?mine=1` — «Мои», без параметра — «Все». */
-  function writeMineToUrl(): void {
-    const url = new URL(window.location.href);
-    if (mine) url.searchParams.set('mine', '1');
-    else url.searchParams.delete('mine');
-    window.history.replaceState(null, '', url.toString());
   }
 
   /** Сброс списка при смене фильтра или uid: курсор, плашка и ответы прошлых запросов. */
@@ -286,12 +331,29 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
     return el('span', 'font-black whitespace-nowrap text-pivko', `${money(price)} 🍺`);
   }
 
+  /**
+   * Ник в сделке: ссылка на профиль, когда uid непустой; «Биржа», пустой
+   * владелец и ник без uid остаются текстом. `bold` — покупатель в строке
+   * таблицы и оба ника в карточке; пометку «ТВОЙ» дописывает вызывающий.
+   */
+  function nick(text: string, uid: string, bold: boolean): HTMLElement {
+    const className = bold ? 'font-bold break-all' : 'break-all';
+    const href = profileHref(uid);
+    if (href === null) return el(bold ? 'b' : 'span', className, text);
+    // Ссылка поднимается над растяжкой карточки ([data-deal-card] в
+    // global.css): иначе клик по нику открывал бы Лот.
+    const link = el('a', `${className} hover:text-ember`, text);
+    link.href = href;
+    link.dataset.profileLink = 'true';
+    return link;
+  }
+
   function whoLine(entry: DealEntry): HTMLElement {
     const line = el('div', 'flex flex-wrap items-baseline gap-x-1.5');
     line.append(
-      el('b', 'break-all', entry.seller),
+      nick(entry.seller, entry.seller_uid, true),
       el('span', 'text-mist', '→'),
-      el('b', 'break-all', entry.buyer)
+      nick(entry.buyer, entry.buyer_uid, true)
     );
     const mark = mineMark(entry);
     if (mark) line.append(mark);
@@ -333,15 +395,18 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
     );
     lotCell.append(lotLink);
 
-    const buyerCell = el('td', 'px-3 py-2 break-all');
-    buyerCell.append(el('b', '', entry.buyer));
+    const sellerCell = el('td', 'px-3 py-2');
+    sellerCell.append(nick(entry.seller, entry.seller_uid, false));
+
+    const buyerCell = el('td', 'px-3 py-2');
+    buyerCell.append(nick(entry.buyer, entry.buyer_uid, true));
     const mark = mineMark(entry);
     if (mark) buyerCell.append(mark);
 
     const priceCell = el('td', 'px-3 py-2 text-right whitespace-nowrap');
     priceCell.append(priceEl(entry.price));
 
-    tr.append(lotCell, el('td', 'px-3 py-2 break-all', entry.seller), buyerCell, priceCell);
+    tr.append(lotCell, sellerCell, buyerCell, priceCell);
     return tr;
   }
 
@@ -489,7 +554,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
   async function load(): Promise<void> {
     if (pager.state().loadingFirst) return;
     // «Мои» без входа — подсказка, а не запрос без фильтра (он показал бы чужие).
-    if (mine && !live.uid()) {
+    if (filter.mode === 'mine' && !live.uid()) {
       showGuest();
       return;
     }
@@ -549,7 +614,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
    * прокручено ниже — копим в плашке, чтобы список не прыгал под пальцем.
    */
   async function refresh(): Promise<void> {
-    if (mine && !live.uid()) return;
+    if (filter.mode === 'mine' && !live.uid()) return;
     const state = pager.state();
     // Первой страницы ещё нет и она не грузится — её загрузит `load`, а не
     // живое обновление; иначе событие встанет в отложенную очередь пейджера.
@@ -569,19 +634,17 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
     announce(`${newDealsLabel(result.added)}: в логе`);
   }
 
-  /** Переключить фильтр: URL, оформление и список начинаются заново. */
-  function setMine(next: boolean): void {
-    if (mine === next) return;
-    mine = next;
-    writeMineToUrl();
-    syncFilterUi();
-    resetList();
-    if (!mine) {
+  /**
+   * Первая страница с текущим фильтром. «Мои» без прочитанного uid ждёт
+   * честного «uid прочитан» (это ловит и гостя: на холодном визите
+   * uid-события не будет), а не гадает с подсказкой входа. Чужой фильтр
+   * открывается и гостю.
+   */
+  function startFilteredLoad(): void {
+    if (filter.mode !== 'mine') {
       void load();
       return;
     }
-    // uid ещё не прочитан — ждём честного «uid прочитан» (это ловит и гостя:
-    // на холодном визите uid-события не будет), а не гадаем с подсказкой входа.
     if (!uidReady) {
       void live.whenUidKnown().then(onUid);
       return;
@@ -590,19 +653,48 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
     else showGuest();
   }
 
-  /** uid снапшота: «ТВОЙ» в «Все», перезагрузка списка в «Моих», подсказка гостю. */
+  /**
+   * Переключить фильтр кнопкой «Все» / «Мои покупки». Уход из чужого фильтра —
+   * push, чтобы браузерная «назад» вернула «Покупки @nick» (US 15); смена
+   * «Все» ↔ «Мои» по-прежнему replace.
+   */
+  function setFilter(next: DealFilter): void {
+    if (sameFilter(filter, next)) return;
+    const push = filter.mode === 'user';
+    filter = next;
+    const url = dealFilterUrl(filter, new URL(window.location.href));
+    window.history[push ? 'pushState' : 'replaceState'](null, '', url.toString());
+    syncFilterUi();
+    void syncTitle();
+    resetList();
+    startFilteredLoad();
+  }
+
+  /** Браузерная «назад»: перечитываем адрес и начинаем фильтр заново. */
+  function onPopState(): void {
+    const next = parseDealFilter(window.location.search);
+    if (sameFilter(filter, next)) return;
+    filter = next;
+    syncFilterUi();
+    void syncTitle();
+    resetList();
+    startFilteredLoad();
+  }
+
+  /** uid снапшота: «ТВОЙ» в общем логе, перезагрузка списка в «Моих», подсказка гостю. */
   function onUid(uid: string | null): void {
     const changed = !uidReady || uid !== seenUid;
     uidReady = true;
     seenUid = uid;
     if (!changed) return;
-    if (mine) {
+    if (filter.mode === 'mine') {
       resetList();
       if (uid) void load();
       else showGuest();
-    } else if (pager.state().loaded) {
-      render();
+      return;
     }
+    // Чужой и общий фильтры от uid не зависят; «ТВОЙ» на строках — зависят.
+    if (pager.state().loaded) render();
   }
 
   /** Липкая полоса дня встаёт под фактической высотой шапки, а не под догадкой. */
@@ -618,9 +710,11 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
   for (const node of filterButtons) {
     node.addEventListener('click', () => {
       if (!(node instanceof HTMLElement)) return;
-      setMine(node.dataset.logMine === '1');
+      setFilter({ mode: node.dataset.logMine === '1' ? 'mine' : 'all' });
     });
   }
+
+  window.addEventListener('popstate', onPopState);
 
   pill?.addEventListener('click', () => {
     const count = pager.showPending();
@@ -646,14 +740,6 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
   // Подписка уже могла отдать прочитанный uid (prime в live.subscribe);
   // в «Моих» без него ждём whenUidKnown — гость иначе не дождался бы.
   syncFilterUi();
-  if (!mine) {
-    void load();
-  } else if (uidReady) {
-    if (live.uid()) void load();
-    else showGuest();
-  } else {
-    // Холодный гость не получит uid-события (значение не менялось) — только
-    // разрешение «uid прочитан» решает «список или подсказка входа».
-    void live.whenUidKnown().then(onUid);
-  }
+  void syncTitle();
+  startFilteredLoad();
 </script>

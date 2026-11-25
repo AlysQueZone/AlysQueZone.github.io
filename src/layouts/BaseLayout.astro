@@ -125,11 +125,16 @@ assertSupabaseConfigured();
             />
             гамба на пивкойны
           </button>
-          <div data-wallet-chip class="hidden chip-arcade bg-void px-4 py-2 text-sm font-black">
+          <!-- Плашка баланса — ссылка в свой профиль; адрес ставит скрипт,
+               когда известен uid (гостю плашки нет). -->
+          <a
+            data-wallet-chip
+            class="btn-arcade btn-arcade-ghost hidden cursor-pointer px-4 py-2 text-sm font-black"
+          >
             <span aria-hidden="true">🍺</span>
             <span data-wallet-balance>—</span>
             <span class="text-mist">Пивкойнов</span>
-          </div>
+          </a>
           <!-- Ежедневный вход: автовыдача без кнопок — только всплывающее уведомление о факте. -->
           <DailyLogin />
         </div>
@@ -213,6 +218,7 @@ assertSupabaseConfigured();
     <script>
       import { fetchDealLog } from '@/lib/purchases-read';
       import { dealLogLine, MARQUEE_DEAL_LIMIT } from '@/lib/trade-history';
+      import { balancePlate } from '@/lib/header';
       import { live } from '@/lib/live';
       import { initOutbidNotice } from '@/lib/outbid-notice';
       import { initSubmissionNotice } from '@/lib/submission-notice';
@@ -324,9 +330,10 @@ assertSupabaseConfigured();
         });
       });
       // Баланс в шапке: из снапшота живых данных
-      // (src/lib/live.ts). Гостю чип не показываем вообще; залогиненному без
-      // строки (счёт ещё не создан триггером / офлайн) — прочерк, деньги целы.
-      // Локального кошелька и window-шины нет — тик и смена сессии у модуля.
+      // (src/lib/live.ts). Плашка — ссылка в свой профиль; гостю её нет
+      // вообще, залогиненному без строки (счёт ещё не создан триггером /
+      // офлайн) — прочерк, деньги целы. Локального кошелька и window-шины нет —
+      // тик и смена сессии у модуля.
       const setChipVisible = (visible: boolean): void => {
         document.querySelectorAll('[data-wallet-chip]').forEach((el) => {
           el.classList.toggle('hidden', !visible);
@@ -339,19 +346,26 @@ assertSupabaseConfigured();
           el.removeAttribute('title');
         });
       };
+      const setChipHref = (href: string | null): void => {
+        document.querySelectorAll('[data-wallet-chip]').forEach((el) => {
+          if (!(el instanceof HTMLAnchorElement)) return;
+          if (href) el.setAttribute('href', href);
+          else el.removeAttribute('href');
+        });
+      };
       function renderChip(): void {
-        const uid = live.uid();
-        if (uid === null) {
-          setChipVisible(false);
-          return;
-        }
+        const plate = balancePlate({
+          uid: live.uid(),
+          balanceKnown: live.balanceKnown(),
+          balance: live.balance(),
+        });
+        setChipHref(plate.href);
         // Ответа по балансу ещё нет — не мигаем прочерком, ждём событие.
-        if (!live.balanceKnown()) {
+        if (!plate.visible) {
           setChipVisible(false);
           return;
         }
-        const balance = live.balance();
-        paint(balance === null ? '—' : String(balance));
+        paint(plate.value);
         setChipVisible(true);
       }
       // Снапшот живых данных — единственный источник чипа и маркизы:
