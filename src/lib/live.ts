@@ -353,7 +353,11 @@ function supabaseTransport(): LiveTransport {
 const registry = createLiveRegistry(supabaseTransport());
 const store = createLiveStore(supabaseReaders());
 
-/** Баланс из payload профиля: строка видна только своя (RLS) — без чтения. */
+/**
+ * Баланс из payload профиля — без чтения. Строка приходит по своему каналу
+ * (фильтр `user_id=eq.<uid>`); публичная политика `profiles` этому не мешает,
+ * но чужие строки в снапшот не попадают (docs/adr/0014).
+ */
 function balanceFromPayload(payload: LivePayload): number | null {
   const row = (payload.new ?? {}) as Record<string, unknown>;
   return normalizeBalance(row['balance']);
