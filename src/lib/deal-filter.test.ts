@@ -10,6 +10,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buyerUidFor,
+  dealFilterEmptyText,
   dealFilterTitle,
   dealFilterUrl,
   parseDealFilter,
@@ -131,6 +132,32 @@ describe('dealFilterTitle', () => {
       const title = dealFilterTitle({ mode: 'user', uid: UID }, login);
       expect(title).toBe('Покупки чатерса');
       expect(title).not.toContain(UID);
+    }
+  });
+});
+
+describe('dealFilterEmptyText', () => {
+  it('пустая биржа зовёт забрать первый привет', () => {
+    expect(dealFilterEmptyText({ mode: 'all' }, null)).toBe(
+      'Сделок пока нет — забери первый привет'
+    );
+  });
+
+  it('«Мои покупки» — про тебя, без совета забрать привет', () => {
+    expect(dealFilterEmptyText({ mode: 'mine' }, null)).toBe('Ты пока ничего не покупал');
+  });
+
+  it('чужой фильтр называет чатерса и не советует ему покупать', () => {
+    const text = dealFilterEmptyText({ mode: 'user', uid: UID }, 'ShidouQuE');
+    expect(text).toBe('Покупок у @ShidouQuE пока нет');
+    expect(text).not.toContain('забери');
+  });
+
+  it('логина нет — честное «Покупок пока нет», без uuid', () => {
+    for (const login of [null, undefined, '', '   ', '@']) {
+      const text = dealFilterEmptyText({ mode: 'user', uid: UID }, login);
+      expect(text).toBe('Покупок пока нет');
+      expect(text).not.toContain(UID);
     }
   });
 });

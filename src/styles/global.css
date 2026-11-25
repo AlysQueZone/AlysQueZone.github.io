@@ -431,10 +431,9 @@ video:-webkit-full-screen {
 
 /* Бейдж-ссылка владельца — цель минимум 24×24 (WCAG 2.5.8): по контенту она
    23px в высоту (9px шрифт + 4px поля), и рядом с ней другая цель — кнопка
-   «смотреть» на весь кадр. Один пиксель высоты ничего не сдвигает. */
+   «смотреть» на весь кадр. Один пиксель высоты ничего не сдвигает. `display`
+   не трогаем: бейдж абсолютный (blockified), а K1 прячет его через display. */
 .lot-media-frame a[data-owner-badge] {
-  display: inline-flex;
-  align-items: center;
   min-height: 24px;
 }
 
@@ -514,6 +513,20 @@ video:-webkit-full-screen {
   font-weight: 900;
   color: var(--color-cream);
   text-shadow: 2px 2px 0 var(--color-milk);
+}
+
+/* Колонки K1 — по ширине самой колонки, а не вьюпорта (как в прототипе):
+   280px паспорта отнимают место, и на планшете две карточки в узкой колонке
+   тесны. Контейнер — секция приветов; на /lots/ правила не срабатывают:
+   там нет контейнера, и сетка остаётся своей. */
+[data-profile-lots] {
+  container-type: inline-size;
+}
+
+@container (min-width: 620px) {
+  [data-profile-lots] [data-lots-grid] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 /* «Случайные приветы»: широкая карточка показывается одна. Как только у любой

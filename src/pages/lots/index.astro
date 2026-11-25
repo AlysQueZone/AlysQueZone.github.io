@@ -25,16 +25,16 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
   </BrandHeadline>
   <p class="mt-3 text-mist">Выбирай лот, жми «купить» и забирай, пока чат не разобрал</p>
 
-  <section aria-label="Мои приветы" class="mt-8">
+  <div class="mt-8">
     <p data-my-privety-hint class="hidden text-sm font-bold text-mist">
       Войди через Twitch — тут будут твои приветы
     </p>
     <a data-my-privety-link class="hidden text-sm font-bold text-stream hover:underline">
       Мои приветы →
     </a>
-  </section>
+  </div>
 
-  <section aria-label="Все лоты" class="mt-8">
+  <section class="mt-8">
     <h2 class="font-display text-xs uppercase">Все лоты</h2>
     <p data-lots-state class="mt-3 hidden text-sm font-bold text-mist"></p>
     <p data-lots-status class="sr-only" role="status">
@@ -55,12 +55,9 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
         >
           Показать ещё
         </button>
-        <p data-lots-more-status class="text-sm font-bold text-mist" role="status"></p>
+        <p data-lots-more-status class="text-sm font-bold text-mist"></p>
       </div>
     </div>
-    <p data-lots-end class="mt-4 hidden text-center text-sm font-bold text-mist">
-      Это все приветы
-    </p>
 
     <SuggestGreeting />
   </section>
@@ -106,7 +103,6 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
   const moreWrap = document.querySelector('[data-lots-more]');
   const moreBtn = document.querySelector('[data-lots-more-btn]');
   const moreStatus = document.querySelector('[data-lots-more-status]');
-  const endNote = document.querySelector('[data-lots-end]');
   const skeletonTpl = document.querySelector('[data-lot-skeleton-template]');
 
   function toggle(el: Element | null, show: boolean): void {
@@ -221,9 +217,7 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
   function updateMoreUi(): void {
     const known = live.catalogKnown();
     const hasMore = live.catalogHasMore();
-    const count = live.catalogWindow().length;
     toggle(moreWrap, known && hasMore);
-    toggle(endNote, known && !hasMore && count > 0);
     if (moreBtn instanceof HTMLButtonElement) {
       moreBtn.disabled = moreState === 'loading';
       moreBtn.textContent =
@@ -236,6 +230,9 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
     if (moreStatus instanceof HTMLElement) {
       moreStatus.textContent = moreState === 'error' ? MORE_FAIL_TEXT : '';
     }
+    // Один live-регион на страницу: ошибку подгрузки объявляем через него,
+    // видимая подпись остаётся рядом с кнопкой.
+    if (moreState === 'error') setStatus(MORE_FAIL_TEXT);
   }
 
   /** Сентинел в зоне подгрузки: высокий вьюпорт/короткая страница — догружаем. */

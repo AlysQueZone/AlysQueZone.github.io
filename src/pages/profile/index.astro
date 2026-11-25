@@ -119,14 +119,12 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
       <!-- Приветы владельца: страницы по 12 (lib/catalog-page.ts), компактные
              карточки K1 (LotCardCompact), покупка — общая модалка (BaseLayout).
              Секция включается, когда uid разобран; скелетоны держат геометрию
-             до первого ответа. Покупки — соседняя секция ниже. -->
-      <section id="profile-lots" data-profile-lots hidden aria-label="Приветы">
-        <h2 class="font-display text-xs uppercase">Приветы</h2>
+             до первого ответа. Заголовок только для скринридера: на прототипе
+             карточки стоят вровень с паспортом, видимая подпись их сдвигала. -->
+      <section id="profile-lots" data-profile-lots hidden>
+        <h2 class="sr-only">Приветы</h2>
         <p data-lots-note class="mt-3 hidden text-sm font-bold text-mist"></p>
-        <p data-lots-status class="sr-only" role="status">
-          Загружаю приветы…
-        </p>
-        <div data-lots-grid class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div data-lots-grid class="grid grid-cols-1 gap-3">
           {Array.from({ length: CATALOG_PAGE_SIZE }, () => (
             <LotCardCompactSkeleton />
           ))}
@@ -140,21 +138,12 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
             >
               Показать ещё
             </button>
-            <p data-lots-more-status class="text-sm font-bold text-mist" role="status"></p>
+            <p data-lots-more-status class="text-sm font-bold text-mist"></p>
           </div>
         </div>
-        <p data-lots-end class="mt-4 hidden text-center text-sm font-bold text-mist">
-          Это все приветы
-        </p>
       </section>
 
-      <section
-        id="profile-purchases"
-        data-profile-purchases
-        hidden
-        aria-label="История покупок"
-        class="mt-8"
-      >
+      <section id="profile-purchases" data-profile-purchases hidden class="mt-8">
         <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
           <h2 class="font-display text-lg uppercase">История покупок</h2>
           <a
@@ -165,12 +154,11 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
             Вся история →
           </a>
         </div>
-        <p data-profile-purchases-status class="sr-only" role="status"></p>
 
         <!-- Скелетон повторяет строку покупки: дата, название, цена. -->
         <div data-profile-purchases-skeleton aria-hidden="true" class="mt-3 flex flex-col gap-2">
           {Array.from({ length: 5 }, () => (
-            <div class="flex items-baseline gap-3 border-2 border-milk/15 px-3 py-2">
+            <div class="flex items-baseline gap-3 py-2">
               <div class="skeleton-block h-3 w-20"></div>
               <div class="skeleton-block h-4 flex-1"></div>
               <div class="skeleton-block h-3 w-16"></div>
@@ -292,11 +280,9 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
   const lotsSection = document.querySelector('[data-profile-lots]');
   const lotsGrid = document.querySelector('[data-lots-grid]');
   const lotsNote = document.querySelector('[data-lots-note]');
-  const lotsStatus = document.querySelector('[data-lots-status]');
   const lotsMore = document.querySelector('[data-lots-more]');
   const lotsMoreBtn = document.querySelector('[data-lots-more-btn]');
   const lotsMoreStatus = document.querySelector('[data-lots-more-status]');
-  const lotsEnd = document.querySelector('[data-lots-end]');
   const lotsTpl = document.querySelector('[data-lot-compact-template]');
   const lotsSkeletonTpl = document.querySelector('[data-lot-compact-skeleton-template]');
 
@@ -324,7 +310,6 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
   const purchasesError = document.querySelector('[data-profile-purchases-error]');
   const purchasesRetry = document.querySelector('[data-profile-purchases-retry]');
   const purchasesMore = document.querySelector('[data-profile-purchases-more]');
-  const purchasesStatus = document.querySelector('[data-profile-purchases-status]');
 
   /** Подгрузка паспорта: одно чтение в полёте + один хвостовой проход. */
   let loading = false;
@@ -380,10 +365,6 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
     if (lotsNote instanceof HTMLElement) lotsNote.textContent = text ?? '';
   }
 
-  function setLotsStatus(text: string): void {
-    if (lotsStatus instanceof HTMLElement) lotsStatus.textContent = text;
-  }
-
   function clearSkeletons(): void {
     document.querySelectorAll('[data-lot-skeleton]').forEach((node) => node.remove());
   }
@@ -427,7 +408,6 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
     setNote(lotsFailed ? LOTS_FAIL_TEXT : empty ? LOTS_EMPTY_TEXT : null);
     // Блок подгрузки — единственная кнопка повтора и для первой страницы.
     toggle(lotsMore, lotsFailed || (lotsLoaded && lotHasMore));
-    toggle(lotsEnd, lotsLoaded && !lotHasMore && lotStates.length > 0);
     if (lotsMoreBtn instanceof HTMLButtonElement) {
       lotsMoreBtn.disabled = lotsMoreState === 'loading';
       lotsMoreBtn.textContent =
@@ -440,7 +420,9 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
     if (lotsMoreStatus instanceof HTMLElement) {
       lotsMoreStatus.textContent = lotsMoreState === 'error' ? LOTS_MORE_FAIL_TEXT : '';
     }
-    setLotsStatus(lotsFailed ? LOTS_FAIL_TEXT : empty ? LOTS_EMPTY_TEXT : '');
+    // Один live-регион на страницу: объявляем итог чтения, не каждый шаг.
+    if (lotsFailed) announce(LOTS_FAIL_TEXT);
+    else if (empty) announce(LOTS_EMPTY_TEXT);
   }
 
   /** Повтор первой страницы: снять заметку об ошибке и вернуть скелетоны. */
@@ -559,17 +541,13 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
     }
   }
 
-  function announcePurchases(text: string): void {
-    if (purchasesStatus instanceof HTMLElement) purchasesStatus.textContent = text;
-  }
-
   /** Строка превью: дата, название, цена; вся площадь ведёт на страницу привета. */
   function purchasesRow(entry: DealEntry): HTMLLIElement {
     const row = document.createElement('li');
     const link = document.createElement('a');
     link.href = `${base}lot/?id=${encodeURIComponent(entry.slug)}`;
     link.className =
-      'flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-2 border-milk/15 px-3 py-2 hover:border-milk hover:bg-void/50';
+      'flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 py-2 hover:text-ember';
 
     const date = document.createElement('span');
     date.className = 'text-xs font-bold whitespace-nowrap text-mist';
@@ -598,7 +576,7 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
     toggle(purchasesList, shown);
     toggle(purchasesEmpty, !shown);
     toggle(purchasesError, false);
-    announcePurchases(shown ? `Последние покупки: ${entries.length}` : 'Покупок пока нет');
+    announce(shown ? `Последние покупки: ${entries.length}` : 'Покупок пока нет');
   }
 
   /** Строки и ошибка меняются, но «Вся история →» остаётся: путь в лог цел. */
@@ -607,7 +585,7 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
     toggle(purchasesList, false);
     toggle(purchasesEmpty, false);
     toggle(purchasesError, false);
-    announcePurchases('Загружаю историю покупок…');
+    announce('Загружаю историю покупок…');
   }
 
   function showPurchasesError(): void {
@@ -615,7 +593,7 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
     toggle(purchasesList, false);
     toggle(purchasesEmpty, false);
     toggle(purchasesError, true);
-    announcePurchases('История покупок не загрузилась');
+    announce('История покупок не загрузилась');
   }
 
   /** Подгрузка превью: одно чтение в полёте + один хвостовой проход. */

@@ -64,3 +64,15 @@ export function dealFilterTitle(filter: DealFilter, login: string | null | undef
   const text = cleanLogin(login);
   return text.length > 0 ? `Покупки @${text}` : 'Покупки чатерса';
 }
+
+/**
+ * Пустое состояние своим словами: «забери первый привет» — совет только для
+ * всей биржи. В чужом фильтре это чужие покупки, советовать нечего; в «Моих» —
+ * реплика про тебя. Логина нет — общая честная фраза без ника.
+ */
+export function dealFilterEmptyText(filter: DealFilter, login: string | null | undefined): string {
+  if (filter.mode === 'all') return 'Сделок пока нет — забери первый привет';
+  if (filter.mode === 'mine') return 'Ты пока ничего не покупал';
+  const text = cleanLogin(login);
+  return text.length > 0 ? `Покупок у @${text} пока нет` : 'Покупок пока нет';
+}

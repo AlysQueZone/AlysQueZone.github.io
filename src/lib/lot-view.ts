@@ -36,6 +36,8 @@ export function isMine(st: LotState, uid: string | null): boolean {
 export interface OwnerBadgeView {
   /** «👑 nick»; пусто — владельца нет, бейдж скрыт («свободен» на месте). */
   text: string;
+  /** Ник без короны — подпись в разметке; корона скрыта от скринридера. */
+  login: string;
   /** Адрес профиля владельца; null — бейдж остаётся текстом («Биржа», нет uid). */
   href: string | null;
   /** Ник для `aria-label` ссылки (корона — не имя); null — бейдж не ссылка. */
@@ -49,9 +51,9 @@ export interface OwnerBadgeView {
  */
 export function ownerBadgeView(st: LotState): OwnerBadgeView {
   const login = typeof st.owner_login === 'string' ? st.owner_login.trim() : '';
-  if (login.length === 0) return { text: '', href: null, label: null };
+  if (login.length === 0) return { text: '', login: '', href: null, label: null };
   const href = profileHref(st.owner_uid);
-  return { text: `👑 ${login}`, href, label: href === null ? null : login };
+  return { text: `👑 ${login}`, login, href, label: href === null ? null : login };
 }
 
 export interface LotViewOptions {
@@ -204,8 +206,13 @@ function fillOwnerBadges(root: ParentNode | null, st: LotState, mine: boolean): 
   const view = ownerBadgeView(st);
   const owner = root.querySelector('[data-owner-badge]');
   if (owner instanceof HTMLElement) {
-    owner.textContent = view.text;
-    owner.classList.toggle('hidden', view.text.length === 0);
+    // Корона — отдельный `aria-hidden`-спан: доступное имя ссылки — ник, и
+    // видимый ник входит в него (Label in Name). Подпись пишем в свой слот,
+    // иначе span-корона стёрлась бы textContent.
+    const name = owner.querySelector('[data-owner-name]');
+    if (name instanceof HTMLElement) name.textContent = view.login;
+    else owner.textContent = view.text;
+    owner.classList.toggle('hidden', view.login.length === 0);
     if (owner instanceof HTMLAnchorElement) {
       // Ссылка — настоящий href, а не обработчик: клавиатура и контекстное
       // меню работают штатно. Нет uid — атрибуты снимаются: `a` без href и
@@ -215,12 +222,12 @@ function fillOwnerBadges(root: ParentNode | null, st: LotState, mine: boolean): 
         owner.removeAttribute('aria-label');
       } else {
         owner.href = view.href;
-        owner.setAttribute('aria-label', view.label ?? view.text);
+        owner.setAttribute('aria-label', view.label ?? view.login);
       }
     }
   }
   const free = root.querySelector('[data-free-badge]');
-  if (free instanceof HTMLElement) free.classList.toggle('hidden', view.text.length > 0);
+  if (free instanceof HTMLElement) free.classList.toggle('hidden', view.login.length > 0);
   const mineBadge = root.querySelector('[data-mine-badge]');
   if (mineBadge instanceof HTMLElement) mineBadge.classList.toggle('hidden', !mine);
 }

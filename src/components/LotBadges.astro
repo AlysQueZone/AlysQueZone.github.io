@@ -4,14 +4,15 @@
 // Клиент заполняет их по data-слотам (lib/lot-view.ts, fillLot): ник поверх
 // кадра, а не строкой текста; у свободного лота владелец скрыт, показан «свободен».
 // Владелец — настоящая ссылка на профиль, когда у лота есть uid: `href` ставит
-// fillLot (снимает, если uid нет), `aria-label` — ник без короны.
+// fillLot (снимает, если uid нет), `aria-label` — ник без короны; корона —
+// `aria-hidden`, чтобы доступное имя совпадало с видимым ником (Label in Name).
 ---
 
 <a
   data-owner-badge
   class="badge-pixel absolute top-2 left-2 hidden max-w-[85%] truncate bg-milk text-cream"
 >
-  👑
+  <span aria-hidden="true">👑</span> <span data-owner-name></span>
 </a>
 <span data-free-badge class="badge-pixel absolute top-2 left-2 bg-bar text-mist">
   свободен

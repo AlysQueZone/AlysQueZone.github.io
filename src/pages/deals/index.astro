@@ -140,6 +140,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
   import { fetchPublicProfile } from '@/lib/profile-read';
   import {
     buyerUidFor,
+    dealFilterEmptyText,
     dealFilterTitle,
     dealFilterUrl,
     parseDealFilter,
@@ -180,6 +181,8 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
   let seenUid: string | null = null;
   /** Поколение заголовка: ответ прошлого фильтра не переписывает новый. */
   let titleToken = 0;
+  /** Логин чужого фильтра (из `public_profile`) — для заголовка и пустой фразы. */
+  let filterLogin: string | null = null;
 
   function toggle(el: Element | null, show: boolean): void {
     if (el instanceof HTMLElement) el.classList.toggle('hidden', !show);
@@ -224,15 +227,27 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
   async function syncTitle(): Promise<void> {
     const token = ++titleToken;
     if (filter.mode !== 'user') {
+      filterLogin = null;
       applyTitle(dealFilterTitle(filter, null), filter.mode === 'all');
+      syncEmptyText();
       return;
     }
     const uid = filter.uid;
     applyTitle(dealFilterTitle(filter, null), false);
+    syncEmptyText();
     const result = await fetchPublicProfile(uid);
     if (token !== titleToken) return;
     const login = result.status === 'ok' ? result.profile.login : null;
+    filterLogin = login;
     applyTitle(dealFilterTitle(filter, login), false);
+    syncEmptyText();
+  }
+
+  /** Пустая фраза зависит от фильтра: «забери первый привет» — только для биржи. */
+  function syncEmptyText(): void {
+    if (empty instanceof HTMLElement) {
+      empty.textContent = dealFilterEmptyText(filter, filterLogin);
+    }
   }
 
   function syncFilterUi(): void {
@@ -489,6 +504,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
     body.replaceChildren();
     const shown = state.entries.length > 0;
     toggle(body, shown);
+    syncEmptyText();
     toggle(empty, state.loaded && !shown);
     toggle(more, shown && state.hasMore);
     if (shown) {
@@ -576,7 +592,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
     render();
     announce(
       state.entries.length === 0
-        ? 'Сделок пока нет'
+        ? dealFilterEmptyText(filter, filterLogin)
         : state.hasMore
           ? `Загружено ${dealsLabel(state.entries.length)}`
           : `Лог дочитан — всего ${dealsLabel(state.entries.length)}`
