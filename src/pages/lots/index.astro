@@ -131,7 +131,7 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
     document.querySelectorAll('[data-lot-skeleton]').forEach((el) => el.remove());
   }
 
-  /** Ссылка на свой профиль: список приветов живёт там (ADR 0009). */
+  /** Ссылка на свой профиль: список приветов живёт там (docs/adr/0012). */
   function renderMyLotsLink(uid: string | null): void {
     const hint = document.querySelector('[data-my-privety-hint]');
     const link = document.querySelector('[data-my-privety-link]');

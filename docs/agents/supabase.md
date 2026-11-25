@@ -32,4 +32,4 @@ alter table public.t enable row level security;
 
 `auto_expose_new_tables = false` в `supabase/config.toml` — локальный dev повторяет облако, пропуск гранта падает сразу. Существующие объекты гранты сохраняют; явные гранты для них — `20260924120000_explicit_grants.sql`.
 
-Публичный профиль — осознанное исключение из закрытого чтения: `profiles` открыт колонками (`user_id, login, balance, created_at`) с политикой `using (true)`, read model — RPC `public_profile`; `updated_at` и `ledger` закрыты. Аватар (`profiles.avatar_url`) клиентской колонкой не выдан и едет только через RPC — читает его `private.profile_avatar` (`security definer`). Не «чинить» обратно — `docs/adr/0014-public-chatter-profile.md`.
+Публичный профиль — осознанное исключение из закрытого чтения: `profiles` открыт колонками (`user_id, login, avatar_url, balance, created_at`) с политикой `using (true)`, read model — RPC `public_profile`; `updated_at` и `ledger` закрыты. Аватар — такая же публичная колонка, как логин (security definer-хелперов и usage на `private` у клиентов нет). Не «чинить» обратно — `docs/adr/0014-public-chatter-profile.md`.

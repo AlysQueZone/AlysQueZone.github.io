@@ -371,6 +371,11 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
     toggle(initials, true);
   }
 
+  function showAvatar(): void {
+    toggle(avatar, true);
+    toggle(initials, false);
+  }
+
   function applyAvatar(url: string | null): void {
     if (!(avatar instanceof HTMLImageElement)) return;
     const target = url !== null && !failedAvatars.has(url) ? url : null;
@@ -390,8 +395,7 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
     avatar.addEventListener('load', () => {
       // Поздний load старого URL не перекрывает инициалы новой картинки.
       if (requestedAvatar !== null && avatar.getAttribute('src') === requestedAvatar) {
-        toggle(avatar, true);
-        toggle(initials, false);
+        showAvatar();
       }
     });
     avatar.addEventListener('error', () => {

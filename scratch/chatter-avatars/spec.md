@@ -14,7 +14,7 @@ Status: ready-for-agent
 
 - `profiles.avatar_url text` — nullable. Бэкфилл существующих счетов из `auth.users.raw_user_meta_data` (`avatar_url` → `picture`); пустое значение — аватара нет.
 - Синк — тот же триггер на `auth.users`, что обновляет логин (вставка и изменение метаданных). Пустые метаданные прежнюю картинку не затирают: как и с логином, пустой ник хуже старого.
-- Публичный read model `public_profile(uid)` возвращает `avatar_url`. Новых грантов и политик нет: аватар публичен по своей природе и едет только через RPC, колонка `profiles` для клиентов не открывается.
+- Публичный read model `public_profile(uid)` возвращает `avatar_url`. Аватар — такая же публичная колонка `profiles`, как `login` и `balance` (column-грант `avatar_url`); `updated_at` и `ledger` остаются закрытыми, `private` клиентам не выдан.
 - Чистое ядро профиля (`src/lib/profile.ts`) отдаёт `avatarUrl: string | null`; принимаются только `https:`-адреса (Twitch CDN), мусор и `javascript:` — `null`, то есть инициалы.
 - Паспорт: тот же квадрат 64×64; внутри `<img>` с `alt=""` (ник рядом), `width`/`height`, `decoding="async"`, `referrerpolicy="no-referrer"`; без `loading="lazy"` — скрытая до `load` картинка иначе не грузится. Нет URL — инициалы; `error` у картинки — прячем её и показываем инициалы (без скачка раскладки и без повторных запросов).
 - Никаких новых зависимостей, storage и прокси: картинку отдаёт CDN Twitch, URL меняется вместе с аватаром.

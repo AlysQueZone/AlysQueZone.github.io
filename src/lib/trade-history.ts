@@ -46,7 +46,7 @@ export interface DealEntry {
   title: string;
   /** Продавец; у ничейного лота — «Биржа» (`PURCHASE_SELLER_FALLBACK`). */
   seller: string;
-  /** UID продавца; `''` у «Биржи» (нет продавца или его ника) — ник текстом. */
+  /** UID продавца; `''` только у «Биржи» (нет аккаунта) — ник текстом. */
   seller_uid: string;
   buyer: string;
   /** Пометка «ТВОЙ»: uid покупателя. */
@@ -70,7 +70,7 @@ export interface HistoryEntry {
   /** Номер строки `purchases` — ключ дедупа при слиянии и вторая часть курсора. */
   id: number;
   from: string;
-  /** UID продавца; `''` у «Биржи» (нет продавца или его ника) — ник текстом. */
+  /** UID продавца; `''` только у «Биржи» (нет аккаунта) — ник текстом. */
   seller_uid: string;
   to: string;
   price: number;
