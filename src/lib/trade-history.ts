@@ -46,7 +46,7 @@ export interface DealEntry {
   title: string;
   /** Продавец; у ничейного лота — «Биржа» (`PURCHASE_SELLER_FALLBACK`). */
   seller: string;
-  /** UID продавца; `''` у «Биржи» и без uid — ник остаётся текстом. */
+  /** UID продавца; `''` у «Биржи» (нет продавца или его ника) — ник текстом. */
   seller_uid: string;
   buyer: string;
   /** Пометка «ТВОЙ»: uid покупателя. */
@@ -70,7 +70,7 @@ export interface HistoryEntry {
   /** Номер строки `purchases` — ключ дедупа при слиянии и вторая часть курсора. */
   id: number;
   from: string;
-  /** UID продавца; `''` у «Биржи» и без uid — ник остаётся текстом. */
+  /** UID продавца; `''` у «Биржи» (нет продавца или его ника) — ник текстом. */
   seller_uid: string;
   to: string;
   price: number;
@@ -108,6 +108,18 @@ export interface TradeRow {
 /** Непустая строка или null: пустое значение — это отсутствие, а не текст. */
 function asText(value: unknown): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+/**
+ * Продавец записи: подпись и uid всегда согласованы. Нет ника — «Биржа» без
+ * uid: продавца либо не было, либо его подпись потеряна (старые seed-лоты),
+ * и ссылка на аккаунт под чужой подписью «Биржа» вводила бы в заблуждение.
+ * Ник есть, uid нет («Биржа» со старой записью) — текст без ссылки.
+ */
+function sellerOf(row: TradeRow): { name: string; uid: string } {
+  const name = asText(row.seller_login);
+  if (name === null) return { name: PURCHASE_SELLER_FALLBACK, uid: '' };
+  return { name, uid: asText(row.seller_uid) ?? '' };
 }
 
 /** Конечный положительный id строки или null (без него курсор и дедуп не стоят). */
@@ -149,10 +161,11 @@ export function historyEntries(rows: readonly TradeRow[]): HistoryEntry[] {
     const price = asPrice(row.price_paid);
     const created_at = asTime(row.created_at);
     if (id === null || to === null || price === null || created_at === null) continue;
+    const seller = sellerOf(row);
     entries.push({
       id,
-      from: asText(row.seller_login) ?? PURCHASE_SELLER_FALLBACK,
-      seller_uid: asText(row.seller_uid) ?? '',
+      from: seller.name,
+      seller_uid: seller.uid,
       to,
       price,
       buyer_uid: asText(row.buyer_uid) ?? '',
@@ -182,12 +195,13 @@ export function dealEntries(rows: readonly TradeRow[]): DealEntry[] {
     }
     const slug = asText(lot['slug']);
     if (slug === null) continue;
+    const seller = sellerOf(row);
     entries.push({
       id,
       slug,
       title: asText(lot['title']) ?? slug,
-      seller: asText(row.seller_login) ?? PURCHASE_SELLER_FALLBACK,
-      seller_uid: asText(row.seller_uid) ?? '',
+      seller: seller.name,
+      seller_uid: seller.uid,
       buyer,
       buyer_uid: asText(row.buyer_uid) ?? '',
       price,

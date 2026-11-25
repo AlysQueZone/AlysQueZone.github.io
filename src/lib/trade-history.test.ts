@@ -87,6 +87,12 @@ describe('historyEntries', () => {
     expect(entries[0]?.seller_uid).toBe('seller-me');
   });
 
+  it('uid без ника — «Биржа» без ссылки: подпись и адрес всегда согласованы', () => {
+    const entries = historyEntries([purchase({ seller_uid: 'legacy-uid', seller_login: null })]);
+    expect(entries[0]?.from).toBe(PURCHASE_SELLER_FALLBACK);
+    expect(entries[0]?.seller_uid).toBe('');
+  });
+
   it('пустая история — пустой список', () => {
     expect(historyEntries([])).toEqual([]);
   });
@@ -537,6 +543,12 @@ describe('dealEntries', () => {
   it('uid продавца сохранён — по нему ник ведёт в профиль', () => {
     const entries = dealEntries([purchase({ seller_uid: 'seller-me' })]);
     expect(entries[0]?.seller_uid).toBe('seller-me');
+  });
+
+  it('uid без ника — «Биржа» без ссылки, а не профиль под чужой подписью', () => {
+    const entries = dealEntries([purchase({ seller_uid: 'legacy-uid', seller_login: null })]);
+    expect(entries[0]?.seller).toBe(PURCHASE_SELLER_FALLBACK);
+    expect(entries[0]?.seller_uid).toBe('');
   });
 
   it('лот без названия — запись остаётся с slug вместо названия', () => {
