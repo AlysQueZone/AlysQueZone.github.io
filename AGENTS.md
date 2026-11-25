@@ -57,6 +57,7 @@
 - Supabase-схема / RLS / миграции / отладка → `docs/agents/supabase.md`.
 - Профиль чатерса (`/profile/?uid=<uuid>`, публичный баланс и капитал) → `docs/adr/0014-public-chatter-profile.md`.
 - Публичный read model профиля (RPC `public_profile`, колонки-гранты `profiles`, логин-подпись) → `docs/adr/0014-public-chatter-profile.md`, `docs/agents/supabase.md`.
+- Аватар в паспорте — из метаданных Twitch (`avatar_url` → `picture`) в `profiles.avatar_url`, только через `public_profile`; нет/битая картинка — инициалы → `docs/adr/0014-public-chatter-profile.md`.
 - Фильтр «Лога сделок» по чатерсу `?user=<uid>` (заголовок «Покупки @nick») → `src/lib/deal-filter.ts`.
 - Стандарты кода / стиль / импорты / рендер / тесты / SQL-гайд / `just` → `CODING_STANDARDS.md`.
 - Цвета / токены / типографика / компоненты → `DESIGN.md`.

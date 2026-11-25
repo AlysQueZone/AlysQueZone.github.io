@@ -16,11 +16,14 @@ import {
 } from './profile';
 
 const UID = '5b1f0c2e-9d3a-4f7b-8c1d-2e3f4a5b6c7d';
+const AVATAR =
+  'https://static-cdn.jtvnw.net/jtv_user_pictures/5b1f0c2e-9d3a-4f7b-8c1d-profile_image-300x300.png';
 
 function row(overrides: Partial<ProfileRow> = {}): ProfileRow {
   return {
     user_id: UID,
     login: 'ShidouQuE',
+    avatar_url: AVATAR,
     balance: 4320,
     created_at: '2026-09-12T10:00:00+00:00',
     capital: 7860,
@@ -110,11 +113,39 @@ describe('profileStats', () => {
       login: 'ShidouQuE',
       caption: '@ShidouQuE',
       initials: 'SQ',
+      avatarUrl: AVATAR,
       joinedAt: '2026-09-12T10:00:00+00:00',
       balance: 4320,
       capital: 7860,
       lotsCount: 6,
     });
+  });
+
+  it('аватар — только https-адрес Twitch, остальное остаётся инициалам', () => {
+    expect(profileStats(row())?.avatarUrl).toBe(AVATAR);
+    expect(profileStats(row({ avatar_url: `  ${AVATAR}  ` }))?.avatarUrl).toBe(AVATAR);
+  });
+
+  it('нет аватара или он пустой — null, а не «undefined»', () => {
+    expect(profileStats(row({ avatar_url: null }))?.avatarUrl).toBeNull();
+    expect(profileStats(row({ avatar_url: undefined }))?.avatarUrl).toBeNull();
+    expect(profileStats(row({ avatar_url: '' }))?.avatarUrl).toBeNull();
+    expect(profileStats(row({ avatar_url: '   ' }))?.avatarUrl).toBeNull();
+    expect(profileStats(row({ avatar_url: 42 }))?.avatarUrl).toBeNull();
+  });
+
+  it('http, javascript и мусор — null: картинка не грузится из небезопасного источника', () => {
+    for (const bad of [
+      'http://static-cdn.jtvnw.net/avatar.png',
+      'javascript:alert(1)',
+      'data:image/png;base64,AAAA',
+      '//static-cdn.jtvnw.net/avatar.png',
+      'static-cdn.jtvnw.net/avatar.png',
+      'не ссылка',
+      'https://',
+    ]) {
+      expect(profileStats(row({ avatar_url: bad }))?.avatarUrl, bad).toBeNull();
+    }
   });
 
   it('нет логина — подпись-фолбэк, профиль всё равно работает', () => {

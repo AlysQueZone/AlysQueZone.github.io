@@ -9,6 +9,8 @@
  * UID — вечная идентичность, логин — подпись: битый/пустой uid отсекается здесь,
  * чтобы Postgres не получил cast (22P02), и ссылкой не становится («Биржа»);
  * логина может не быть — паспорт живёт по uid («@чатерс», инициалы «?»).
+ * Аватар — только `https:` (CDN Twitch); http, `javascript:` и мусор — null,
+ * тогда квадрат паспорта остаётся инициалам (`docs/adr/0014`).
  *
  * Даты считаются по UTC: дата регистрации — календарный день, а не деньги, зато
  * одинаковая у всех и в тестах. Числа — `ru-RU` (неразрывный разделитель).
@@ -20,6 +22,7 @@
 export interface ProfileRow {
   user_id?: unknown;
   login?: unknown;
+  avatar_url?: unknown;
   balance?: unknown;
   created_at?: unknown;
   capital?: unknown;
@@ -36,6 +39,8 @@ export interface ProfileStats {
   caption: string;
   /** Инициалы для квадрата без аватара: «SQ», «BR»; нет логина — «?». */
   initials: string;
+  /** Аватар Twitch — только `https:`; null — инициалы. */
+  avatarUrl: string | null;
   /** `created_at` как ISO — для `formatProfileDate`. */
   joinedAt: string;
   balance: number;
@@ -104,6 +109,23 @@ export function profileInitials(login: unknown): string {
   return (first + second).toUpperCase();
 }
 
+/**
+ * Аватар из строки `public_profile`: только абсолютный `https:`-адрес с хостом
+ * (CDN Twitch). Пусто, http, `javascript:`, мусор — null, и тогда паспорт
+ * показывает инициалы. Схему решает разбор URL, а не префикс строки.
+ */
+function cleanAvatarUrl(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const text = value.trim();
+  if (text.length === 0) return null;
+  try {
+    const parsed = new URL(text);
+    return parsed.protocol === 'https:' && parsed.hostname.length > 0 ? text : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Конечное неотрицательное число из сети или null (`null` — не ноль). */
 function asAmount(value: unknown): number | null {
   if (typeof value !== 'number' && typeof value !== 'string') return null;
@@ -141,6 +163,7 @@ export function profileStats(row: ProfileRow | null | undefined): ProfileStats |
     login: login.length > 0 ? login : null,
     caption: profileCaption(login),
     initials: profileInitials(login),
+    avatarUrl: cleanAvatarUrl(row.avatar_url),
     joinedAt,
     balance,
     capital,
