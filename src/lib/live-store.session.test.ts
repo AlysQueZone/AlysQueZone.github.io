@@ -154,7 +154,7 @@ describe('createSessionOwner', () => {
     expect(log.events.map((event) => event.kind)).toEqual(['myLots', 'outbid']);
     expect(log.events[1]).toMatchObject({
       kind: 'outbid',
-      event: { slug: 'lot-mine', title: 'Мой', by: 'carol', price: 1200 },
+      event: { slug: 'lot-mine', title: 'Мой', by: 'carol', buyer_uid: 'u3', price: 1200 },
     });
   });
 

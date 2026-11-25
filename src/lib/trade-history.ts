@@ -380,6 +380,7 @@ export function outbidCatchup(rows: readonly TradeRow[], uid: string, limit: num
       slug,
       title: title ?? slug,
       by: asText(row.buyer_login) ?? BUYER_FALLBACK,
+      buyer_uid: asText(row.buyer_uid),
       price,
       at,
       video: asText(lot['video_url']),
