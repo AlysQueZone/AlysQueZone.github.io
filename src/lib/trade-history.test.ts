@@ -45,6 +45,7 @@ function entry(overrides: Partial<HistoryEntry> = {}): HistoryEntry {
   return {
     id: 1,
     from: 'author',
+    seller_uid: 'author-uid',
     to: 'buyer',
     price: 880,
     buyer_uid: 'buyer-uid',
@@ -65,6 +66,7 @@ describe('historyEntries', () => {
       {
         id: 1,
         from: 'melkij_strateg',
+        seller_uid: 'author-uid',
         to: 'foxindique',
         price: 880,
         buyer_uid: 'buyer-uid',
@@ -73,10 +75,16 @@ describe('historyEntries', () => {
     ]);
   });
 
-  it('ничейный лот: пустой продавец — «Биржа», а не пустая строка', () => {
+  it('ничейный лот: пустой продавец — «Биржа», uid продавца пуст', () => {
     const entries = historyEntries([purchase({ seller_uid: null, seller_login: null })]);
     expect(entries[0]?.from).toBe(PURCHASE_SELLER_FALLBACK);
+    expect(entries[0]?.seller_uid).toBe('');
     expect(PURCHASE_SELLER_FALLBACK).toBe('Биржа');
+  });
+
+  it('uid продавца сохранён — по нему ник ведёт в профиль', () => {
+    const entries = historyEntries([purchase({ seller_uid: 'seller-me' })]);
+    expect(entries[0]?.seller_uid).toBe('seller-me');
   });
 
   it('пустая история — пустой список', () => {
@@ -468,6 +476,7 @@ function deal(overrides: Partial<DealEntry> = {}): DealEntry {
     slug: 'lot-a',
     title: 'Привет',
     seller: 'author',
+    seller_uid: 'author-uid',
     buyer: 'buyer',
     buyer_uid: 'buyer-uid',
     price: 880,
@@ -509,6 +518,7 @@ describe('dealEntries', () => {
         slug: 'privet',
         title: 'Привет с дачи',
         seller: 'melkij_strateg',
+        seller_uid: 'author-uid',
         buyer: 'foxindique',
         buyer_uid: 'buyer-uid',
         price: 990,
@@ -518,9 +528,15 @@ describe('dealEntries', () => {
     ]);
   });
 
-  it('пустой продавец — «Биржа», а не пустая строка', () => {
-    const entries = dealEntries([purchase({ seller_login: null })]);
+  it('пустой продавец — «Биржа», uid продавца пуст', () => {
+    const entries = dealEntries([purchase({ seller_uid: null, seller_login: null })]);
     expect(entries[0]?.seller).toBe(PURCHASE_SELLER_FALLBACK);
+    expect(entries[0]?.seller_uid).toBe('');
+  });
+
+  it('uid продавца сохранён — по нему ник ведёт в профиль', () => {
+    const entries = dealEntries([purchase({ seller_uid: 'seller-me' })]);
+    expect(entries[0]?.seller_uid).toBe('seller-me');
   });
 
   it('лот без названия — запись остаётся с slug вместо названия', () => {
