@@ -46,6 +46,8 @@ export interface DealEntry {
   title: string;
   /** Продавец; у ничейного лота — «Биржа» (`PURCHASE_SELLER_FALLBACK`). */
   seller: string;
+  /** UID продавца; `''` у «Биржи» и без uid — ник остаётся текстом. */
+  seller_uid: string;
   buyer: string;
   /** Пометка «ТВОЙ»: uid покупателя. */
   buyer_uid: string;
@@ -68,6 +70,8 @@ export interface HistoryEntry {
   /** Номер строки `purchases` — ключ дедупа при слиянии и вторая часть курсора. */
   id: number;
   from: string;
+  /** UID продавца; `''` у «Биржи» и без uid — ник остаётся текстом. */
+  seller_uid: string;
   to: string;
   price: number;
   buyer_uid: string;
@@ -148,6 +152,7 @@ export function historyEntries(rows: readonly TradeRow[]): HistoryEntry[] {
     entries.push({
       id,
       from: asText(row.seller_login) ?? PURCHASE_SELLER_FALLBACK,
+      seller_uid: asText(row.seller_uid) ?? '',
       to,
       price,
       buyer_uid: asText(row.buyer_uid) ?? '',
@@ -182,6 +187,7 @@ export function dealEntries(rows: readonly TradeRow[]): DealEntry[] {
       slug,
       title: asText(lot['title']) ?? slug,
       seller: asText(row.seller_login) ?? PURCHASE_SELLER_FALLBACK,
+      seller_uid: asText(row.seller_uid) ?? '',
       buyer,
       buyer_uid: asText(row.buyer_uid) ?? '',
       price,

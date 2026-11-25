@@ -48,7 +48,7 @@ export async function fetchSharedHistory(
     const lotId = (lot as unknown as { id: number }).id;
     let query = sb
       .from('purchases')
-      .select('id,seller_login,buyer_login,buyer_uid,price_paid,created_at')
+      .select('id,seller_uid,seller_login,buyer_login,buyer_uid,price_paid,created_at')
       .eq('lot_id', lotId);
     const filter = historyCursorFilter(cursor);
     if (filter) query = query.or(filter);
@@ -98,7 +98,7 @@ export async function fetchDealLog(
     let query = sb
       .from('purchases')
       .select(
-        'id,seller_login,buyer_login,buyer_uid,price_paid,created_at,lots(slug,title,video_url)'
+        'id,seller_uid,seller_login,buyer_login,buyer_uid,price_paid,created_at,lots(slug,title,video_url)'
       );
     if (buyerUid) query = query.eq('buyer_uid', buyerUid);
     const filter = historyCursorFilter(cursor);
