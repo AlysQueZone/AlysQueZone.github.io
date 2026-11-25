@@ -10,8 +10,10 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
 // (см. docs/adr/0002). Шаблон карточки — единственный источник разметки.
 // Скелетонов — ровно на первую страницу: столько же карточек вернёт первый
 // запрос, поэтому загрузка не прыгает.
-// «Мои приветы» живут на профиле (docs/adr/0009, тикет 02): здесь только
-// ссылка в свой профиль, гостю — прежняя подсказка входа.
+// «Мои приветы» живут на профиле (docs/adr/0009): здесь только ссылка в свой
+// профиль, гостю — прежняя подсказка входа. Подсказка стартует скрытой:
+// залогиненному её не видно ни кадра (секция JS-driven, no-JS — статический
+// каркас).
 ---
 
 <BaseLayout
@@ -24,7 +26,7 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
   <p class="mt-3 text-mist">Выбирай лот, жми «купить» и забирай, пока чат не разобрал</p>
 
   <section aria-label="Мои приветы" class="mt-8">
-    <p data-my-privety-hint class="text-sm font-bold text-mist">
+    <p data-my-privety-hint class="hidden text-sm font-bold text-mist">
       Войди через Twitch — тут будут твои приветы
     </p>
     <a data-my-privety-link class="hidden text-sm font-bold text-stream hover:underline">
@@ -129,7 +131,7 @@ import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
     document.querySelectorAll('[data-lot-skeleton]').forEach((el) => el.remove());
   }
 
-  /** Ссылка на свой профиль: список приветов живёт там (тикет 02, ADR 0009). */
+  /** Ссылка на свой профиль: список приветов живёт там (ADR 0009). */
   function renderMyLotsLink(uid: string | null): void {
     const hint = document.querySelector('[data-my-privety-hint]');
     const link = document.querySelector('[data-my-privety-link]');
