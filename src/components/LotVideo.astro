@@ -6,6 +6,8 @@
 // `aspect` — пропорция кадра: карточка витрины берёт «телефонную» (`portrait`,
 // A2, scratch/lot-cards), страница лота — `natural` (рамка по фактической
 // пропорции постера, видео видно целиком; до загрузки — квадрат-плейсхолдер).
+// `fixed` — поверхность владеет геометрией кадра (K1 профиля): рамка не
+// подстраивается под ориентацию постера, широкое видео обрезается по центру.
 // `<slot />` — оверлеи поверх кадра (бейдж владельца, метка «Твой»).
 import { videoSources, mediaAspectClass, type MediaAspect } from '@/lib/lot-video';
 
@@ -13,9 +15,10 @@ interface Props {
   videoUrl?: string | null;
   title?: string;
   aspect?: MediaAspect;
+  fixed?: boolean;
 }
 
-const { videoUrl, title = '', aspect = 'square' } = Astro.props;
+const { videoUrl, title = '', aspect = 'square', fixed = false } = Astro.props;
 const { webm, mp4, poster } = videoSources(videoUrl);
 const hasVideo = webm.length > 0;
 ---
@@ -23,6 +26,7 @@ const hasVideo = webm.length > 0;
 <div
   data-lot-video-root
   data-media-adapt={aspect === 'natural' ? '1' : undefined}
+  data-media-fixed={fixed ? '1' : undefined}
   data-video-webm={webm || undefined}
   data-video-mp4={mp4 || undefined}
   data-video-poster={poster || undefined}

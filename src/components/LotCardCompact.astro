@@ -5,8 +5,10 @@
 // кадр и бейджи приходят общими компонентами. Отличие: кадр 77:136 шириной
 // 64px слева, справа название, отдельная строка цены и кнопка; строки
 // владельца нет — все приветы на профиле принадлежат его хозяину.
-// `data-lot-card` осознанно общий: карточка целиком — одна ссылка на Лот и
-// кольцо фокуса (global.css), как на витрине.
+// `fixed` — рамка не подстраивается под постер: карточка одна на всех, широкое
+// видео обрезается по центру (полоса во всю строку — принадлежность сеток
+// витрины и главной). `data-lot-card` осознанно общий: карточка целиком — одна
+// ссылка на Лот и кольцо фокуса (global.css), как на витрине.
 import LotVideo from './LotVideo.astro';
 import LotBadges from './LotBadges.astro';
 import { LOT_CARD_ASPECT } from '@/lib/lot-video';
@@ -16,7 +18,7 @@ const base = import.meta.env.BASE_URL;
 
 <article data-lot-card data-lot-compact class="card-pixel flex gap-3 p-3">
   <div class="w-16 shrink-0">
-    <LotVideo videoUrl={null} title="" aspect={LOT_CARD_ASPECT}>
+    <LotVideo videoUrl={null} title="" aspect={LOT_CARD_ASPECT} fixed>
       <LotBadges />
     </LotVideo>
   </div>

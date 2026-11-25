@@ -136,7 +136,9 @@ function orientationOf(w: number, h: number): MediaOrientation | null {
  * в 9:16 обрезается до центра); квадрат оставляет базовую рамку с вписыванием.
  * Наружу отдаём ориентацию (`onOrientation`): раскладку (полоса, размытая
  * подложка, ширина кадра страницы лота) решает представление Лота —
- * lib/lot-view.ts (docs/adr/0009), не каждая поверхность.
+ * lib/lot-view.ts (docs/adr/0009), не каждая поверхность. `data-media-fixed`
+ * (K1 профиля) снимает подстройку рамки: геометрией владеет поверхность,
+ * ориентация остаётся только для размытой подложки квадрата.
  */
 function applyPosterFit(
   root: HTMLElement,
@@ -145,7 +147,8 @@ function applyPosterFit(
 ): void {
   const orientation = orientationOf(img.naturalWidth, img.naturalHeight);
   if (!orientation) return;
-  if (orientation === 'wide' || root.dataset.mediaAdapt === '1') {
+  const fixed = root.dataset.mediaFixed === '1';
+  if (!fixed && (orientation === 'wide' || root.dataset.mediaAdapt === '1')) {
     root.style.aspectRatio = `${img.naturalWidth} / ${img.naturalHeight}`;
     root.dataset.mediaFit = 'contain';
   } else {
