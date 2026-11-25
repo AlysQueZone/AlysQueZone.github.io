@@ -55,6 +55,9 @@
 
 - Preview-проверка сборки (`preview` + `agent-browser`), гейт перед релизом → `docs/agents/shipping.md`.
 - Supabase-схема / RLS / миграции / отладка → `docs/agents/supabase.md`.
+- Профиль чатерса (`/profile/?uid=<uuid>`, публичный баланс и капитал) → `docs/adr/0014-public-chatter-profile.md`.
+- Публичный read model профиля (RPC `public_profile`, колонки-гранты `profiles`, логин-подпись) → `docs/adr/0014-public-chatter-profile.md`, `docs/agents/supabase.md`.
+- Фильтр «Лога сделок» по чатерсу `?user=<uid>` (заголовок «Покупки @nick») → `src/lib/deal-filter.ts`.
 - Стандарты кода / стиль / импорты / рендер / тесты / SQL-гайд / `just` → `CODING_STANDARDS.md`.
 - Цвета / токены / типографика / компоненты → `DESIGN.md`.
 - Современная веб-платформа (`<dialog>`, popover, CWV, Baseline) → гайды скилла `modern-web-guidance` (паттерн и фолбэк); канон — ADR и `CODING_STANDARDS.md`.

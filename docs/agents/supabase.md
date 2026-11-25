@@ -31,3 +31,5 @@ alter table public.t enable row level security;
 ```
 
 `auto_expose_new_tables = false` в `supabase/config.toml` — локальный dev повторяет облако, пропуск гранта падает сразу. Существующие объекты гранты сохраняют; явные гранты для них — `20260924120000_explicit_grants.sql`.
+
+Публичный профиль — осознанное исключение из закрытого чтения: `profiles` открыт колонками (`user_id, login, balance, created_at`) с политикой `using (true)`, read model — RPC `public_profile`; `updated_at` и `ledger` закрыты. Не «чинить» обратно — `docs/adr/0014-public-chatter-profile.md`.
