@@ -483,6 +483,27 @@ video:-webkit-full-screen {
   z-index: 1;
 }
 
+/* Компактная Карточка Лота профиля (K1, docs/adr/0009). Кадр 64px: бейджи
+   владельца и «свободен» в него не помещаются, а на профиле все приветы и так
+   принадлежат хозяину — остаётся только «Твой». Оверлей «смотреть» кликабелен
+   на весь кадр, но подпись кнопки в 64px не влезает — показываем значок.
+   Unlayered: display утилитами не перебить. */
+[data-lot-compact] [data-owner-badge],
+[data-lot-compact] [data-free-badge] {
+  display: none;
+}
+
+[data-lot-compact] [data-lot-video-play] > span {
+  display: none;
+}
+
+[data-lot-compact] [data-lot-video-play]::after {
+  content: '▶';
+  font-weight: 900;
+  color: var(--color-cream);
+  text-shadow: 2px 2px 0 var(--color-milk);
+}
+
 /* «Случайные приветы»: широкая карточка показывается одна. Как только у любой
    карточки постер догрузился и оказался широким (lib/lot-view.ts ставит
    data-media-orientation), узкие прячутся, а из широких остаётся первая —

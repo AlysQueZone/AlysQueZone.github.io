@@ -131,6 +131,40 @@ async function readList(
   }
 }
 
+/**
+ * Страница в порядке витрины `(price, slug)` после курсора. `ownerUid`
+ * фильтрует приветы владельца (профиль) — механика листания одна, второй
+ * формулы курсора нет. Строк берём на одну больше: по ней честно знаем
+ * «есть ещё».
+ */
+async function readOrderedPage(
+  ownerUid: string | null,
+  cursor: CatalogCursor | null,
+  limit: number
+): Promise<CatalogPageRead> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, states: [], hasMore: false };
+  const cap = Math.max(1, Math.floor(limit));
+  const read = await readList((table, columns) => {
+    let query = sb
+      .from(table)
+      .select(columns)
+      .order('price', { ascending: true })
+      .order('slug', { ascending: true })
+      .limit(cap + 1);
+    if (ownerUid !== null) query = query.eq('owner_uid', ownerUid);
+    if (cursor) {
+      query = query.or(
+        `price.gt.${cursor.price},and(price.eq.${cursor.price},slug.gt.${cursor.slug})`
+      );
+    }
+    return query;
+  });
+  if (!read.ok) return { ok: false, states: [], hasMore: false };
+  const list = fillCatalogList(read.rows);
+  return { ok: true, states: list.slice(0, cap), hasMore: list.length > cap };
+}
+
 /** Читатели живых данных поверх Supabase (ядро зовёт их, DOM/сети не знает). */
 function supabaseReaders(): LiveReaders {
   return {
@@ -186,29 +220,9 @@ function supabaseReaders(): LiveReaders {
      * Одна страница витрины после курсора (null — первая). Keyset по паре
      * `(price, slug)`: цена меняется от перекупов, slug добивает ничью и
      * держит границу страниц на месте (offset бы сдвинулся живой вставкой).
-     * Строк берём на одну больше — по ней честно знаем «есть ещё».
      */
     async readCatalogPage(cursor: CatalogCursor | null, limit: number): Promise<CatalogPageRead> {
-      const sb = getSupabase();
-      if (!sb) return { ok: false, states: [], hasMore: false };
-      const cap = Math.max(1, Math.floor(limit));
-      const read = await readList((table, columns) => {
-        let query = sb
-          .from(table)
-          .select(columns)
-          .order('price', { ascending: true })
-          .order('slug', { ascending: true })
-          .limit(cap + 1);
-        if (cursor) {
-          query = query.or(
-            `price.gt.${cursor.price},and(price.eq.${cursor.price},slug.gt.${cursor.slug})`
-          );
-        }
-        return query;
-      });
-      if (!read.ok) return { ok: false, states: [], hasMore: false };
-      const list = fillCatalogList(read.rows);
-      return { ok: true, states: list.slice(0, cap), hasMore: list.length > cap };
+      return readOrderedPage(null, cursor, limit);
     },
 
     /**
@@ -280,6 +294,22 @@ function supabaseReaders(): LiveReaders {
       }
     },
   };
+}
+
+/**
+ * Приветы владельца страницами — профиль чатерса. Тот же keyset `(price, slug)`
+ * и те же колонки/маппер, что у витрины, плюс фильтр `owner_uid`; срез
+ * каталога профиль не включает (docs/adr/0012) и снапшот не трогает: это
+ * снимок страницы, а не живое окно. Индекс — `lots_owner_uid_idx`.
+ * Пустой uid — честный отказ без запроса (Postgres упал бы на cast).
+ */
+export function readOwnerLotsPage(
+  uid: string,
+  cursor: CatalogCursor | null,
+  limit: number
+): Promise<CatalogPageRead> {
+  if (uid.length === 0) return Promise.resolve({ ok: false, states: [], hasMore: false });
+  return readOrderedPage(uid, cursor, limit);
 }
 
 // ---------------------------------------------------------------------------

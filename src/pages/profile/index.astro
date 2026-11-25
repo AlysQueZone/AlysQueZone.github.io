@@ -1,11 +1,17 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
+import LotCardCompact from '@/components/LotCardCompact.astro';
+import LotCardCompactSkeleton from '@/components/LotCardCompactSkeleton.astro';
+import { CATALOG_PAGE_SIZE } from '@/lib/catalog-page';
 
 // Публичный профиль чатерса — статический каркас: в HTML нет данных и нет
 // запросов к БД (docs/adr/0002). UID из `?uid=` разбирает клиент; один RPC
 // `public_profile` через lib/profile-read рисует паспорт. UID — идентичность,
 // логин — подпись, поэтому битая ссылка — состояние внутри страницы, а не 404.
 // Паспорт: десктоп — слева и липкий, телефон — сверху; без аватаров, инициалы.
+// Приветы — страницы по 12 компактными карточками K1 (LotCardCompact): та же
+// раскладка Лота, что на витрине, но кадр 64px и цена строкой (docs/adr/0009).
+// Скелетонов — страница целиком: столько же карточек вернёт первый запрос.
 ---
 
 <BaseLayout
@@ -91,7 +97,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
             </div>
             <div class="flex items-center justify-between gap-3 border-b-2 border-milk/15 py-2">
               <dt class="text-mist">Приветов</dt>
-              <dd class="font-black" data-profile-lots>
+              <dd class="font-black" data-profile-lots-count>
                 —
               </dd>
             </div>
@@ -109,11 +115,38 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
       </aside>
 
       <div class="min-w-0">
-        <!-- Точки расширения: приветы — владелец тикет 02, покупки — тикет 03.
-             Контракт: секции остаются на месте, id и data-* стабильны; uid
-             профиля — в data-profile-uid на [data-profile-root]. Пока разделы
-             пустые и hidden, страница лоты/покупки не читает. -->
-        <section id="profile-lots" data-profile-lots hidden aria-label="Приветы"></section>
+        <!-- Приветы владельца: страницы по 12 (lib/catalog-page.ts), компактные
+             карточки K1 (LotCardCompact), покупка — общая модалка (BaseLayout).
+             Секция включается, когда uid разобран; скелетоны держат геометрию
+             до первого ответа. Покупки — тикет 03, здесь их нет. -->
+        <section id="profile-lots" data-profile-lots hidden aria-label="Приветы">
+          <h2 class="font-display text-xs uppercase">Приветы</h2>
+          <p data-lots-note class="mt-3 hidden text-sm font-bold text-mist"></p>
+          <p data-lots-status class="sr-only" role="status">
+            Загружаю приветы…
+          </p>
+          <div data-lots-grid class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {Array.from({ length: CATALOG_PAGE_SIZE }, () => (
+              <LotCardCompactSkeleton />
+            ))}
+          </div>
+          <div data-lots-more class="mt-4 hidden">
+            <div class="flex flex-col items-center gap-2">
+              <button
+                type="button"
+                class="btn-arcade btn-arcade-ghost px-5 py-2 text-sm"
+                data-lots-more-btn
+              >
+                Показать ещё
+              </button>
+              <p data-lots-more-status class="text-sm font-bold text-mist" role="status"></p>
+            </div>
+          </div>
+          <p data-lots-end class="mt-4 hidden text-center text-sm font-bold text-mist">
+            Это все приветы
+          </p>
+        </section>
+
         <section
           id="profile-purchases"
           data-profile-purchases
@@ -123,6 +156,13 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
         ></section>
       </div>
     </div>
+
+    <template data-lot-compact-template>
+      <LotCardCompact />
+    </template>
+    <template data-lot-compact-skeleton-template>
+      <LotCardCompactSkeleton />
+    </template>
 
     <div data-profile-notfound class="card-pixel mt-6 hidden p-6 text-center sm:p-8">
       <h1 class="font-display text-lg uppercase">Профиль не найден</h1>
@@ -150,12 +190,16 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 </BaseLayout>
 
 <script>
-  // Страница рисует паспорт из одного публичного RPC (lib/profile-read);
-  // статы и форматы — lib/profile.ts. Состояния: скелетон, готовый паспорт,
-  // «не найден» (нет/битый/неизвестный uid) и «не загрузилось» с повтором.
-  // «Выйти» — только когда uid сессии совпал с профилем; смена uid приходит
-  // из live.ts (docs/adr/0003), нового канала страница не заводит.
-  import { live } from '@/lib/live';
+  // Страница рисует паспорт из одного публичного RPC (lib/profile-read) и
+  // приветы владельца страницами по 12 (readOwnerLotsPage: тот же keyset
+  // `(price, slug)`, что у витрины). Статы и форматы — lib/profile.ts, карточки —
+  // общая раскладка Лота (LotCardCompact + fillLot, docs/adr/0009). Состояния:
+  // скелетон, готовый паспорт, «не найден» (нет/битый/неизвестный uid),
+  // «не загрузилось» с повтором; приветы — пусто и ошибка с повтором.
+  // «Выйти» — только когда uid сессии совпал с профилем. Смена uid, сделки и
+  // возврат на вкладку приходят из live.ts (docs/adr/0003): перечитываем статы и
+  // первую страницу приветов, нового канала страница не заводит.
+  import { live, readOwnerLotsPage, type LotState } from '@/lib/live';
   import { fetchPublicProfile } from '@/lib/profile-read';
   import {
     formatProfileDate,
@@ -164,9 +208,22 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
     type ProfileStats,
   } from '@/lib/profile';
   import { signOut } from '@/lib/session';
+  import {
+    CATALOG_PAGE_SIZE,
+    appendCatalogPage,
+    catalogCursor,
+    type CatalogCursor,
+  } from '@/lib/catalog-page';
+  import { fillLot } from '@/lib/lot-view';
 
   const base = import.meta.env.BASE_URL;
   const profileUid = profileUidFromQuery(window.location.search);
+
+  /** Свой Лот на профиле — «Твой лот» (раскладка K1, docs/adr/0009). */
+  const MINE_LABEL = 'Твой лот';
+  const LOTS_EMPTY_TEXT = 'Пока нет приветов';
+  const LOTS_FAIL_TEXT = 'Не загрузилось — попробуй ещё';
+  const LOTS_MORE_FAIL_TEXT = 'Не получилось подгрузить — попробуй ещё';
 
   const root = document.querySelector('[data-profile-root]');
   const shell = document.querySelector('[data-profile-shell]');
@@ -182,7 +239,35 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
   const joined = document.querySelector('[data-profile-joined]');
   const balance = document.querySelector('[data-profile-balance]');
   const capital = document.querySelector('[data-profile-capital]');
-  const lots = document.querySelector('[data-profile-lots]');
+  const lotsCount = document.querySelector('[data-profile-lots-count]');
+  const lotsSection = document.querySelector('[data-profile-lots]');
+  const lotsGrid = document.querySelector('[data-lots-grid]');
+  const lotsNote = document.querySelector('[data-lots-note]');
+  const lotsStatus = document.querySelector('[data-lots-status]');
+  const lotsMore = document.querySelector('[data-lots-more]');
+  const lotsMoreBtn = document.querySelector('[data-lots-more-btn]');
+  const lotsMoreStatus = document.querySelector('[data-lots-more-status]');
+  const lotsEnd = document.querySelector('[data-lots-end]');
+  const lotsTpl = document.querySelector('[data-lot-compact-template]');
+  const lotsSkeletonTpl = document.querySelector('[data-lot-compact-skeleton-template]');
+
+  // Приветы — снимок страниц: перечитываем первую страницу по сигналу живых
+  // данных (ADR 0003), окно витрины профиль не включает (ADR 0012).
+  let lotStates: LotState[] = [];
+  let lotCursor: CatalogCursor | null = null;
+  let lotHasMore = false;
+  /** Первый ответ получен — скелетоны сняты, «пусто» честное. */
+  let lotsLoaded = false;
+  /** Первый ответ не пришёл — заметка и «Повторить» вместо пустоты. */
+  let lotsFailed = false;
+  let lotsMoreState: 'idle' | 'loading' | 'error' = 'idle';
+  // Поколение чтения: ответ первой страницы, пришедший после перечитывания,
+  // не должен дописываться к новому снимку.
+  let lotsGeneration = 0;
+  /** Первая страница едет — новую подгрузку не начинаем (курсор сменится). */
+  let lotsReloading = false;
+  // slug → карточка: перекраска по балансу/uid без перезапроса и перестройки DOM.
+  const lotCards = new Map<string, HTMLElement>();
 
   // Точки расширения (тикеты 02/03) читают uid отсюда, не разбирая query.
   if (root instanceof HTMLElement) root.dataset.profileUid = profileUid ?? '';
@@ -228,9 +313,181 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
     }
     if (balance instanceof HTMLElement) balance.textContent = formatProfileNumber(stats.balance);
     if (capital instanceof HTMLElement) capital.textContent = formatProfileNumber(stats.capital);
-    if (lots instanceof HTMLElement) lots.textContent = formatProfileNumber(stats.lotsCount);
+    if (lotsCount instanceof HTMLElement)
+      lotsCount.textContent = formatProfileNumber(stats.lotsCount);
     document.title = `${stats.caption} — AlysQueZone`;
     renderOwn();
+  }
+
+  // --- Приветы: страницы по 12, общая раскладка Лота -------------------------
+
+  function setNote(text: string | null): void {
+    toggle(lotsNote, text !== null);
+    if (lotsNote instanceof HTMLElement) lotsNote.textContent = text ?? '';
+  }
+
+  function setLotsStatus(text: string): void {
+    if (lotsStatus instanceof HTMLElement) lotsStatus.textContent = text;
+  }
+
+  function clearSkeletons(): void {
+    document.querySelectorAll('[data-lot-skeleton]').forEach((node) => node.remove());
+  }
+
+  /** Стартовые скелетоны страницы: на повтор первой страницы без карточек. */
+  function resetSkeletons(): void {
+    if (!(lotsGrid instanceof HTMLElement)) return;
+    const tpl = lotsSkeletonTpl;
+    if (!(tpl instanceof HTMLTemplateElement)) return;
+    if (lotsGrid.querySelector('[data-lot-compact]')) return;
+    lotsGrid.replaceChildren();
+    for (let i = 0; i < CATALOG_PAGE_SIZE; i++) {
+      const fresh = tpl.content.firstElementChild;
+      if (!(fresh instanceof HTMLElement)) return;
+      lotsGrid.appendChild(fresh.cloneNode(true));
+    }
+  }
+
+  /** Подгрузка идёт скелетонами K1 — не текстом-заглушкой (AGENTS.md). */
+  function addLoadingSkeletons(): void {
+    if (!(lotsGrid instanceof HTMLElement)) return;
+    const tpl = lotsSkeletonTpl;
+    if (!(tpl instanceof HTMLTemplateElement)) return;
+    for (let i = 0; i < 3; i++) {
+      const fresh = tpl.content.firstElementChild;
+      if (!(fresh instanceof HTMLElement)) return;
+      const clone = fresh.cloneNode(true) as HTMLElement;
+      // Маркер свой: серверные скелетоны снимает первая отрисовка, эти — ответ.
+      clone.removeAttribute('data-lot-skeleton');
+      clone.dataset.lotsLoading = '1';
+      lotsGrid.appendChild(clone);
+    }
+  }
+
+  function removeLoadingSkeletons(): void {
+    document.querySelectorAll('[data-lots-loading]').forEach((node) => node.remove());
+  }
+
+  function updateLotsUi(): void {
+    const empty = lotsLoaded && lotStates.length === 0;
+    setNote(lotsFailed ? LOTS_FAIL_TEXT : empty ? LOTS_EMPTY_TEXT : null);
+    // Блок подгрузки — единственная кнопка повтора и для первой страницы.
+    toggle(lotsMore, lotsFailed || (lotsLoaded && lotHasMore));
+    toggle(lotsEnd, lotsLoaded && !lotHasMore && lotStates.length > 0);
+    if (lotsMoreBtn instanceof HTMLButtonElement) {
+      lotsMoreBtn.disabled = lotsMoreState === 'loading';
+      lotsMoreBtn.textContent =
+        lotsFailed || lotsMoreState === 'error'
+          ? 'Повторить'
+          : lotsMoreState === 'loading'
+            ? 'Загружаю ещё…'
+            : 'Показать ещё';
+    }
+    if (lotsMoreStatus instanceof HTMLElement) {
+      lotsMoreStatus.textContent = lotsMoreState === 'error' ? LOTS_MORE_FAIL_TEXT : '';
+    }
+    setLotsStatus(lotsFailed ? LOTS_FAIL_TEXT : empty ? LOTS_EMPTY_TEXT : '');
+  }
+
+  /** Повтор первой страницы: снять заметку об ошибке и вернуть скелетоны. */
+  function prepareFirstPageRetry(): void {
+    if (lotsLoaded) return;
+    lotsFailed = false;
+    lotsMoreState = 'idle';
+    updateLotsUi();
+    resetSkeletons();
+  }
+
+  /** Снимок страниц → сетка: карточки заново, порядок — порядок чтения. */
+  function renderLots(): void {
+    if (!(lotsGrid instanceof HTMLElement) || !(lotsTpl instanceof HTMLTemplateElement)) return;
+    clearSkeletons();
+    removeLoadingSkeletons();
+    lotCards.clear();
+    lotsGrid.replaceChildren();
+    const balance = live.balance();
+    const uid = live.uid();
+    for (const state of lotStates) {
+      const fresh = lotsTpl.content.firstElementChild;
+      if (!(fresh instanceof HTMLElement)) break;
+      const card = fresh.cloneNode(true) as HTMLElement;
+      lotCards.set(state.slug, card);
+      fillLot(card, state, { balance, uid, mineLabel: MINE_LABEL });
+      lotsGrid.appendChild(card);
+    }
+    updateLotsUi();
+  }
+
+  /** Баланс/uid изменились — перекрасить кнопки и цену, не перезапрашивая. */
+  function repaintLots(): void {
+    const balance = live.balance();
+    const uid = live.uid();
+    for (const state of lotStates) {
+      const card = lotCards.get(state.slug);
+      if (card) fillLot(card, state, { balance, uid, mineLabel: MINE_LABEL });
+    }
+  }
+
+  /**
+   * Перечитать первую страницу: после сделок снимок владельца мог измениться,
+   * окно страниц сбрасывается на первую. Ошибка после успешного ответа
+   * последний хороший снимок не затирает (как и в паспорте).
+   */
+  async function reloadLots(uid: string): Promise<void> {
+    lotsReloading = true;
+    const generation = ++lotsGeneration;
+    lotsMoreState = 'idle';
+    const result = await readOwnerLotsPage(uid, null, CATALOG_PAGE_SIZE);
+    if (generation !== lotsGeneration) return;
+    lotsReloading = false;
+    if (!result.ok) {
+      if (!lotsLoaded) {
+        lotsFailed = true;
+        clearSkeletons();
+        removeLoadingSkeletons();
+        updateLotsUi();
+      }
+      return;
+    }
+    lotsFailed = false;
+    lotsLoaded = true;
+    lotStates = [...result.states];
+    lotCursor = catalogCursor(result.states);
+    lotHasMore = result.hasMore;
+    renderLots();
+  }
+
+  /** Сентинел в зоне подгрузки: короткая страница — тянем следующую. */
+  function sentinelNear(): boolean {
+    if (!(lotsMore instanceof HTMLElement) || lotsMore.classList.contains('hidden')) return false;
+    return lotsMore.getBoundingClientRect().top <= window.innerHeight + 600;
+  }
+
+  /** Догрузить страницу; `manual` — клик, он же снимает блок ошибки. */
+  async function loadMore(uid: string, manual: boolean): Promise<void> {
+    if (!lotsLoaded || lotsReloading || lotsMoreState === 'loading' || !lotHasMore) return;
+    if (lotsMoreState === 'error' && !manual) return;
+    const generation = lotsGeneration;
+    lotsMoreState = 'loading';
+    updateLotsUi();
+    addLoadingSkeletons();
+    const result = await readOwnerLotsPage(uid, lotCursor, CATALOG_PAGE_SIZE);
+    // Пока страница ехала, первую перечитали — ответ устарел вместе со снимком.
+    if (generation !== lotsGeneration) return;
+    if (!result.ok) {
+      removeLoadingSkeletons();
+      lotsMoreState = 'error';
+      updateLotsUi();
+      return;
+    }
+    lotsMoreState = 'idle';
+    lotStates = appendCatalogPage(lotStates, result.states);
+    lotCursor = catalogCursor(result.states) ?? lotCursor;
+    lotHasMore = result.hasMore;
+    renderLots();
+    // Пересечение уже было — нового колбэка не будет: сентинел всё ещё в зоне
+    // загрузки (страница не заполнила экран) — тянем следующую.
+    if (lotHasMore && sentinelNear()) void loadMore(uid, false);
   }
 
   /**
@@ -248,7 +505,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
     try {
       do {
         pendingReload = false;
-        const result = await fetchPublicProfile(uid);
+        const [result] = await Promise.all([fetchPublicProfile(uid), reloadLots(uid)]);
         if (result.status === 'ok') {
           fill(result.profile);
           showState('ready');
@@ -278,6 +535,7 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
     announce('Профиль не найден');
   } else {
     const targetUid = profileUid;
+    toggle(lotsSection, true);
     showState('loading');
     void load(targetUid, true);
 
@@ -285,14 +543,45 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
       retry.addEventListener('click', () => {
         showState('loading');
         announce('Загружаю профиль…');
+        prepareFirstPageRetry();
         void load(targetUid, true);
       });
     }
 
+    if (lotsMoreBtn instanceof HTMLButtonElement) {
+      lotsMoreBtn.addEventListener('click', () => {
+        if (!lotsLoaded) {
+          // Первая страница не пришла: та же кнопка повторяет чтение снимка.
+          prepareFirstPageRetry();
+          void load(targetUid, false);
+          return;
+        }
+        void loadMore(targetUid, true);
+      });
+    }
+
+    // Подгрузка — скроллом к сентинелу; кнопка остаётся для клавиатуры и как
+    // повтор после ошибки. rootMargin — начинать заранее.
+    if (lotsMore && 'IntersectionObserver' in window) {
+      const observer = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((entry) => entry.isIntersecting)) void loadMore(targetUid, false);
+        },
+        { rootMargin: '600px 0px' }
+      );
+      observer.observe(lotsMore);
+    }
+
     live.subscribe((change) => {
-      if (change.kind === 'uid') renderOwn();
-      // Сделка, своя покупка и возврат на вкладку — повод перечитать статы:
-      // баланс/капитал/число приветов меняются на сервере, не в шапке.
+      if (change.kind === 'uid') {
+        renderOwn();
+        // «Твой лот» и доступность покупки считаются от сессии — перекраска
+        // без перезапроса, приветы от этого не меняются.
+        repaintLots();
+      }
+      if (change.kind === 'balance') repaintLots();
+      // Сделка, своя покупка и возврат на вкладку — повод перечитать статы и
+      // первую страницу приветов: баланс/капитал/владение меняются на сервере.
       if (change.kind === 'deals' || change.kind === 'sync' || change.kind === 'purchase') {
         void load(targetUid, false);
       }
